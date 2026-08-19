@@ -1,0 +1,122 @@
+<main class="shell">
+  <header class="brand">
+    <span class="brand-mark" aria-hidden="true">M</span>
+    <div>
+      <p>LAN card adventure</p>
+      <h1>{{ title }}</h1>
+    </div>
+    <span class="connection" [class.online]="connection() === 'CONNECTED'">
+      <span aria-hidden="true"></span>
+      {{ connection() === 'CONNECTED' ? 'Online' : 'Offline' }}
+    </span>
+  </header>
+
+  @if (lobby(); as room) {
+    <section class="lobby-card" aria-labelledby="lobby-title">
+      <div class="room-heading">
+        <div>
+          <p class="eyebrow">Room code</p>
+          <h2 id="lobby-title">{{ room.roomCode }}</h2>
+        </div>
+        <span class="player-count">{{ room.players.length }} / 6</span>
+      </div>
+
+      @if (hasStarted()) {
+        <div class="started-message" role="status">
+          <strong>Game started</strong>
+          <span>Game synchronization arrives in the next milestone.</span>
+        </div>
+      } @else {
+        <p class="waiting-copy">
+          Share the code with friends on this Wi-Fi. The player list updates live.
+        </p>
+      }
+
+      <ul class="player-list" aria-label="Players">
+        @for (player of room.players; track player.playerId) {
+          <li>
+            <span class="avatar" aria-hidden="true">{{ player.name.charAt(0).toUpperCase() }}</span>
+            <span class="player-name">{{ player.name }}</span>
+            @if (player.playerId === playerId()) {
+              <span class="tag">You</span>
+            }
+            @if (player.isHost) {
+              <span class="tag host">Host</span>
+            }
+          </li>
+        }
+      </ul>
+
+      @if (isHost() && !hasStarted()) {
+        <button class="primary" type="button" [disabled]="pending()" (click)="startGame()">
+          {{ pending() ? 'Starting…' : 'Start game' }}
+        </button>
+        <p class="development-note">Development mode allows a one-player game.</p>
+      } @else if (!hasStarted()) {
+        <p class="host-note">Waiting for the host to start…</p>
+      }
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+    </section>
+  } @else {
+    <section class="welcome" aria-labelledby="welcome-title">
+      <div class="intro">
+        <p class="eyebrow">Gather your party</p>
+        <h2 id="welcome-title">Adventure is better together.</h2>
+        <p>Create a room or join friends already playing on your local network.</p>
+      </div>
+
+      <form class="join-card" (submit)="$event.preventDefault()">
+        <label for="player-name">Your name</label>
+        <input
+          id="player-name"
+          name="playerName"
+          type="text"
+          autocomplete="name"
+          placeholder="Ada"
+          [ngModel]="playerName()"
+          (ngModelChange)="playerName.set($event)"
+        />
+
+        <button
+          class="primary"
+          type="button"
+          [disabled]="pending() || connection() !== 'CONNECTED'"
+          (click)="createRoom()"
+        >
+          Create room
+        </button>
+
+        <div class="divider"><span>or join a room</span></div>
+
+        <label for="room-code">Room code</label>
+        <input
+          id="room-code"
+          class="code-input"
+          name="roomCode"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          maxlength="4"
+          placeholder="ABCD"
+          [ngModel]="roomCode()"
+          (ngModelChange)="normalizeRoomCode($event)"
+        />
+
+        <button
+          class="secondary"
+          type="button"
+          [disabled]="pending() || connection() !== 'CONNECTED'"
+          (click)="joinRoom()"
+        >
+          Join room
+        </button>
+
+        @if (error(); as message) {
+          <p class="error" role="alert">{{ message }}</p>
+        }
+      </form>
+    </section>
+  }
+</main>
