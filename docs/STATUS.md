@@ -342,3 +342,7 @@ Milestone 13 — LAN production
 
 Serve the Angular production build from NestJS on the same origin, listen on all
 LAN interfaces, and display the LAN URL for phone clients.
+
+# Card art prompt export
+
+- Added `npm run generate:card-art-csv` to export the development card catalog to `generated/card-art-prompts.csv`.

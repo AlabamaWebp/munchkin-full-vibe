@@ -21,7 +21,8 @@
     "test": "npm run build:packages && npm run test --workspaces --if-present",
     "typecheck": "npm run build",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "generate:card-art-csv": "npm run build --workspace @munchkin-lan/game-engine && node --experimental-strip-types scripts/generate-card-art-csv.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
