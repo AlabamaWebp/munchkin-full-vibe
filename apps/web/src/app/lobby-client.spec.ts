@@ -1,4 +1,4 @@
-import { resolveSocketUrl } from './lobby-client';
+import { readSavedSession, resolveSocketUrl } from './lobby-client';
 
 describe('resolveSocketUrl', () => {
   it('targets the Nest port when Angular runs on its development port', () => {
@@ -21,5 +21,25 @@ describe('resolveSocketUrl', () => {
         protocol: 'http:',
       }),
     ).toBe('http://game-pc:3000');
+  });
+});
+
+describe('readSavedSession', () => {
+  it('restores only a complete stored player session', () => {
+    expect(
+      readSavedSession({
+        getItem: () =>
+          JSON.stringify({
+            roomCode: 'ABCD',
+            playerId: 'player-1',
+            sessionToken: 'secret',
+          }),
+      }),
+    ).toEqual({
+      roomCode: 'ABCD',
+      playerId: 'player-1',
+      sessionToken: 'secret',
+    });
+    expect(readSavedSession({ getItem: () => '{bad json' })).toBeNull();
   });
 });

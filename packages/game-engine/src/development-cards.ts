@@ -1,6 +1,7 @@
 import {
   CardType,
   DeckType,
+  EquipmentSlot,
   type CardDefinition,
   type CardInstance,
   type CardSet,
@@ -17,7 +18,12 @@ const definitionInputs: readonly DefinitionInput[] = [
     type: CardType.MONSTER,
     deck: DeckType.DOOR,
     effects: [],
-    monster: { level: 1, treasureRewards: 1 },
+    monster: {
+      level: 1,
+      levelRewards: 1,
+      treasureRewards: 1,
+      badStuff: [{ type: "LOSE_LEVEL", amount: 1 }],
+    },
   },
   {
     id: "corridor-crab",
@@ -26,7 +32,12 @@ const definitionInputs: readonly DefinitionInput[] = [
     type: CardType.MONSTER,
     deck: DeckType.DOOR,
     effects: [],
-    monster: { level: 3, treasureRewards: 1 },
+    monster: {
+      level: 3,
+      levelRewards: 1,
+      treasureRewards: 1,
+      badStuff: [{ type: "DISCARD_RANDOM_CARDS", zone: "HAND", count: 1 }],
+    },
   },
   {
     id: "bureaucratic-ooze",
@@ -35,7 +46,12 @@ const definitionInputs: readonly DefinitionInput[] = [
     type: CardType.MONSTER,
     deck: DeckType.DOOR,
     effects: [],
-    monster: { level: 6, treasureRewards: 2 },
+    monster: {
+      level: 6,
+      levelRewards: 1,
+      treasureRewards: 2,
+      badStuff: [{ type: "LOSE_LEVEL", amount: 2 }],
+    },
   },
   {
     id: "clockwork-yak",
@@ -44,7 +60,12 @@ const definitionInputs: readonly DefinitionInput[] = [
     type: CardType.MONSTER,
     deck: DeckType.DOOR,
     effects: [],
-    monster: { level: 10, treasureRewards: 3 },
+    monster: {
+      level: 10,
+      levelRewards: 1,
+      treasureRewards: 3,
+      badStuff: [{ type: "DISCARD_RANDOM_CARDS", zone: "EQUIPMENT", count: 1 }],
+    },
   },
   {
     id: "moonlit-leviathan",
@@ -53,7 +74,12 @@ const definitionInputs: readonly DefinitionInput[] = [
     type: CardType.MONSTER,
     deck: DeckType.DOOR,
     effects: [],
-    monster: { level: 18, treasureRewards: 5 },
+    monster: {
+      level: 18,
+      levelRewards: 2,
+      treasureRewards: 5,
+      badStuff: [{ type: "DEATH" }],
+    },
   },
   {
     id: "curse-shortcut-tax",
@@ -80,9 +106,17 @@ const definitionInputs: readonly DefinitionInput[] = [
     effects: [{ type: "LOSE_LEVEL", amount: 2 }],
   },
   {
+    id: "curse-career-fog",
+    name: "Curse! Career Fog",
+    description: "Discard your current Class card.",
+    type: CardType.CURSE,
+    deck: DeckType.DOOR,
+    effects: [{ type: "DISCARD_ROLE", role: "CLASS" }],
+  },
+  {
     id: "guild-of-echoes",
     name: "Guild of Echoes",
-    description: "A future class card with no milestone-two effect.",
+    description: "A resonant class that can use the Two-Handed Bookmark.",
     type: CardType.CLASS,
     deck: DeckType.DOOR,
     effects: [],
@@ -90,7 +124,7 @@ const definitionInputs: readonly DefinitionInput[] = [
   {
     id: "lantern-folk",
     name: "Lantern Folk",
-    description: "A future ancestry card with no milestone-two effect.",
+    description: "A bright ancestry with a talent for finding the way.",
     type: CardType.RACE,
     deck: DeckType.DOOR,
     effects: [],
@@ -109,6 +143,7 @@ const definitionInputs: readonly DefinitionInput[] = [
     description: "Kitchen-tested equipment worth two combat power.",
     type: CardType.EQUIPMENT,
     deck: DeckType.TREASURE,
+    equipment: { slot: EquipmentSlot.HANDS, hands: 1, value: 1000 },
     effects: [{ type: "COMBAT_BONUS", amount: 2 }],
   },
   {
@@ -117,6 +152,7 @@ const definitionInputs: readonly DefinitionInput[] = [
     description: "You see danger approximately one second early.",
     type: CardType.EQUIPMENT,
     deck: DeckType.TREASURE,
+    equipment: { slot: EquipmentSlot.HEAD, value: 300 },
     effects: [{ type: "COMBAT_BONUS", amount: 1 }],
   },
   {
@@ -125,6 +161,7 @@ const definitionInputs: readonly DefinitionInput[] = [
     description: "Subtlety is overrated; confidence is worth two power.",
     type: CardType.EQUIPMENT,
     deck: DeckType.TREASURE,
+    equipment: { slot: EquipmentSlot.FEET, value: 300 },
     effects: [{ type: "COMBAT_BONUS", amount: 2 }],
   },
   {
@@ -133,6 +170,7 @@ const definitionInputs: readonly DefinitionInput[] = [
     description: "Weather-sensitive protection worth three power.",
     type: CardType.EQUIPMENT,
     deck: DeckType.TREASURE,
+    equipment: { slot: EquipmentSlot.BODY, value: 500 },
     effects: [{ type: "COMBAT_BONUS", amount: 3 }],
   },
   {
@@ -141,6 +179,12 @@ const definitionInputs: readonly DefinitionInput[] = [
     description: "Marks both your page and your enemies for defeat.",
     type: CardType.EQUIPMENT,
     deck: DeckType.TREASURE,
+    equipment: {
+      slot: EquipmentSlot.HANDS,
+      hands: 2,
+      value: 700,
+      requiredClass: parseCardDefinitionId("guild-of-echoes"),
+    },
     effects: [{ type: "COMBAT_BONUS", amount: 4 }],
   },
   {
@@ -166,6 +210,22 @@ const definitionInputs: readonly DefinitionInput[] = [
     type: CardType.TEMPORARY_BONUS,
     deck: DeckType.TREASURE,
     effects: [{ type: "COMBAT_BONUS", amount: 2 }],
+  },
+  {
+    id: "inflatable-shoulder-pads",
+    name: "Inflatable Shoulder Pads",
+    description: "Makes the monster look four points more intimidating.",
+    type: CardType.MONSTER_MODIFIER,
+    deck: DeckType.TREASURE,
+    effects: [{ type: "MONSTER_COMBAT_BONUS", amount: 4 }],
+  },
+  {
+    id: "dramatic-entrance-music",
+    name: "Dramatic Entrance Music",
+    description: "An unnecessary fanfare gives the monster two extra power.",
+    type: CardType.MONSTER_MODIFIER,
+    deck: DeckType.TREASURE,
+    effects: [{ type: "MONSTER_COMBAT_BONUS", amount: 2 }],
   },
   {
     id: "coupon-of-destiny",
@@ -194,6 +254,7 @@ const copiesByDefinition: Readonly<Record<string, number>> = {
   "curse-shortcut-tax": 3,
   "curse-memory-moths": 3,
   "curse-double-backtrack": 3,
+  "curse-career-fog": 3,
   "guild-of-echoes": 2,
   "lantern-folk": 2,
   "mysterious-membership-card": 2,
@@ -205,6 +266,8 @@ const copiesByDefinition: Readonly<Record<string, number>> = {
   "bottled-applause": 3,
   "pocket-comet": 3,
   "emergency-confetti": 3,
+  "inflatable-shoulder-pads": 3,
+  "dramatic-entrance-music": 3,
   "coupon-of-destiny": 3,
   "polished-pebble-collection": 3,
 };

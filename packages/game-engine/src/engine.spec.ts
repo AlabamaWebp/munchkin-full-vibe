@@ -80,7 +80,14 @@ function definition(
     deck,
     effects,
     ...(type === CardType.MONSTER
-      ? { monster: { level: 2, treasureRewards: 1 } }
+      ? {
+          monster: {
+            level: 2,
+            levelRewards: 1,
+            treasureRewards: 1,
+            badStuff: [],
+          },
+        }
       : {}),
   };
 }
@@ -151,7 +158,7 @@ describe("game setup", () => {
     ).toHaveLength(5);
     expect(
       set.definitions.filter((card) => card.type === CardType.CURSE),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
   });
 
@@ -461,7 +468,14 @@ describe("turn commands", () => {
     }
 
     const result = executeCommand(
-      afterDoor,
+      {
+        ...afterDoor,
+        players: afterDoor.players.map((player) =>
+          player.id === activeId
+            ? { ...player, hand: player.hand.slice(0, 5) }
+            : player,
+        ),
+      },
       { type: "END_TURN", actorId: activeId },
       { random: keepOrderRandom },
     );

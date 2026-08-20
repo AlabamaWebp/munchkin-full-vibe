@@ -10,6 +10,7 @@ export * from "./cards.js";
 export * from "./commands.js";
 export * from "./development-cards.js";
 export * from "./engine.js";
+export * from "./equipment.js";
 export * from "./events.js";
 export * from "./game.js";
 export * from "./game-state.js";

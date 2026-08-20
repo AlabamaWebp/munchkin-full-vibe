@@ -10,10 +10,10 @@ export class AppService {
   getStatus(): FoundationStatusResponse {
     return {
       applicationName: APPLICATION_NAME,
-      milestone: 3,
+      milestone: 12,
       engine: getGameEngineStatus(),
-      serverConnection: 'lobby-ready',
-      gameplay: 'not-implemented',
+      serverConnection: 'game-ready',
+      gameplay: 'game-completion-ready',
     };
   }
 }

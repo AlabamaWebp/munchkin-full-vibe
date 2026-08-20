@@ -37,7 +37,7 @@ export function createGame(options: CreateGameOptions): GameState {
   assertValidCardSet(cardSet);
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: options.id,
     status: GameStatus.LOBBY,
     phase: GamePhase.LOBBY,
@@ -49,6 +49,7 @@ export function createGame(options: CreateGameOptions): GameState {
     doorDiscard: [],
     treasureDiscard: [],
     combat: null,
+    lastRunAwayResult: null,
     turnNumber: 0,
     winnerId: null,
   };

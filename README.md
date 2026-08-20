@@ -1,9 +1,9 @@
 # Munchkin LAN
 
 A mobile-first LAN multiplayer card game inspired by Munchkin, built as a
-full-stack learning project. The current build includes the basic game engine and
-a real-time multiplayer lobby; resumable sessions and synchronized gameplay are
-the next milestones.
+full-stack learning project. The current build includes the basic game engine,
+resumable multiplayer sessions, player-specific game synchronization,
+equipment, basic combat and rewards, and a mobile-first game screen.
 
 The project does not include copyrighted Munchkin artwork or card text. Future
 development content will use fictional cards and original wording.
@@ -31,9 +31,15 @@ npm run lint
 npm run typecheck
 ```
 
+`npm run dev` uses the root `start-dev.mjs` launcher. On Windows it delegates to
+`start-dev.ps1`, which places both servers in a kill-on-close process job.
+Stopping the launcher, closing it, or losing either child process terminates
+both the Angular and NestJS process trees.
+
 `npm run dev` first builds the two shared packages, then starts:
 
-- Angular at `http://localhost:4200`;
+- Angular at `http://localhost:4200`, also reachable through `127.0.0.1` and the
+  computer's LAN address;
 - NestJS at `http://localhost:3000`.
 
 The server exposes a project status endpoint at:
@@ -70,9 +76,10 @@ munchkin-lan/
 - Shared network types belong in `packages/contracts`.
 - The game engine has no Angular, NestJS, Express, or Socket.IO dependencies.
 - Angular uses standalone components and Signals for application state.
-- NestJS listens on `0.0.0.0:3000` and owns in-memory Socket.IO lobby rooms.
-- A browser can create or join a four-character room and sees synchronized public
-  lobby state; refresh/reconnect recovery is scheduled for Milestone 4.
+- NestJS listens on `0.0.0.0:3000` and owns in-memory lobby and game state.
+- A browser can create or join a four-character room, start a match, receive a
+  private hand, send basic turn commands, and recover its session after refresh
+  or a temporary connection loss.
 - Initial game persistence will be in memory only.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and

@@ -146,7 +146,40 @@ describe('LobbyService', () => {
     });
   });
 
-  it('removes disconnected players and transfers hosting in join order', () => {
+  it('allows only the host of a started room to return the same roster to the lobby', () => {
+    const created = service.createRoom('socket-host', { playerName: 'Ada' });
+    const joined = service.joinRoom('socket-guest', {
+      roomCode: 'ABCD',
+      playerName: 'Grace',
+    });
+    if (!created.success || !joined.success)
+      throw new Error('Expected room setup to succeed.');
+    service.startRoom('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+    });
+
+    expect(
+      service.returnToLobby('socket-guest', {
+        roomCode: 'ABCD',
+        playerId: joined.acknowledgement.playerId,
+      }),
+    ).toMatchObject({ acknowledgement: { error: { code: 'NOT_HOST' } } });
+
+    const returned = service.returnToLobby('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+    });
+    expect(returned).toMatchObject({
+      success: true,
+      state: {
+        status: LobbyStatus.LOBBY,
+        players: [{ name: 'Ada' }, { name: 'Grace' }],
+      },
+    });
+  });
+
+  it('keeps a disconnected player and resumes the same identity on a new socket', () => {
     const created = service.createRoom('socket-host', { playerName: 'Ada' });
     const joined = service.joinRoom('socket-guest', {
       roomCode: 'ABCD',
@@ -158,12 +191,43 @@ describe('LobbyService', () => {
     const departure = service.disconnect('socket-host');
 
     expect(departure?.state).toMatchObject({
-      hostPlayerId: joined.acknowledgement.playerId,
-      players: [{ name: 'Grace', isHost: true }],
+      hostPlayerId: created.acknowledgement.playerId,
+      players: [
+        { name: 'Ada', isHost: true, connected: false },
+        { name: 'Grace', isHost: false, connected: true },
+      ],
     });
-    expect(service.disconnect('socket-guest')).toEqual({
+    const resumed = service.resumeSession('socket-host-new', {
       roomCode: 'ABCD',
-      state: null,
+      sessionToken: created.acknowledgement.sessionToken,
+    });
+    expect(resumed).toMatchObject({
+      success: true,
+      acknowledgement: { playerId: created.acknowledgement.playerId },
+    });
+    if (!resumed.success)
+      throw new Error('Expected session resume to succeed.');
+    expect(resumed.state.players[0]).toMatchObject({
+      name: 'Ada',
+      connected: true,
+    });
+    expect(service.getPlayerForSocket('socket-host-new', 'ABCD')).toMatchObject(
+      { playerId: created.acknowledgement.playerId },
+    );
+    expect(joined.acknowledgement.sessionToken).not.toBe(
+      created.acknowledgement.sessionToken,
+    );
+  });
+
+  it('rejects an unknown reconnect credential', () => {
+    service.createRoom('socket-host', { playerName: 'Ada' });
+    expect(
+      service.resumeSession('socket-new', {
+        roomCode: 'ABCD',
+        sessionToken: 'wrong-token',
+      }),
+    ).toMatchObject({
+      acknowledgement: { error: { code: 'INVALID_SESSION' } },
     });
   });
 

@@ -16,7 +16,14 @@ describe("shared contracts", () => {
       roomCode: "ABCD",
       status: LobbyStatus.LOBBY,
       hostPlayerId: "player-1",
-      players: [{ playerId: "player-1", name: "Ada", isHost: true }],
+      players: [
+        {
+          playerId: "player-1",
+          name: "Ada",
+          isHost: true,
+          connected: true,
+        },
+      ],
     };
 
     expect(state.roomCode).toHaveLength(ROOM_CODE_LENGTH);

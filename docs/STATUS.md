@@ -3,62 +3,165 @@
 Current milestone:
 
 ```text
-Milestone 3 — Multiplayer lobby (complete)
+Milestone 12 — Game completion (complete)
 ```
 
 ## Implemented
 
-- shared, typed Socket.IO contracts for room creation, joining, start acknowledgements,
-  public lobby state, and consistent lobby errors;
-- four-character, human-friendly room codes generated on the server with collision
-  avoidance and case-insensitive joining;
-- an in-memory NestJS lobby service with a 1–6 player limit, normalized names,
-  host authority, room closure after start, and cleanup on disconnect;
-- stable random player identities that remain separate from transient Socket.IO
-  connection identities;
-- Socket.IO room membership and full public lobby-state broadcasts after create,
-  join, start, and disconnect changes;
-- host transfer to the next player in join order if the host disconnects;
-- a responsive Angular home screen for entering a name, creating a room, or joining
-  by code;
-- a synchronized lobby screen with room code, live player list, host/current-player
-  labels, connection feedback, errors, and a host-only start action;
-- a development-mode one-player start flow that closes the lobby without yet
-  creating or synchronizing authoritative game state;
-- server unit coverage for valid, invalid, capacity, authority, identity, and
-  disconnection cases, plus real Socket.IO end-to-end coverage with two clients;
-- Angular component coverage for the home and host lobby flows and URL selection
-  for local development versus same-origin production.
+- process-lifetime player sessions with random reconnect credentials stored by
+  Angular in `localStorage`;
+- automatic session recovery after refresh, temporary connection loss, or a new
+  Socket.IO connection, without changing the permanent player identity;
+- disconnected-player indication while preserving room membership and host
+  authority;
+- authoritative in-memory games created from the lobby roster when the host
+  starts a match;
+- generic `game:command` transport for the current Kick Door, Loot Room, and End
+  Turn engine commands;
+- complete player-specific `GameView` broadcasts after game start and successful
+  commands;
+- an explicit privacy projection: the recipient receives their own card
+  identities and definitions, while another player's hand exposes only a count;
+- synchronized deck counts, turn, phase, public player information, equipment,
+  combat monster, and available server-derived actions;
+- a mobile-first game screen with a player rail, central table/combat area,
+  character and equipment panel, horizontally scrollable private hand, card
+  details, connection feedback, and a persistent action bar;
+- complete Russian localization of the home, lobby, game, connection/error,
+  accessibility, and current card-content UI, used by default;
+- an RU/EN language switcher that updates the page language, card text, plural
+  forms, and document title immediately and remembers the choice locally;
+- a root development launcher that owns both Angular and NestJS process trees
+  and terminates both when the launcher stops or either child exits;
+- Angular development hosting on `0.0.0.0:4200`, making the UI reachable through
+  `localhost`, `127.0.0.1`, and the computer's LAN address;
+- authoritative `EQUIP_ITEM` and `UNEQUIP_ITEM` commands routed through the
+  existing generic `game:command` transport;
+- typed Head, Body, Feet, and Hands equipment slots, including the two-hand
+  capacity rule and validation for occupied slots, ownership, card type, phase,
+  active player, and combat state;
+- engine-derived equipment bonuses and total combat power, projected for every
+  public player without trusting client calculations;
+- server-derived per-card equip and unequip availability, with mobile UI actions,
+  localized slot details, equipment bonuses, and combat-power display;
+- public equipment events and focused engine, projection, and Angular coverage
+  for valid, invalid, and edge-case equipment actions;
+- authoritative temporary-bonus card play during the active player's combat,
+  with typed target validation, server-side effect resolution, and immediate
+  Treasure discard;
+- engine-derived player and monster power comparison, with ties correctly
+  treated as not won and an explicit combat-resolution command;
+- data-driven level and Treasure rewards for each Monster, atomic reward
+  validation, Monster discard, temporary-power cleanup, and transition to
+  `END_TURN` after victory;
+- public combat, level, and reward events while individual Treasure identities
+  remain private to their recipient;
+- synchronized combat power, Monster power, rewards, playable temporary cards,
+  and server-derived combat actions in every player-specific `GameView`;
+- a localized mobile combat panel with power comparison, reward preview,
+  temporary-bonus feedback, card-play controls, and victory action;
+- focused engine coverage for valid bonus play and victory plus invalid targets,
+  invalid card types, ties, and insufficient rewards; projection and Angular
+  coverage for combat actions and rendering;
+- authoritative `REQUEST_HELP` and `ACCEPT_HELP` commands with one addressable
+  pending request, redirect-before-accept behavior, and validation against
+  self-help, unknown players, unsolicited acceptance, and multiple helpers;
+- engine-derived combined player-side power using the accepted helper's level
+  and public equipment bonuses, while combat rewards remain with the active
+  player under the documented simplified rules;
+- combat-card play by every participant through the existing generic command,
+  with explicit player/Monster target sides and no client-provided power;
+- typed, data-driven `MONSTER_MODIFIER` cards and
+  `MONSTER_COMBAT_BONUS` effects, including two localized fictional development
+  cards, Monster-side validation, discard handling, and power projection;
+- serializable public per-combat history for the encounter, help requests and
+  acceptance, and cards played on either side, preserved across full-state
+  synchronization and reconnects while the combat is active;
+- player-specific available help and combat-card actions, combined/helper and
+  Monster bonus projections, and a localized mobile UI for requesting or
+  accepting help, playing for either side, and reading the combat history;
+- focused engine coverage for valid and invalid multiplayer actions, server
+  projection coverage for helper views and both card sides, and Angular coverage
+  for multiplayer combat controls and history rendering;
+- server unit coverage for reconnect credentials and projections, Socket.IO E2E
+  coverage for two-player start, private state, game commands, disconnect, and
+  resume, and Angular coverage for stored-session parsing and primary screens.
+- an authoritative `RUN_AWAY` command available only to the active player in a
+  combat they are not currently winning;
+- a deterministic six-sided escape roll through the injected `RandomSource`,
+  with success on 5–6 and failure on 1–4;
+- typed, data-driven Monster bad stuff for level loss and random hand/equipment
+  discard, including five fictional development-Monster consequences and the
+  level-one lower bound;
+- complete losing-combat cleanup after either outcome: Monster discard,
+  temporary-bonus reset, removal of helper and combat history with combat state,
+  and transition to `END_TURN`;
+- a public, reconnect-safe escape-result summary that is cleared when the turn
+  ends, plus public escape and bad-stuff domain events;
+- server-derived victory-versus-run-away actions and a localized mobile UI that
+  previews Monster bad stuff and shows the die roll, escape result, and whether
+  bad stuff was applied;
+- focused engine tests for successful and failed escape, bad-stuff edge cases,
+  invalid actors and winning-combat rejection; projection and Angular coverage
+  for the new action and visible outcome.
+- public single-card Class and Race zones, authoritative role replacement, and
+  typed role restrictions for equipment, including automatic unequipping after
+  an incompatible role replacement;
+- player-targeted Curse play from private hands, including typed role loss and
+  death effects without card-name checks;
+- data-driven equipment values and authoritative sales, with one engine-derived
+  level per complete 1,000 gold and atomic validation of item selections;
+- equipment trading into another player's private hand outside combat;
+- a five-card end-turn hand limit and authoritative charity to a lowest-level
+  player, or discard when the active player is tied for lowest level;
+- explicit death and revival: death keeps level while discarding possessions
+  and roles; the player revives with replacement cards on their next turn;
+- player-specific projections and localized mobile controls for roles, Curses,
+  item value, selling, trading, charity, and death;
+- focused expanded-rule engine tests for valid actions, restrictions, invalid
+  recipients, insufficient sale value, charity boundaries, and death cleanup.
+- an engine-owned winning level of 10, reached through any authoritative level
+  gain, with an atomic transition to `FINISHED`, a persistent winner identity,
+  active-combat cleanup, and rejection of all later gameplay commands;
+- a public `GAME_FINISHED` domain event and finished player-specific projections
+  that remain safe across full synchronization and reconnects;
+- host-only rematch and return-to-lobby Socket.IO actions that preserve the room
+  roster, player identities, reconnect credentials, and connection status;
+- a localized mobile victory screen naming the winner, offering replay/lobby
+  controls to the host, and showing a waiting state to other players;
+- focused engine, lobby, server, and Angular coverage for winning by combat or
+  sale, post-finish command rejection, lifecycle authorization, unfinished-game
+  rejection, and victory controls.
 
 ## Verification
 
-Verified on 2026-08-19:
+Verified on 2026-08-20:
 
-- `npm test` — succeeded; 10 test files and 55 tests passed across all workspaces;
-- `npm run lint` — succeeded across all four workspaces with 0 errors;
-- `npm run build` — succeeded for both packages, the Angular production build,
-  and the NestJS production build; Angular's initial bundle was 224.08 kB raw and
-  62.41 kB estimated transfer size;
+- `npm test` — succeeded; 18 test files and 98 tests passed across all workspaces;
 - `npm run test:e2e --workspace @munchkin-lan/server -- --runInBand` — succeeded;
   2 suites and 3 HTTP/Socket.IO end-to-end tests passed;
+- `npm run lint` — succeeded across all four workspaces with 0 errors;
+- `npm run build` — succeeded for shared packages, Angular, and NestJS;
 - `npm run format:check` — succeeded across the repository.
+- `npm run dev` — both Angular and NestJS started successfully in watch mode.
 
 ## Intentional scope limits
 
-- Starting a lobby changes its public status only. Connecting that action to
-  `game-engine`, dealing cards, and emitting player-specific `GameView` projections
-  remain Milestone 5 work.
-- A disconnected socket is removed from its lobby. Persistent sessions, refresh
-  recovery, reconnect credentials, and disconnected-player indication remain
-  Milestone 4 work.
-- The Angular development server connects to port 3000 on the same host. Serving
-  Angular and Socket.IO from one production origin remains Milestone 13 work.
+- Sessions and games remain in memory and are lost when the NestJS process
+  restarts, as required for the initial LAN version.
+- Helper reward negotiation is intentionally deferred; all current combat
+  rewards go to the active player.
+- Helpers do not yet make separate escape rolls or receive bad stuff; Milestone
+  10 intentionally uses one active-player escape resolution for the combat.
+- NestJS does not yet serve the Angular production files; development still uses
+  Angular on port 4200 and NestJS on port 3000. The one-origin LAN package remains
+  Milestone 13 work.
 
 ## Next
 
 ```text
-Milestone 4 — Session/reconnect
+Milestone 13 — LAN production
 ```
 
-Add resumable player sessions without conflating `sessionToken`, `playerId`,
-`socketId`, or room/game identity.
+Serve the Angular production build from NestJS on the same origin, listen on all
+LAN interfaces, and display the LAN URL for phone clients.

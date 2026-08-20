@@ -15,13 +15,13 @@ describe('AppController', () => {
   });
 
   describe('status', () => {
-    it('reports that the multiplayer lobby is ready', () => {
+    it('reports that synchronized gameplay is ready', () => {
       expect(appController.getStatus()).toEqual({
         applicationName: 'Munchkin LAN',
-        milestone: 3,
+        milestone: 12,
         engine: 'domain-ready',
-        serverConnection: 'lobby-ready',
-        gameplay: 'not-implemented',
+        serverConnection: 'game-ready',
+        gameplay: 'game-completion-ready',
       });
     });
   });

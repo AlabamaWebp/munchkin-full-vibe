@@ -70,6 +70,53 @@ export type GameEvent =
       readonly monsterDefinitionId: CardDefinitionId;
     })
   | (PublicEvent & {
+      readonly type: "COMBAT_UPDATED";
+      readonly playerId: PlayerId;
+      readonly playerPower: number;
+      readonly monsterPower: number;
+    })
+  | (PublicEvent & {
+      readonly type: "COMBAT_WON";
+      readonly playerId: PlayerId;
+      readonly monsterCardId: CardInstanceId;
+      readonly monsterDefinitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "RUN_AWAY_ATTEMPTED";
+      readonly playerId: PlayerId;
+      readonly monsterCardId: CardInstanceId;
+      readonly monsterDefinitionId: CardDefinitionId;
+      readonly roll: number;
+      readonly escaped: boolean;
+    })
+  | (PublicEvent & {
+      readonly type: "BAD_STUFF_APPLIED";
+      readonly playerId: PlayerId;
+      readonly monsterCardId: CardInstanceId;
+      readonly monsterDefinitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "HELP_REQUESTED";
+      readonly playerId: PlayerId;
+      readonly helperId: PlayerId;
+    })
+  | (PublicEvent & {
+      readonly type: "HELP_ACCEPTED";
+      readonly playerId: PlayerId;
+      readonly helperId: PlayerId;
+    })
+  | (PublicEvent & {
+      readonly type: "LEVEL_GAINED";
+      readonly playerId: PlayerId;
+      readonly amount: number;
+      readonly newLevel: number;
+    })
+  | (PublicEvent & {
+      readonly type: "TREASURE_GAINED";
+      readonly playerId: PlayerId;
+      readonly count: number;
+    })
+  | (PublicEvent & {
       readonly type: "ROOM_LOOTED";
       readonly playerId: PlayerId;
     })
@@ -80,7 +127,55 @@ export type GameEvent =
       readonly target: CardTarget | null;
     })
   | (PublicEvent & {
+      readonly type: "ITEM_EQUIPPED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "ITEM_UNEQUIPPED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "ROLE_PLAYED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+      readonly role: "CLASS" | "RACE";
+    })
+  | (PublicEvent & {
+      readonly type: "ITEMS_SOLD";
+      readonly playerId: PlayerId;
+      readonly cardIds: readonly CardInstanceId[];
+      readonly value: number;
+      readonly levelsGained: number;
+    })
+  | (PublicEvent & {
+      readonly type: "ITEM_TRADED";
+      readonly playerId: PlayerId;
+      readonly recipientId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "CHARITY_RESOLVED";
+      readonly playerId: PlayerId;
+      readonly recipientId: PlayerId | null;
+      readonly count: number;
+    })
+  | (PublicEvent & {
+      readonly type: "PLAYER_DIED" | "PLAYER_REVIVED";
+      readonly playerId: PlayerId;
+    })
+  | (PublicEvent & {
       readonly type: "TURN_ENDED";
       readonly playerId: PlayerId;
       readonly turnNumber: number;
+    })
+  | (PublicEvent & {
+      readonly type: "GAME_FINISHED";
+      readonly winnerId: PlayerId;
+      readonly winningLevel: number;
     });

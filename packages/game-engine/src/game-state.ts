@@ -1,5 +1,10 @@
 import type { CardDefinition, CardInstance } from "./cards.js";
-import type { GameId, PlayerId } from "./identifiers.js";
+import type {
+  CardDefinitionId,
+  CardInstanceId,
+  GameId,
+  PlayerId,
+} from "./identifiers.js";
 
 export const GameStatus = {
   LOBBY: "LOBBY",
@@ -28,16 +33,56 @@ export interface PlayerState {
   readonly level: number;
   readonly hand: readonly CardInstance[];
   readonly equipment: readonly CardInstance[];
+  readonly classCard: CardInstance | null;
+  readonly raceCard: CardInstance | null;
+  readonly isDead: boolean;
   readonly temporaryCombatBonus: number;
 }
 
 export interface CombatState {
   readonly playerId: PlayerId;
   readonly monster: CardInstance;
+  readonly monsterBonus: number;
+  readonly requestedHelperId: PlayerId | null;
+  readonly helperId: PlayerId | null;
+  readonly history: readonly CombatHistoryEntry[];
 }
 
+export interface RunAwayResultState {
+  readonly playerId: PlayerId;
+  readonly monsterCardId: CardInstanceId;
+  readonly monsterDefinitionId: CardDefinitionId;
+  readonly roll: number;
+  readonly escaped: boolean;
+  readonly badStuffApplied: boolean;
+}
+
+export type CombatHistoryEntry =
+  | {
+      readonly type: "COMBAT_STARTED";
+      readonly playerId: PlayerId;
+      readonly monsterDefinitionId: CardDefinitionId;
+    }
+  | {
+      readonly type: "HELP_REQUESTED";
+      readonly playerId: PlayerId;
+      readonly helperId: PlayerId;
+    }
+  | {
+      readonly type: "HELP_ACCEPTED";
+      readonly playerId: PlayerId;
+      readonly helperId: PlayerId;
+    }
+  | {
+      readonly type: "CARD_PLAYED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+      readonly side: "PLAYERS" | "MONSTER";
+    };
+
 export interface GameState {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly id: GameId;
   readonly status: GameStatus;
   readonly phase: GamePhase;
@@ -49,6 +94,7 @@ export interface GameState {
   readonly doorDiscard: readonly CardInstance[];
   readonly treasureDiscard: readonly CardInstance[];
   readonly combat: CombatState | null;
+  readonly lastRunAwayResult: RunAwayResultState | null;
   readonly turnNumber: number;
   readonly winnerId: PlayerId | null;
 }

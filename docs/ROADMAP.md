@@ -99,6 +99,8 @@ Allow 1-player games in development mode.
 
 ## Milestone 4 — Session/reconnect
 
+Status: complete.
+
 Implement:
 
 - session token;
@@ -112,6 +114,8 @@ Tests where practical.
 ---
 
 ## Milestone 5 — Game synchronization
+
+Status: complete.
 
 Connect `game-engine` to NestJS.
 
@@ -132,6 +136,8 @@ Ensure private cards are never leaked.
 ---
 
 ## Milestone 6 — Mobile game UI
+
+Status: complete.
 
 Implement:
 
@@ -159,6 +165,8 @@ Important tap targets should be approximately 44px or larger.
 
 ## Milestone 7 — Equipment
 
+Status: complete.
+
 Implement:
 
 - equipment cards;
@@ -171,6 +179,8 @@ Implement:
 ---
 
 ## Milestone 8 — Combat
+
+Status: complete.
 
 Implement:
 
@@ -189,6 +199,8 @@ At this point the application should begin to feel like an actual game.
 
 ## Milestone 9 — Multiplayer combat
 
+Status: complete.
+
 Implement:
 
 - request help;
@@ -202,6 +214,8 @@ Implement:
 
 ## Milestone 10 — Losing combat
 
+Status: complete.
+
 Implement:
 
 - run away;
@@ -212,6 +226,8 @@ Implement:
 ---
 
 ## Milestone 11 — Expanded rules
+
+Status: complete.
 
 Implement selected features:
 
@@ -229,6 +245,8 @@ Each important rule requires tests.
 ---
 
 ## Milestone 12 — Game completion
+
+Status: complete.
 
 Implement:
 

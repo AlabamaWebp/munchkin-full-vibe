@@ -5,6 +5,7 @@ export const CardType = {
   CURSE: "CURSE",
   EQUIPMENT: "EQUIPMENT",
   TEMPORARY_BONUS: "TEMPORARY_BONUS",
+  MONSTER_MODIFIER: "MONSTER_MODIFIER",
   OTHER: "OTHER",
   CLASS: "CLASS",
   RACE: "RACE",
@@ -19,9 +20,30 @@ export const DeckType = {
 
 export type DeckType = (typeof DeckType)[keyof typeof DeckType];
 
+export const EquipmentSlot = {
+  HEAD: "HEAD",
+  BODY: "BODY",
+  FEET: "FEET",
+  HANDS: "HANDS",
+} as const;
+
+export type EquipmentSlot = (typeof EquipmentSlot)[keyof typeof EquipmentSlot];
+
+export interface EquipmentDefinition {
+  readonly slot: EquipmentSlot;
+  readonly hands?: 1 | 2;
+  readonly value?: number;
+  readonly requiredClass?: CardDefinitionId;
+  readonly requiredRace?: CardDefinitionId;
+}
+
 export type CardEffect =
   | {
       readonly type: "COMBAT_BONUS";
+      readonly amount: number;
+    }
+  | {
+      readonly type: "MONSTER_COMBAT_BONUS";
       readonly amount: number;
     }
   | {
@@ -41,7 +63,22 @@ export type CardEffect =
       readonly type: "DISCARD_RANDOM_CARDS";
       readonly count: number;
       readonly zone: "HAND" | "EQUIPMENT";
+    }
+  | {
+      readonly type: "DISCARD_ROLE";
+      readonly role: "CLASS" | "RACE";
+    }
+  | {
+      readonly type: "DEATH";
     };
+
+export type BadStuffEffect = Extract<
+  CardEffect,
+  {
+    readonly type:
+      "LOSE_LEVEL" | "DISCARD_RANDOM_CARDS" | "DISCARD_ROLE" | "DEATH";
+  }
+>;
 
 export interface CardDefinition {
   readonly id: CardDefinitionId;
@@ -50,9 +87,12 @@ export interface CardDefinition {
   readonly type: CardType;
   readonly deck: DeckType;
   readonly effects: readonly CardEffect[];
+  readonly equipment?: EquipmentDefinition;
   readonly monster?: {
     readonly level: number;
+    readonly levelRewards: number;
     readonly treasureRewards: number;
+    readonly badStuff: readonly BadStuffEffect[];
   };
 }
 

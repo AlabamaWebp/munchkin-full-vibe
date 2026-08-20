@@ -180,3 +180,118 @@ Reason:
 This satisfies real-time lobby behavior while keeping transport lifecycle data out
 of `GameState`, preserving the identity boundaries needed for reconnection, and
 avoiding premature game synchronization before Milestone 5.
+
+---
+
+## ADR-016 — Process-lifetime resumable sessions
+
+Each lobby player receives a cryptographically random session token. The Angular
+client stores the room code, player identity, and token in `localStorage` and
+submits them through `session:resume` after a refresh or Socket.IO reconnect.
+The server retains disconnected players and rebinds a valid session to the new
+socket without changing the player identity.
+
+Reason:
+
+This supports recovery without accounts or a database while keeping `socketId`,
+`playerId`, `sessionToken`, and room identity separate. Sessions intentionally
+expire when the server process restarts.
+
+---
+
+## ADR-017 — Explicit player-specific game projections
+
+NestJS stores the complete authoritative `GameState` and creates a separate
+`GameView` for every connected player after game start and successful commands.
+The view contains the recipient's full hand but represents every player's hand
+publicly only by its card count. Hidden deck cards and other players' card
+instances are never serialized into the recipient's view.
+
+Reason:
+
+Making privacy an explicit projection step provides a testable boundary and
+prevents Angular or transport broadcasting from accidentally exposing hidden
+game information.
+
+---
+
+## ADR-018 — Typed equipment slots and derived combat power
+
+Equipment definitions declare a typed Head, Body, Feet, or Hands slot. Hand
+items additionally declare whether they use one or two of the player's two
+available hands. The engine derives equipment bonus and total combat power from
+the authoritative state rather than storing calculated totals or accepting them
+from clients.
+
+Reason:
+
+Typed card data keeps equipment validation independent of card names, while
+derived values cannot become stale or diverge between the server and clients.
+Class, race, and other advanced restrictions can extend this data model later.
+
+---
+
+## ADR-019 — Typed combat sides and public per-combat history
+
+Combat cards declare their effect semantics through `TEMPORARY_BONUS` with a
+`COMBAT_BONUS` effect or `MONSTER_MODIFIER` with a
+`MONSTER_COMBAT_BONUS` effect. Commands identify the intended player or Monster
+side, and the engine validates the card-side pairing. Help state and an ordered
+public action history live in the serializable `CombatState` and are projected
+identically to every player.
+
+Reason:
+
+Explicit sides allow any player to interfere without client-calculated power or
+card-name checks. Keeping the short history with the combat makes reconnects and
+full-state synchronization deterministic without introducing a separate event
+store before a persistent game log is needed.
+
+---
+
+## ADR-020 — Deterministic escape and persisted outcome summary
+
+Run-away attempts use the injected `RandomSource` for a six-sided roll and apply
+typed bad-stuff effects from the Monster definition. The resolved combat is
+removed immediately, while a small public `lastRunAwayResult` summary remains in
+`GameState` until the active player ends the turn.
+
+Reason:
+
+Randomness remains deterministic in rule tests, bad stuff stays data-driven, and
+full-state projections can show the authoritative escape outcome after a socket
+reconnect without introducing a separate persistent event store.
+
+---
+
+## ADR-021 — Explicit expanded-rule zones and typed economy actions
+
+Class and Race are single-card public player zones, while death is an explicit
+player-state flag. Equipment restrictions reference role definition ids. Sales,
+trades, charity, role changes, and player-targeted Curses are authoritative
+commands; card values, eligible recipients, hand limits, and resulting level
+gains are derived by the engine.
+
+Reason:
+
+Explicit zones keep public information projectable without exposing hands, and
+typed commands prevent the client from calculating economy or rule outcomes.
+The model remains serializable and avoids card-name checks or duplicated Angular
+rules.
+
+---
+
+## ADR-022 — Engine-owned completion and room-preserving replay
+
+The game engine declares a winner as soon as an authoritative level gain reaches
+the clearly defined winning level of 10. It changes the game status and phase to
+`FINISHED`, records the winner, and rejects later gameplay commands. The room
+host may then replace the finished in-memory game with a fresh game for the same
+roster, or remove it and return the existing room to lobby status.
+
+Reason:
+
+Victory remains independent of transport and cannot be claimed by a client.
+Keeping the lobby roster and process-lifetime sessions preserves reconnect
+identity across both rematches and returns without introducing persistence or a
+second room lifecycle.

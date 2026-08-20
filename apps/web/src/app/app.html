@@ -1,120 +1,507 @@
-<main class="shell">
+<main class="shell" [class.in-game]="game() !== null">
   <header class="brand">
     <span class="brand-mark" aria-hidden="true">M</span>
-    <div>
-      <p>LAN card adventure</p>
+    <div class="brand-copy">
+      <p>{{ t('brandTagline') }}</p>
       <h1>{{ title }}</h1>
+    </div>
+    <div class="locale-switcher" [attr.aria-label]="t('language')">
+      <button
+        type="button"
+        [class.active]="locale() === 'ru'"
+        [attr.aria-pressed]="locale() === 'ru'"
+        [attr.aria-label]="t('russian')"
+        (click)="setLocale('ru')"
+      >
+        RU
+      </button>
+      <button
+        type="button"
+        [class.active]="locale() === 'en'"
+        [attr.aria-pressed]="locale() === 'en'"
+        [attr.aria-label]="t('english')"
+        (click)="setLocale('en')"
+      >
+        EN
+      </button>
     </div>
     <span class="connection" [class.online]="connection() === 'CONNECTED'">
       <span aria-hidden="true"></span>
-      {{ connection() === 'CONNECTED' ? 'Online' : 'Offline' }}
+      {{ connection() === 'CONNECTED' ? t('online') : t('reconnecting') }}
     </span>
   </header>
 
-  @if (lobby(); as room) {
+  @if (game(); as currentGame) {
+    <section class="game-screen" aria-labelledby="turn-title">
+      <div class="turn-banner">
+        <div>
+          <p class="eyebrow">{{ t('turn') }} {{ currentGame.turnNumber }}</p>
+          <h2 id="turn-title">{{ phaseLabel(currentGame.phase) }}</h2>
+        </div>
+        <div class="deck-counts" [attr.aria-label]="t('deckSizes')">
+          <span
+            >{{ t('door') }} <b>{{ currentGame.deckCounts.door }}</b></span
+          >
+          <span
+            >{{ t('treasure') }} <b>{{ currentGame.deckCounts.treasure }}</b></span
+          >
+        </div>
+      </div>
+
+      @if (error(); as currentError) {
+        <p class="game-error" role="alert">{{ errorMessage(currentError) }}</p>
+      }
+
+      @if (currentGame.status === 'FINISHED' && currentGame.winnerId; as winnerId) {
+        <section class="table-area victory-panel" aria-live="polite">
+          <p class="eyebrow">{{ t('phaseFinished') }}</p>
+          <h2>{{ t('victory') }}</h2>
+          <p>
+            <strong>{{ lookupPlayerName(currentGame, winnerId) }}</strong>
+            {{ t('winnerMessage') }}
+          </p>
+          @if (isHost()) {
+            <div class="help-actions victory-actions">
+              <button class="primary" type="button" [disabled]="pending()" (click)="rematch()">
+                {{ t('rematch') }}
+              </button>
+              <button type="button" [disabled]="pending()" (click)="returnToLobby()">
+                {{ t('returnToLobby') }}
+              </button>
+            </div>
+          } @else {
+            <small>{{ t('waitingForHostAfterGame') }}</small>
+          }
+        </section>
+      }
+
+      @if (currentGame.status !== 'FINISHED') {
+        <section class="opponents" [attr.aria-label]="t('players')">
+          @for (player of currentGame.players; track player.playerId) {
+            <article
+              [class.active-player]="player.playerId === currentGame.activePlayerId"
+              [class.self-player]="player.playerId === currentGame.viewerPlayerId"
+            >
+              <span class="avatar" aria-hidden="true">{{
+                player.name.charAt(0).toUpperCase()
+              }}</span>
+              <div>
+                <strong>{{ player.name }}</strong
+                ><small
+                  >{{ t('level') }} {{ player.level }} · {{ cardsCount(player.handCount) }}</small
+                >
+              </div>
+              @if (player.playerId === currentGame.activePlayerId) {
+                <span class="turn-dot" [title]="t('currentTurn')"></span>
+              }
+            </article>
+          }
+        </section>
+
+        <section class="table-area" [attr.aria-label]="t('gameTable')">
+          @if (currentGame.combat; as combat) {
+            <p class="eyebrow">{{ t('monsterEncounter') }}</p>
+            <article class="monster-card">
+              <span>{{ t('level') }} {{ combat.monster.monster?.level }}</span>
+              <h3>{{ cardName(combat.monster) }}</h3>
+              <p>{{ cardDescription(combat.monster) }}</p>
+              <div class="combat-score">
+                <strong>{{ t('yourPower') }} {{ combat.playerPower }}</strong>
+                <span aria-hidden="true">×</span>
+                <strong>{{ t('monsterPower') }} {{ combat.monsterPower }}</strong>
+              </div>
+              <small>
+                {{ t('combatRewards') }}: +{{ combat.monster.monster?.levelRewards }}
+                {{ t('levels') }}, {{ combat.monster.monster?.treasureRewards }}
+                {{ t('treasures') }}
+              </small>
+              @if (combat.monster.monster?.badStuff; as badStuff) {
+                <div class="combat-participants">
+                  <strong>{{ t('badStuff') }}</strong>
+                  @for (effect of badStuff; track $index) {
+                    <span>{{ badStuffLabel(effect) }}</span>
+                  }
+                </div>
+              }
+              <div class="combat-participants">
+                @if (combat.helperId) {
+                  <span>
+                    {{ t('helperJoined') }}:
+                    <strong>{{ lookupPlayerName(currentGame, combat.helperId) }}</strong>
+                    (+{{ combat.helperContribution }})
+                  </span>
+                } @else if (combat.requestedHelperId) {
+                  <span>
+                    {{ t('helpRequested') }}:
+                    <strong>{{ lookupPlayerName(currentGame, combat.requestedHelperId) }}</strong>
+                  </span>
+                }
+                @if (combat.monsterBonus > 0) {
+                  <span>{{ t('monsterBonus') }} +{{ combat.monsterBonus }}</span>
+                }
+              </div>
+              @if (currentGame.requestableHelperIds.length > 0) {
+                <div class="help-actions">
+                  @for (helperId of currentGame.requestableHelperIds; track helperId) {
+                    <button type="button" [disabled]="pending()" (click)="requestHelp(helperId)">
+                      {{ t('requestHelp') }}: {{ lookupPlayerName(currentGame, helperId) }}
+                    </button>
+                  }
+                </div>
+              }
+            </article>
+            <section class="combat-history" [attr.aria-label]="t('combatHistory')">
+              <strong>{{ t('combatHistory') }}</strong>
+              <ol>
+                @for (entry of combat.history; track $index) {
+                  <li>
+                    @switch (entry.type) {
+                      @case ('COMBAT_STARTED') {
+                        {{ lookupPlayerName(currentGame, entry.playerId) }}
+                        {{ t('historyCombatStarted') }} {{ cardName(entry.monster) }}
+                      }
+                      @case ('HELP_REQUESTED') {
+                        {{ lookupPlayerName(currentGame, entry.playerId) }}
+                        {{ t('historyHelpRequested') }}
+                        {{ lookupPlayerName(currentGame, entry.helperId) }}
+                      }
+                      @case ('HELP_ACCEPTED') {
+                        {{ lookupPlayerName(currentGame, entry.helperId) }}
+                        {{ t('historyHelpAccepted') }}
+                        {{ lookupPlayerName(currentGame, entry.playerId) }}
+                      }
+                      @case ('CARD_PLAYED') {
+                        {{ lookupPlayerName(currentGame, entry.playerId) }}
+                        {{
+                          t(
+                            entry.side === 'PLAYERS'
+                              ? 'historyPlayedForPlayers'
+                              : 'historyPlayedForMonster'
+                          )
+                        }}:
+                        {{ cardName(entry.card) }}
+                      }
+                    }
+                  </li>
+                }
+              </ol>
+            </section>
+          } @else if (currentGame.lastRunAwayResult; as result) {
+            <div class="table-message run-away-result" aria-live="polite">
+              <strong>
+                {{ result.escaped ? t('runAwaySucceeded') : t('runAwayFailed') }}
+              </strong>
+              <span> {{ cardName(result.monster) }} · {{ t('dieRoll') }}: {{ result.roll }} </span>
+              @if (result.badStuffApplied) {
+                <span>{{ t('badStuffApplied') }}</span>
+              }
+            </div>
+          } @else if (currentGame.activePlayerId === currentGame.viewerPlayerId) {
+            <div class="table-message">
+              <strong>{{ t('yourMove') }}</strong
+              ><span>{{ t('chooseAction') }}</span>
+            </div>
+          } @else {
+            <div class="table-message">
+              <strong>{{ t('anotherPlayerActs') }}</strong
+              ><span>{{ t('handPrivate') }}</span>
+            </div>
+          }
+        </section>
+
+        <section class="character-panel" aria-labelledby="character-title">
+          <div class="character-heading">
+            <div>
+              <p class="eyebrow">{{ t('yourAdventurer') }}</p>
+              <h3 id="character-title">{{ currentGame.self.name }}</h3>
+            </div>
+            <div class="power-badges">
+              <span class="level-badge">{{ t('level') }} {{ currentGame.self.level }}</span>
+              <span class="power-badge"
+                >{{ t('combatPower') }} {{ currentGame.self.combatPower }}</span
+              >
+              @if (currentGame.self.temporaryCombatBonus > 0) {
+                <span class="temporary-badge"
+                  >{{ t('temporaryBonus') }} +{{ currentGame.self.temporaryCombatBonus }}</span
+                >
+              }
+            </div>
+          </div>
+          <div class="equipment-slot">
+            <strong>{{ t('roles') }}</strong>
+            <span
+              >{{ t('cardClass') }}:
+              {{
+                currentGame.self.classCard ? cardName(currentGame.self.classCard) : t('none')
+              }}</span
+            >
+            <span
+              >{{ t('cardRace') }}:
+              {{
+                currentGame.self.raceCard ? cardName(currentGame.self.raceCard) : t('none')
+              }}</span
+            >
+            @if (currentGame.self.isDead) {
+              <span>{{ t('dead') }}</span>
+            }
+          </div>
+          <div class="equipment-slot">
+            <strong>{{ t('equipment') }}</strong>
+            @if (currentGame.self.equipment.length === 0) {
+              <span>{{ t('nothingEquipped') }}</span>
+            } @else {
+              @for (card of currentGame.self.equipment; track card.instanceId) {
+                <button
+                  type="button"
+                  class="equipped-card"
+                  [class.selected]="selectedCard()?.instanceId === card.instanceId"
+                  (click)="selectedCard.set(card)"
+                >
+                  {{ cardName(card) }} +{{ card.equipment?.combatBonus }}
+                </button>
+              }
+            }
+          </div>
+          <small class="equipment-summary">
+            {{ t('equipmentBonus') }} +{{ currentGame.self.equipmentCombatBonus }}
+          </small>
+        </section>
+
+        <section class="hand-section" aria-labelledby="hand-title">
+          <div class="section-heading">
+            <h3 id="hand-title">{{ t('yourHand') }}</h3>
+            <span>{{ cardsCount(currentGame.self.hand.length) }}</span>
+          </div>
+          <div class="hand" tabindex="0">
+            @for (card of currentGame.self.hand; track card.instanceId) {
+              <button
+                class="hand-card"
+                type="button"
+                [class.selected]="selectedCard()?.instanceId === card.instanceId"
+                (click)="selectedCard.set(card)"
+              >
+                <small>{{ deckLabel(card.deck) }}</small
+                ><strong>{{ cardName(card) }}</strong
+                ><span>{{ cardTypeLabel(card.type) }}</span>
+              </button>
+            }
+          </div>
+        </section>
+
+        @if (selectedCard(); as card) {
+          <aside class="card-details" aria-live="polite">
+            <div class="card-details-copy">
+              <small>{{ cardTypeLabel(card.type) }}</small
+              ><strong>{{ cardName(card) }}</strong>
+              <p>{{ cardDescription(card) }}</p>
+              @if (card.equipment; as equipment) {
+                <p>
+                  {{ equipmentSlotLabel(equipment.slot) }} · {{ t('equipmentBonus') }} +{{
+                    equipment.combatBonus
+                  }}
+                  · {{ t('value') }} {{ equipment.value }}
+                </p>
+              }
+              <div class="card-details-actions">
+                @if (canEquip(currentGame, card)) {
+                  <button type="button" [disabled]="pending()" (click)="equip(card)">
+                    {{ t('equip') }}
+                  </button>
+                }
+                @if (canUnequip(currentGame, card)) {
+                  <button type="button" [disabled]="pending()" (click)="unequip(card)">
+                    {{ t('unequip') }}
+                  </button>
+                }
+                @if (
+                  expandedActionIncludes(currentGame.expandedRuleActions.playableRoleCardIds, card)
+                ) {
+                  <button type="button" [disabled]="pending()" (click)="playRole(card)">
+                    {{ t('playRole') }}
+                  </button>
+                }
+                @if (
+                  expandedActionIncludes(currentGame.expandedRuleActions.playableCurseCardIds, card)
+                ) {
+                  @for (player of currentGame.players; track player.playerId) {
+                    <button
+                      type="button"
+                      [disabled]="pending()"
+                      (click)="playCurse(card, player.playerId)"
+                    >
+                      {{ t('curseTo') }} {{ player.name }}
+                    </button>
+                  }
+                }
+                @if (
+                  expandedActionIncludes(
+                    currentGame.expandedRuleActions.sellableItemCardIds,
+                    card
+                  ) && (card.equipment?.value ?? 0) >= 1000
+                ) {
+                  <button type="button" [disabled]="pending()" (click)="sell(card)">
+                    {{ t('sell') }}
+                  </button>
+                }
+                @if (
+                  expandedActionIncludes(currentGame.expandedRuleActions.tradeableItemCardIds, card)
+                ) {
+                  @for (player of currentGame.players; track player.playerId) {
+                    @if (player.playerId !== currentGame.viewerPlayerId) {
+                      <button
+                        type="button"
+                        [disabled]="pending()"
+                        (click)="trade(card, player.playerId)"
+                      >
+                        {{ t('tradeTo') }} {{ player.name }}
+                      </button>
+                    }
+                  }
+                }
+                @if (canPlayCombatCard(currentGame, card, 'PLAYERS')) {
+                  <button
+                    type="button"
+                    [disabled]="pending()"
+                    (click)="playCombatCard(card, 'PLAYERS')"
+                  >
+                    {{ t('playForPlayers') }}
+                  </button>
+                }
+                @if (canPlayCombatCard(currentGame, card, 'MONSTER')) {
+                  <button
+                    type="button"
+                    [disabled]="pending()"
+                    (click)="playCombatCard(card, 'MONSTER')"
+                  >
+                    {{ t('playForMonster') }}
+                  </button>
+                }
+              </div>
+            </div>
+            <button
+              class="close-details"
+              type="button"
+              [attr.aria-label]="t('closeCardDetails')"
+              (click)="selectedCard.set(null)"
+            >
+              ×
+            </button>
+          </aside>
+        }
+
+        <nav class="action-bar" [attr.aria-label]="t('availableActions')">
+          @if (currentGame.expandedRuleActions.charityCardCount > 0) {
+            <button type="button" [disabled]="pending()" (click)="resolveCharity(currentGame)">
+              {{ t('charity') }} ({{ currentGame.expandedRuleActions.charityCardCount }})
+            </button>
+          }
+          @if (currentGame.availableActions.length === 0) {
+            <span>{{ currentGame.combat ? t('combatInProgress') : t('waitingForTurn') }}</span>
+          } @else {
+            @for (action of currentGame.availableActions; track action) {
+              <button
+                type="button"
+                [class.primary-action]="action !== 'END_TURN'"
+                [disabled]="pending()"
+                (click)="sendAction(action)"
+              >
+                {{ actionLabel(action) }}
+              </button>
+            }
+          }
+        </nav>
+      }
+    </section>
+  } @else if (lobby(); as room) {
     <section class="lobby-card" aria-labelledby="lobby-title">
       <div class="room-heading">
         <div>
-          <p class="eyebrow">Room code</p>
+          <p class="eyebrow">{{ t('roomCode') }}</p>
           <h2 id="lobby-title">{{ room.roomCode }}</h2>
         </div>
         <span class="player-count">{{ room.players.length }} / 6</span>
       </div>
-
-      @if (hasStarted()) {
-        <div class="started-message" role="status">
-          <strong>Game started</strong>
-          <span>Game synchronization arrives in the next milestone.</span>
-        </div>
-      } @else {
-        <p class="waiting-copy">
-          Share the code with friends on this Wi-Fi. The player list updates live.
-        </p>
-      }
-
-      <ul class="player-list" aria-label="Players">
+      <p class="waiting-copy">{{ t('shareRoom') }}</p>
+      <ul class="player-list" [attr.aria-label]="t('players')">
         @for (player of room.players; track player.playerId) {
-          <li>
-            <span class="avatar" aria-hidden="true">{{ player.name.charAt(0).toUpperCase() }}</span>
-            <span class="player-name">{{ player.name }}</span>
+          <li [class.disconnected-player]="!player.connected">
+            <span class="avatar" aria-hidden="true">{{ player.name.charAt(0).toUpperCase() }}</span
+            ><span class="player-name">{{ player.name }}</span>
+            @if (!player.connected) {
+              <span class="tag">{{ t('offline') }}</span>
+            }
             @if (player.playerId === playerId()) {
-              <span class="tag">You</span>
+              <span class="tag">{{ t('you') }}</span>
             }
             @if (player.isHost) {
-              <span class="tag host">Host</span>
+              <span class="tag host">{{ t('host') }}</span>
             }
           </li>
         }
       </ul>
-
       @if (isHost() && !hasStarted()) {
         <button class="primary" type="button" [disabled]="pending()" (click)="startGame()">
-          {{ pending() ? 'Starting…' : 'Start game' }}
+          {{ pending() ? t('starting') : t('startGame') }}
         </button>
-        <p class="development-note">Development mode allows a one-player game.</p>
+        <p class="development-note">{{ t('singlePlayerNote') }}</p>
       } @else if (!hasStarted()) {
-        <p class="host-note">Waiting for the host to start…</p>
+        <p class="host-note">{{ t('waitingForHost') }}</p>
       }
-      @if (error(); as message) {
-        <p class="error" role="alert">{{ message }}</p>
+      @if (error(); as currentError) {
+        <p class="error" role="alert">{{ errorMessage(currentError) }}</p>
       }
     </section>
   } @else {
     <section class="welcome" aria-labelledby="welcome-title">
       <div class="intro">
-        <p class="eyebrow">Gather your party</p>
-        <h2 id="welcome-title">Adventure is better together.</h2>
-        <p>Create a room or join friends already playing on your local network.</p>
+        <p class="eyebrow">{{ t('gatherParty') }}</p>
+        <h2 id="welcome-title">{{ t('welcomeTitle') }}</h2>
+        <p>{{ t('welcomeCopy') }}</p>
       </div>
-
       <form class="join-card" (submit)="$event.preventDefault()">
-        <label for="player-name">Your name</label>
+        <label for="player-name">{{ t('yourName') }}</label>
         <input
           id="player-name"
           name="playerName"
           type="text"
           autocomplete="name"
-          placeholder="Ada"
+          [placeholder]="locale() === 'ru' ? 'Ада' : 'Ada'"
           [ngModel]="playerName()"
           (ngModelChange)="playerName.set($event)"
         />
-
         <button
           class="primary"
           type="button"
           [disabled]="pending() || connection() !== 'CONNECTED'"
           (click)="createRoom()"
         >
-          Create room
+          {{ t('createRoom') }}
         </button>
-
-        <div class="divider"><span>or join a room</span></div>
-
-        <label for="room-code">Room code</label>
+        <div class="divider">
+          <span>{{ t('orJoinRoom') }}</span>
+        </div>
+        <label for="room-code">{{ t('roomCode') }}</label>
         <input
           id="room-code"
           class="code-input"
           name="roomCode"
           type="text"
-          inputmode="text"
           autocomplete="off"
           maxlength="4"
           placeholder="ABCD"
           [ngModel]="roomCode()"
           (ngModelChange)="normalizeRoomCode($event)"
         />
-
         <button
           class="secondary"
           type="button"
           [disabled]="pending() || connection() !== 'CONNECTED'"
           (click)="joinRoom()"
         >
-          Join room
+          {{ t('joinRoom') }}
         </button>
-
-        @if (error(); as message) {
-          <p class="error" role="alert">{{ message }}</p>
+        @if (error(); as currentError) {
+          <p class="error" role="alert">{{ errorMessage(currentError) }}</p>
         }
       </form>
     </section>

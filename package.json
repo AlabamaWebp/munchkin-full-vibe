@@ -16,7 +16,7 @@
   "scripts": {
     "build": "npm run build:packages && npm run build --workspace @munchkin-lan/web && npm run build --workspace @munchkin-lan/server",
     "build:packages": "npm run build --workspace @munchkin-lan/contracts && npm run build --workspace @munchkin-lan/game-engine",
-    "dev": "npm run build:packages && concurrently --kill-others-on-fail --names web,server --prefix-colors cyan,magenta \"npm run start --workspace @munchkin-lan/web\" \"npm run start:dev --workspace @munchkin-lan/server\"",
+    "dev": "node start-dev.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build:packages && npm run test --workspaces --if-present",
     "typecheck": "npm run build",
@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "concurrently": "^10.0.5",
     "eslint": "^10.0.1",
     "globals": "^17.0.0",
     "prettier": "^3.8.1",

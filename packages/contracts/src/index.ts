@@ -2,27 +2,24 @@ export const APPLICATION_NAME = "Munchkin LAN";
 
 export interface FoundationStatusResponse {
   applicationName: typeof APPLICATION_NAME;
-  milestone: 3;
+  milestone: 12;
   engine: "domain-ready";
-  serverConnection: "lobby-ready";
-  gameplay: "not-implemented";
+  serverConnection: "game-ready";
+  gameplay: "game-completion-ready";
 }
 
 export const LOBBY_MIN_PLAYERS = 1;
 export const LOBBY_MAX_PLAYERS = 6;
 export const ROOM_CODE_LENGTH = 4;
 
-export const LobbyStatus = {
-  LOBBY: "LOBBY",
-  STARTED: "STARTED",
-} as const;
-
+export const LobbyStatus = { LOBBY: "LOBBY", STARTED: "STARTED" } as const;
 export type LobbyStatus = (typeof LobbyStatus)[keyof typeof LobbyStatus];
 
 export interface LobbyPlayerView {
   readonly playerId: string;
   readonly name: string;
   readonly isHost: boolean;
+  readonly connected: boolean;
 }
 
 export interface LobbyState {
@@ -35,15 +32,18 @@ export interface LobbyState {
 export interface CreateLobbyPayload {
   readonly playerName: string;
 }
-
 export interface JoinLobbyPayload {
   readonly roomCode: string;
   readonly playerName: string;
 }
-
 export interface StartLobbyPayload {
   readonly roomCode: string;
   readonly playerId: string;
+}
+export type GameLifecyclePayload = StartLobbyPayload;
+export interface ResumeSessionPayload {
+  readonly roomCode: string;
+  readonly sessionToken: string;
 }
 
 export type LobbyErrorCode =
@@ -51,28 +51,258 @@ export type LobbyErrorCode =
   | "GAME_ALREADY_STARTED"
   | "INVALID_PLAYER_NAME"
   | "INVALID_ROOM_CODE"
+  | "INVALID_SESSION"
   | "NOT_HOST"
   | "PLAYER_NOT_FOUND"
   | "ROOM_FULL"
-  | "ROOM_NOT_FOUND";
+  | "ROOM_NOT_FOUND"
+  | "GAME_NOT_FINISHED";
 
 export interface LobbyActionSuccess {
   readonly success: true;
   readonly roomCode: string;
   readonly playerId: string;
+  readonly sessionToken: string;
 }
 
 export interface LobbyActionFailure {
   readonly success: false;
-  readonly error: {
-    readonly code: LobbyErrorCode;
-    readonly message: string;
+  readonly error: { readonly code: LobbyErrorCode; readonly message: string };
+}
+export type LobbyActionAck = LobbyActionSuccess | LobbyActionFailure;
+
+export const GameStatus = {
+  LOBBY: "LOBBY",
+  IN_PROGRESS: "IN_PROGRESS",
+  FINISHED: "FINISHED",
+} as const;
+export type GameStatus = (typeof GameStatus)[keyof typeof GameStatus];
+
+export const GamePhase = {
+  LOBBY: "LOBBY",
+  TURN_START: "TURN_START",
+  KICK_DOOR: "KICK_DOOR",
+  DOOR_RESOLUTION: "DOOR_RESOLUTION",
+  POST_DOOR: "POST_DOOR",
+  LOOT_ROOM: "LOOT_ROOM",
+  END_TURN: "END_TURN",
+  FINISHED: "FINISHED",
+} as const;
+export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
+
+export type GameCardType =
+  | "MONSTER"
+  | "CURSE"
+  | "EQUIPMENT"
+  | "TEMPORARY_BONUS"
+  | "MONSTER_MODIFIER"
+  | "OTHER"
+  | "CLASS"
+  | "RACE";
+export type GameDeckType = "DOOR" | "TREASURE";
+export type GameEquipmentSlot = "HEAD" | "BODY" | "FEET" | "HANDS";
+
+export interface GameCardView {
+  readonly instanceId: string;
+  readonly definitionId: string;
+  readonly name: string;
+  readonly description: string;
+  readonly type: GameCardType;
+  readonly deck: GameDeckType;
+  readonly equipment?: {
+    readonly slot: GameEquipmentSlot;
+    readonly hands?: 1 | 2;
+    readonly combatBonus: number;
+    readonly value: number;
+    readonly requiredClass?: string;
+    readonly requiredRace?: string;
+  };
+  readonly monster?: {
+    readonly level: number;
+    readonly levelRewards: number;
+    readonly treasureRewards: number;
+    readonly badStuff: readonly GameBadStuffEffectView[];
   };
 }
 
-export type LobbyActionAck = LobbyActionSuccess | LobbyActionFailure;
+export type GameEffectView =
+  | {
+      readonly type:
+        "COMBAT_BONUS" | "MONSTER_COMBAT_BONUS" | "GAIN_LEVEL" | "LOSE_LEVEL";
+      readonly amount: number;
+    }
+  | {
+      readonly type: "DRAW_CARDS";
+      readonly deck: GameDeckType;
+      readonly count: number;
+    }
+  | {
+      readonly type: "DISCARD_RANDOM_CARDS";
+      readonly count: number;
+      readonly zone: "HAND" | "EQUIPMENT";
+    }
+  | { readonly type: "DISCARD_ROLE"; readonly role: "CLASS" | "RACE" }
+  | { readonly type: "DEATH" };
+
+export type GameBadStuffEffectView =
+  | { readonly type: "LOSE_LEVEL"; readonly amount: number }
+  | {
+      readonly type: "DISCARD_RANDOM_CARDS";
+      readonly count: number;
+      readonly zone: "HAND" | "EQUIPMENT";
+    }
+  | { readonly type: "DISCARD_ROLE"; readonly role: "CLASS" | "RACE" }
+  | { readonly type: "DEATH" };
+
+export interface GamePlayerView {
+  readonly playerId: string;
+  readonly name: string;
+  readonly level: number;
+  readonly handCount: number;
+  readonly equipment: readonly GameCardView[];
+  readonly temporaryCombatBonus: number;
+  readonly equipmentCombatBonus: number;
+  readonly combatPower: number;
+  readonly classCard: GameCardView | null;
+  readonly raceCard: GameCardView | null;
+  readonly isDead: boolean;
+}
+
+export interface OwnPlayerView extends GamePlayerView {
+  readonly hand: readonly GameCardView[];
+}
+
+export type AvailableGameAction =
+  | "KICK_DOOR"
+  | "ACCEPT_HELP"
+  | "RESOLVE_COMBAT"
+  | "RUN_AWAY"
+  | "LOOT_ROOM"
+  | "END_TURN";
+
+export type CombatHistoryView =
+  | {
+      readonly type: "COMBAT_STARTED";
+      readonly playerId: string;
+      readonly monster: GameCardView;
+    }
+  | {
+      readonly type: "HELP_REQUESTED" | "HELP_ACCEPTED";
+      readonly playerId: string;
+      readonly helperId: string;
+    }
+  | {
+      readonly type: "CARD_PLAYED";
+      readonly playerId: string;
+      readonly card: GameCardView;
+      readonly side: "PLAYERS" | "MONSTER";
+    };
+
+export interface GameView {
+  readonly gameId: string;
+  readonly viewerPlayerId: string;
+  readonly status: GameStatus;
+  readonly phase: GamePhase;
+  readonly activePlayerId: string;
+  readonly turnNumber: number;
+  readonly winnerId: string | null;
+  readonly players: readonly GamePlayerView[];
+  readonly self: OwnPlayerView;
+  readonly combat: {
+    readonly playerId: string;
+    readonly monster: GameCardView;
+    readonly playerPower: number;
+    readonly monsterPower: number;
+    readonly monsterBonus: number;
+    readonly requestedHelperId: string | null;
+    readonly helperId: string | null;
+    readonly helperContribution: number;
+    readonly history: readonly CombatHistoryView[];
+  } | null;
+  readonly lastRunAwayResult: {
+    readonly playerId: string;
+    readonly monster: GameCardView;
+    readonly roll: number;
+    readonly escaped: boolean;
+    readonly badStuffApplied: boolean;
+  } | null;
+  readonly deckCounts: { readonly door: number; readonly treasure: number };
+  readonly availableActions: readonly AvailableGameAction[];
+  readonly availableEquipmentActions: {
+    readonly equipCardIds: readonly string[];
+    readonly unequipCardIds: readonly string[];
+  };
+  readonly requestableHelperIds: readonly string[];
+  readonly playableCombatCards: {
+    readonly playersSideCardIds: readonly string[];
+    readonly monsterSideCardIds: readonly string[];
+  };
+  readonly expandedRuleActions: {
+    readonly playableRoleCardIds: readonly string[];
+    readonly playableCurseCardIds: readonly string[];
+    readonly sellableItemCardIds: readonly string[];
+    readonly tradeableItemCardIds: readonly string[];
+    readonly charityCardCount: number;
+    readonly charityRecipientIds: readonly string[];
+  };
+}
+
+export type GameClientCommand =
+  | { readonly type: "KICK_DOOR" }
+  | { readonly type: "LOOT_ROOM" }
+  | { readonly type: "END_TURN" }
+  | { readonly type: "RESOLVE_COMBAT" }
+  | { readonly type: "RUN_AWAY" }
+  | {
+      readonly type: "PLAY_CARD";
+      readonly cardId: string;
+      readonly targetSide: "PLAYERS" | "MONSTER";
+    }
+  | { readonly type: "REQUEST_HELP"; readonly helperId: string }
+  | { readonly type: "ACCEPT_HELP" }
+  | { readonly type: "EQUIP_ITEM"; readonly cardId: string }
+  | { readonly type: "UNEQUIP_ITEM"; readonly cardId: string }
+  | { readonly type: "PLAY_ROLE"; readonly cardId: string }
+  | {
+      readonly type: "PLAY_CURSE";
+      readonly cardId: string;
+      readonly targetPlayerId: string;
+    }
+  | { readonly type: "SELL_ITEMS"; readonly cardIds: readonly string[] }
+  | {
+      readonly type: "TRADE_ITEM";
+      readonly cardId: string;
+      readonly recipientId: string;
+    }
+  | {
+      readonly type: "GIVE_CHARITY";
+      readonly cardIds: readonly string[];
+      readonly recipientId: string | null;
+    };
+export interface GameCommandPayload {
+  readonly roomCode: string;
+  readonly command: GameClientCommand;
+}
+export type GameActionAck =
+  | { readonly success: true }
+  | {
+      readonly success: false;
+      readonly error: { readonly code: string; readonly message: string };
+    };
 
 export interface ClientToServerEvents {
+  "game:rematch": (
+    payload: GameLifecyclePayload,
+    acknowledge: (response: GameActionAck) => void,
+  ) => void;
+  "game:return-to-lobby": (
+    payload: GameLifecyclePayload,
+    acknowledge: (response: GameActionAck) => void,
+  ) => void;
+  "game:command": (
+    payload: GameCommandPayload,
+    acknowledge: (response: GameActionAck) => void,
+  ) => void;
   "game:start": (
     payload: StartLobbyPayload,
     acknowledge: (response: LobbyActionAck) => void,
@@ -85,8 +315,13 @@ export interface ClientToServerEvents {
     payload: JoinLobbyPayload,
     acknowledge: (response: LobbyActionAck) => void,
   ) => void;
+  "session:resume": (
+    payload: ResumeSessionPayload,
+    acknowledge: (response: LobbyActionAck) => void,
+  ) => void;
 }
 
 export interface ServerToClientEvents {
+  "game:state": (state: GameView) => void;
   "lobby:state": (state: LobbyState) => void;
 }

@@ -10,6 +10,7 @@ import {
   type LobbyActionSuccess,
   type LobbyErrorCode,
   type LobbyState,
+  type ResumeSessionPayload,
   type StartLobbyPayload,
 } from '@munchkin-lan/contracts';
 import { RoomCodeService } from './room-code.service';
@@ -17,13 +18,15 @@ import { RoomCodeService } from './room-code.service';
 interface LobbyPlayerRecord {
   readonly playerId: string;
   readonly name: string;
-  readonly socketId: string;
+  readonly sessionToken: string;
+  socketId: string | null;
+  connected: boolean;
 }
 
 interface LobbyRoomRecord {
   readonly roomCode: string;
   status: LobbyStatus;
-  hostPlayerId: string;
+  readonly hostPlayerId: string;
   readonly players: LobbyPlayerRecord[];
 }
 
@@ -31,6 +34,7 @@ export interface LobbyOperationSuccess {
   readonly success: true;
   readonly acknowledgement: LobbyActionSuccess;
   readonly state: LobbyState;
+  readonly previousSocketId?: string;
 }
 
 export interface LobbyOperationFailure {
@@ -43,7 +47,16 @@ export type LobbyOperationResult =
 
 export interface LobbyDeparture {
   readonly roomCode: string;
-  readonly state: LobbyState | null;
+  readonly state: LobbyState;
+}
+
+export interface LobbyGamePlayer {
+  readonly playerId: string;
+  readonly name: string;
+}
+
+export interface ConnectedLobbyPlayer extends LobbyGamePlayer {
+  readonly socketId: string;
 }
 
 const ROOM_CODE_PATTERN = new RegExp(`^[A-Z2-9]{${ROOM_CODE_LENGTH}}$`);
@@ -59,6 +72,7 @@ function failure(code: LobbyErrorCode, message: string): LobbyOperationFailure {
 export class LobbyService {
   private readonly rooms = new Map<string, LobbyRoomRecord>();
   private readonly roomCodeBySocketId = new Map<string, string>();
+  private readonly roomCodeBySessionToken = new Map<string, string>();
 
   constructor(private readonly roomCodes: RoomCodeService) {}
 
@@ -72,11 +86,9 @@ export class LobbyService {
         'This connection is already in a room.',
       );
     }
-
     const name = this.normalizePlayerName(payload?.playerName);
-    if (name === null) {
+    if (name === null)
       return failure('INVALID_PLAYER_NAME', 'Enter a player name.');
-    }
 
     const roomCode = this.generateUniqueRoomCode();
     const player = this.createPlayer(socketId, name);
@@ -87,9 +99,8 @@ export class LobbyService {
       players: [player],
     };
     this.rooms.set(roomCode, room);
-    this.roomCodeBySocketId.set(socketId, roomCode);
-
-    return this.success(room, player.playerId);
+    this.trackPlayer(roomCode, player);
+    return this.success(room, player);
   }
 
   joinRoom(socketId: string, payload: JoinLobbyPayload): LobbyOperationResult {
@@ -99,7 +110,6 @@ export class LobbyService {
         'This connection is already in a room.',
       );
     }
-
     const roomCode = this.normalizeRoomCode(payload?.roomCode);
     if (roomCode === null) {
       return failure(
@@ -107,16 +117,13 @@ export class LobbyService {
         `Enter a ${ROOM_CODE_LENGTH}-character room code.`,
       );
     }
-
     const name = this.normalizePlayerName(payload?.playerName);
-    if (name === null) {
+    if (name === null)
       return failure('INVALID_PLAYER_NAME', 'Enter a player name.');
-    }
 
     const room = this.rooms.get(roomCode);
-    if (room === undefined) {
+    if (room === undefined)
       return failure('ROOM_NOT_FOUND', 'No room exists with that code.');
-    }
     if (room.status !== LobbyStatus.LOBBY) {
       return failure('GAME_ALREADY_STARTED', 'That game has already started.');
     }
@@ -129,9 +136,48 @@ export class LobbyService {
 
     const player = this.createPlayer(socketId, name);
     room.players.push(player);
-    this.roomCodeBySocketId.set(socketId, roomCode);
+    this.trackPlayer(roomCode, player);
+    return this.success(room, player);
+  }
 
-    return this.success(room, player.playerId);
+  resumeSession(
+    socketId: string,
+    payload: ResumeSessionPayload,
+  ): LobbyOperationResult {
+    if (this.roomCodeBySocketId.has(socketId)) {
+      return failure(
+        'ALREADY_IN_ROOM',
+        'This connection is already in a room.',
+      );
+    }
+    const roomCode = this.normalizeRoomCode(payload?.roomCode);
+    if (roomCode === null || typeof payload?.sessionToken !== 'string') {
+      return failure('INVALID_SESSION', 'The saved session is invalid.');
+    }
+    if (this.roomCodeBySessionToken.get(payload.sessionToken) !== roomCode) {
+      return failure(
+        'INVALID_SESSION',
+        'The saved session could not be resumed.',
+      );
+    }
+    const room = this.rooms.get(roomCode);
+    const player = room?.players.find(
+      (candidate) => candidate.sessionToken === payload.sessionToken,
+    );
+    if (room === undefined || player === undefined) {
+      return failure(
+        'INVALID_SESSION',
+        'The saved session could not be resumed.',
+      );
+    }
+
+    const previousSocketId = player.socketId ?? undefined;
+    if (previousSocketId !== undefined)
+      this.roomCodeBySocketId.delete(previousSocketId);
+    player.socketId = socketId;
+    player.connected = true;
+    this.roomCodeBySocketId.set(socketId, roomCode);
+    return { ...this.success(room, player), previousSocketId };
   }
 
   startRoom(
@@ -145,11 +191,9 @@ export class LobbyService {
         `Enter a ${ROOM_CODE_LENGTH}-character room code.`,
       );
     }
-
     const room = this.rooms.get(roomCode);
-    if (room === undefined) {
+    if (room === undefined)
       return failure('ROOM_NOT_FOUND', 'No room exists with that code.');
-    }
     const player = room.players.find(
       (candidate) =>
         candidate.socketId === socketId &&
@@ -169,79 +213,186 @@ export class LobbyService {
     }
 
     room.status = LobbyStatus.STARTED;
-    return this.success(room, player.playerId);
+    return this.success(room, player);
+  }
+
+  authorizeHost(
+    socketId: string,
+    payload: StartLobbyPayload,
+  ): LobbyOperationResult {
+    const authorized = this.findHost(socketId, payload);
+    return authorized.success
+      ? this.success(authorized.room, authorized.player)
+      : authorized.result;
+  }
+
+  returnToLobby(
+    socketId: string,
+    payload: StartLobbyPayload,
+  ): LobbyOperationResult {
+    const authorized = this.findHost(socketId, payload);
+    if (!authorized.success) return authorized.result;
+    authorized.room.status = LobbyStatus.LOBBY;
+    return this.success(authorized.room, authorized.player);
   }
 
   disconnect(socketId: string): LobbyDeparture | null {
     const roomCode = this.roomCodeBySocketId.get(socketId);
-    if (roomCode === undefined) {
-      return null;
-    }
-
+    if (roomCode === undefined) return null;
     this.roomCodeBySocketId.delete(socketId);
     const room = this.rooms.get(roomCode);
-    if (room === undefined) {
-      return null;
-    }
-
-    const departingPlayer = room.players.find(
-      (player) => player.socketId === socketId,
+    const player = room?.players.find(
+      (candidate) => candidate.socketId === socketId,
     );
-    const index = room.players.findIndex(
-      (player) => player.socketId === socketId,
-    );
-    if (index >= 0) {
-      room.players.splice(index, 1);
-    }
-    if (room.players.length === 0) {
-      this.rooms.delete(roomCode);
-      return { roomCode, state: null };
-    }
-    if (departingPlayer?.playerId === room.hostPlayerId) {
-      const nextHost = room.players[0];
-      if (nextHost !== undefined) {
-        room.hostPlayerId = nextHost.playerId;
-      }
-    }
-
+    if (room === undefined || player === undefined) return null;
+    player.socketId = null;
+    player.connected = false;
     return { roomCode, state: this.toState(room) };
   }
 
-  private normalizePlayerName(value: unknown): string | null {
-    if (typeof value !== 'string') {
+  getGamePlayers(roomCode: string): readonly LobbyGamePlayer[] {
+    return (
+      this.rooms
+        .get(roomCode)
+        ?.players.map(({ playerId, name }) => ({ playerId, name })) ?? []
+    );
+  }
+
+  getConnectedPlayers(roomCode: string): readonly ConnectedLobbyPlayer[] {
+    return (
+      this.rooms.get(roomCode)?.players.flatMap((player) =>
+        player.connected && player.socketId !== null
+          ? [
+              {
+                playerId: player.playerId,
+                name: player.name,
+                socketId: player.socketId,
+              },
+            ]
+          : [],
+      ) ?? []
+    );
+  }
+
+  getPlayerForSocket(
+    socketId: string,
+    roomCode: string,
+  ): LobbyGamePlayer | null {
+    const normalizedRoomCode = this.normalizeRoomCode(roomCode);
+    if (
+      normalizedRoomCode === null ||
+      this.roomCodeBySocketId.get(socketId) !== normalizedRoomCode
+    ) {
       return null;
     }
+    const player = this.rooms
+      .get(normalizedRoomCode)
+      ?.players.find((candidate) => candidate.socketId === socketId);
+    return player === undefined
+      ? null
+      : { playerId: player.playerId, name: player.name };
+  }
+
+  private findHost(
+    socketId: string,
+    payload: StartLobbyPayload,
+  ):
+    | {
+        readonly success: true;
+        readonly room: LobbyRoomRecord;
+        readonly player: LobbyPlayerRecord;
+      }
+    | { readonly success: false; readonly result: LobbyOperationFailure } {
+    const roomCode = this.normalizeRoomCode(payload?.roomCode);
+    if (roomCode === null) {
+      return {
+        success: false,
+        result: failure(
+          'INVALID_ROOM_CODE',
+          `Enter a ${ROOM_CODE_LENGTH}-character room code.`,
+        ),
+      };
+    }
+    const room = this.rooms.get(roomCode);
+    if (room === undefined)
+      return {
+        success: false,
+        result: failure('ROOM_NOT_FOUND', 'No room exists with that code.'),
+      };
+    const player = room.players.find(
+      (candidate) =>
+        candidate.socketId === socketId &&
+        candidate.playerId === payload?.playerId,
+    );
+    if (player === undefined)
+      return {
+        success: false,
+        result: failure(
+          'PLAYER_NOT_FOUND',
+          'This connection is not a player in that room.',
+        ),
+      };
+    if (room.hostPlayerId !== player.playerId)
+      return {
+        success: false,
+        result: failure('NOT_HOST', 'Only the host can perform this action.'),
+      };
+    if (room.status !== LobbyStatus.STARTED)
+      return {
+        success: false,
+        result: failure(
+          'GAME_NOT_FINISHED',
+          'There is no finished game in this room.',
+        ),
+      };
+    return { success: true, room, player };
+  }
+
+  private normalizePlayerName(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
     const name = value.trim();
     return name.length > 0 ? name : null;
   }
 
   private normalizeRoomCode(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
+    if (typeof value !== 'string') return null;
     const roomCode = value.trim().toUpperCase();
     return ROOM_CODE_PATTERN.test(roomCode) ? roomCode : null;
   }
 
   private generateUniqueRoomCode(): string {
     let roomCode = this.roomCodes.generate();
-    while (this.rooms.has(roomCode)) {
-      roomCode = this.roomCodes.generate();
-    }
+    while (this.rooms.has(roomCode)) roomCode = this.roomCodes.generate();
     return roomCode;
   }
 
   private createPlayer(socketId: string, name: string): LobbyPlayerRecord {
-    return { playerId: randomUUID(), name, socketId };
+    return {
+      playerId: randomUUID(),
+      name,
+      sessionToken: randomUUID(),
+      socketId,
+      connected: true,
+    };
+  }
+
+  private trackPlayer(roomCode: string, player: LobbyPlayerRecord): void {
+    this.roomCodeBySocketId.set(player.socketId as string, roomCode);
+    this.roomCodeBySessionToken.set(player.sessionToken, roomCode);
   }
 
   private success(
     room: LobbyRoomRecord,
-    playerId: string,
+    player: LobbyPlayerRecord,
   ): LobbyOperationSuccess {
     return {
       success: true,
-      acknowledgement: { success: true, roomCode: room.roomCode, playerId },
+      acknowledgement: {
+        success: true,
+        roomCode: room.roomCode,
+        playerId: player.playerId,
+        sessionToken: player.sessionToken,
+      },
       state: this.toState(room),
     };
   }
@@ -255,6 +406,7 @@ export class LobbyService {
         playerId: player.playerId,
         name: player.name,
         isHost: player.playerId === room.hostPlayerId,
+        connected: player.connected,
       })),
     };
   }

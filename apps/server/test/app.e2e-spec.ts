@@ -19,10 +19,10 @@ describe('AppController (e2e)', () => {
   it('/api/status (GET)', () => {
     return request(app.getHttpServer()).get('/api/status').expect(200).expect({
       applicationName: 'Munchkin LAN',
-      milestone: 3,
+      milestone: 12,
       engine: 'domain-ready',
-      serverConnection: 'lobby-ready',
-      gameplay: 'not-implemented',
+      serverConnection: 'game-ready',
+      gameplay: 'game-completion-ready',
     });
   });
 

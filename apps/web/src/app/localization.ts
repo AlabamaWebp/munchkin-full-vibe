@@ -1,0 +1,539 @@
+import { Injectable, signal } from '@angular/core';
+import type { GameCardView } from '@munchkin-lan/contracts';
+import type { UserFacingError } from './lobby-client';
+
+export type AppLocale = 'ru' | 'en';
+
+const ENGLISH = {
+  language: 'Language',
+  russian: 'Russian',
+  english: 'English',
+  brandTagline: 'LAN card adventure',
+  online: 'Online',
+  reconnecting: 'Reconnecting',
+  turn: 'Turn',
+  victory: 'Victory!',
+  winnerMessage: 'reached the winning level and won the game.',
+  rematch: 'Play again',
+  returnToLobby: 'Return to lobby',
+  waitingForHostAfterGame: 'Waiting for the host to choose what happens next…',
+  deckSizes: 'Deck sizes',
+  door: 'Door',
+  treasure: 'Treasure',
+  players: 'Players',
+  currentTurn: 'Current turn',
+  gameTable: 'Game table',
+  monsterEncounter: 'Monster encounter',
+  level: 'Level',
+  combatPower: 'Power',
+  equipmentBonus: 'Equipment bonus',
+  yourPower: 'Your power',
+  monsterPower: 'Monster power',
+  combatRewards: 'Rewards',
+  badStuff: 'Bad stuff on a failed escape',
+  badStuffLoseLevel: 'Lose levels:',
+  badStuffDiscardHand: 'Discard random cards from hand:',
+  badStuffDiscardEquipment: 'Discard random equipped items:',
+  badStuffDiscardRole: 'Discard role:',
+  badStuffDeath: 'Death: discard cards, equipment, class and race',
+  runAwaySucceeded: 'Escape succeeded',
+  runAwayFailed: 'Escape failed',
+  dieRoll: 'Die roll',
+  badStuffApplied: 'The monster’s bad stuff was applied.',
+  levels: 'levels',
+  treasures: 'treasures',
+  temporaryBonus: 'Temporary bonus',
+  monsterBonus: 'Monster bonus',
+  helperContribution: 'Helper contribution',
+  requestHelp: 'Ask for help',
+  helpRequested: 'Help requested from',
+  helperJoined: 'Helper joined',
+  combatHistory: 'Combat history',
+  historyCombatStarted: 'started combat with',
+  historyHelpRequested: 'asked for help from',
+  historyHelpAccepted: 'joined the combat with',
+  historyPlayedForPlayers: 'played for the adventurers',
+  historyPlayedForMonster: 'played for the monster',
+  playForPlayers: 'Play for adventurers',
+  playForMonster: 'Play for monster',
+  yourMove: 'Your move',
+  chooseAction: 'Choose an available action below.',
+  anotherPlayerActs: 'Another adventurer is acting',
+  handPrivate: 'Your hand remains private.',
+  yourAdventurer: 'Your adventurer',
+  equipment: 'Equipment',
+  nothingEquipped: 'Nothing equipped yet',
+  equip: 'Equip',
+  unequip: 'Unequip',
+  roles: 'Class and race',
+  none: 'None',
+  dead: 'Dead — new cards arrive at the start of your next turn',
+  value: 'Value',
+  playRole: 'Use role',
+  curseTo: 'Curse',
+  sell: 'Sell for a level',
+  tradeTo: 'Give to',
+  charity: 'Resolve charity',
+  slotHead: 'Head',
+  slotBody: 'Body',
+  slotFeet: 'Feet',
+  slotHands: 'Hands',
+  yourHand: 'Your hand',
+  closeCardDetails: 'Close card details',
+  availableActions: 'Available actions',
+  combatInProgress: 'Combat in progress',
+  waitingForTurn: 'Waiting for your turn…',
+  roomCode: 'Room code',
+  shareRoom: 'Share the code with friends on this Wi-Fi. Sessions recover after refresh.',
+  offline: 'Offline',
+  you: 'You',
+  host: 'Host',
+  starting: 'Starting…',
+  startGame: 'Start game',
+  singlePlayerNote: 'Development mode allows a one-player game.',
+  waitingForHost: 'Waiting for the host to start…',
+  gatherParty: 'Gather your party',
+  welcomeTitle: 'Adventure is better together.',
+  welcomeCopy: 'Create a room or join friends already playing on your local network.',
+  yourName: 'Your name',
+  createRoom: 'Create room',
+  orJoinRoom: 'or join a room',
+  joinRoom: 'Join room',
+  phaseLobby: 'Waiting in lobby',
+  phaseTurnStart: 'Kick down the door',
+  phaseKickDoor: 'Opening the door',
+  phaseDoorResolution: 'Resolving the door',
+  phasePostDoor: 'Choose what to do next',
+  phaseLootRoom: 'Looting the room',
+  phaseEndTurn: 'End the turn',
+  phaseFinished: 'Game finished',
+  actionKickDoor: 'Kick the door',
+  actionAcceptHelp: 'Accept help request',
+  actionResolveCombat: 'Claim victory',
+  actionRunAway: 'Run away',
+  actionLootRoom: 'Loot the room',
+  actionEndTurn: 'End turn',
+  cardMonster: 'Monster',
+  cardCurse: 'Curse',
+  cardEquipment: 'Equipment',
+  cardTemporaryBonus: 'Temporary bonus',
+  cardMonsterModifier: 'Monster modifier',
+  cardOther: 'Other',
+  cardClass: 'Class',
+  cardRace: 'Race',
+  errorConnectionLost: 'Connection lost. Reconnecting…',
+  errorServerUnavailable: 'Cannot reach the game server. Retrying…',
+  errorAlreadyInRoom: 'This connection is already in a room.',
+  errorGameStarted: 'The game has already started.',
+  errorInvalidPlayerName: 'Enter a player name.',
+  errorInvalidRoomCode: 'Enter a valid 4-character room code.',
+  errorInvalidSession: 'The saved session is invalid or has expired.',
+  errorNotHost: 'Only the host can start the game.',
+  errorPlayerNotFound: 'This player was not found in the room.',
+  errorRoomFull: 'The room is full (maximum 6 players).',
+  errorRoomNotFound: 'No room exists with that code.',
+  errorGameNotFinished: 'The game has not finished yet.',
+  errorGameNotFound: 'The game is not running.',
+  errorNotActivePlayer: 'It is not your turn.',
+  errorInvalidPhase: 'This action is not available right now.',
+  errorNotEnoughPlayers: 'There are not enough players to start.',
+  errorActorNotFound: 'This player is not part of the game.',
+  errorCardNotInHand: 'That card is not in your hand.',
+  errorCardNotEquipped: 'That item is not equipped.',
+  errorCardNotEquipment: 'That card is not equipment.',
+  errorCardNotPlayable: 'That card cannot be played in this combat.',
+  errorInvalidTarget: 'That card has no valid target.',
+  errorInvalidHelper: 'That player cannot help in this combat.',
+  errorHelpAlreadyAccepted: 'A helper has already joined this combat.',
+  errorHelpNotRequested: 'You do not have an active help request.',
+  errorCombatNotWon: 'Your power must be greater than the monster power.',
+  errorEquipmentSlotOccupied: 'That equipment slot is already occupied.',
+  errorNotEnoughFreeHands: 'You do not have enough free hands.',
+  errorClassRequired: 'This item requires a different Class.',
+  errorRaceRequired: 'This item requires a different Race.',
+  errorInvalidRecipient: 'Choose a valid recipient.',
+  errorInvalidCardSelection: 'Choose the required cards.',
+  errorInsufficientSaleValue: 'The selected items are not worth 1,000 gold.',
+  errorHandLimitExceeded: 'Resolve charity before ending the turn.',
+  errorCommandNotAvailable: 'This action is not available yet.',
+  errorDeckEmpty: 'There are no cards left in that deck.',
+  errorDuplicatePlayer: 'That player is already in the game.',
+  errorInsufficientCards: 'There are not enough cards to start the game.',
+  errorPlayerLimit: 'The game already has the maximum number of players.',
+  errorUnknown: 'Something went wrong. Please try again.',
+} as const;
+
+type TranslationKey = keyof typeof ENGLISH;
+
+const RUSSIAN: Record<TranslationKey, string> = {
+  language: 'Язык',
+  russian: 'Русский',
+  english: 'English',
+  brandTagline: 'Карточное приключение по локальной сети',
+  online: 'В сети',
+  reconnecting: 'Переподключение',
+  turn: 'Ход',
+  victory: 'Победа!',
+  winnerMessage: 'достиг победного уровня и выиграл партию.',
+  rematch: 'Сыграть ещё раз',
+  returnToLobby: 'Вернуться в лобби',
+  waitingForHostAfterGame: 'Ждём, когда ведущий выберет, что делать дальше…',
+  deckSizes: 'Размеры колод',
+  door: 'Двери',
+  treasure: 'Сокровища',
+  players: 'Игроки',
+  currentTurn: 'Сейчас ходит',
+  gameTable: 'Игровой стол',
+  monsterEncounter: 'Встреча с монстром',
+  level: 'Уровень',
+  combatPower: 'Сила',
+  equipmentBonus: 'Бонус снаряжения',
+  yourPower: 'Ваша сила',
+  monsterPower: 'Сила монстра',
+  combatRewards: 'Награда',
+  badStuff: 'Непотребство при неудачном побеге',
+  badStuffLoseLevel: 'Потерять уровни:',
+  badStuffDiscardHand: 'Сбросить случайные карты с руки:',
+  badStuffDiscardEquipment: 'Сбросить случайные надетые предметы:',
+  badStuffDiscardRole: 'Сбросить роль:',
+  badStuffDeath: 'Смерть: сбросить карты, снаряжение, класс и расу',
+  runAwaySucceeded: 'Побег удался',
+  runAwayFailed: 'Побег не удался',
+  dieRoll: 'Бросок кубика',
+  badStuffApplied: 'Непотребство монстра применено.',
+  levels: 'ур.',
+  treasures: 'сокровищ',
+  temporaryBonus: 'Временный бонус',
+  monsterBonus: 'Бонус монстра',
+  helperContribution: 'Вклад помощника',
+  requestHelp: 'Позвать на помощь',
+  helpRequested: 'Помощь запрошена у',
+  helperJoined: 'Помощник в бою',
+  combatHistory: 'История боя',
+  historyCombatStarted: 'начал бой с',
+  historyHelpRequested: 'попросил помощи у',
+  historyHelpAccepted: 'вступил в бой вместе с',
+  historyPlayedForPlayers: 'сыграл за приключенцев',
+  historyPlayedForMonster: 'сыграл за монстра',
+  playForPlayers: 'Сыграть за приключенцев',
+  playForMonster: 'Сыграть за монстра',
+  yourMove: 'Ваш ход',
+  chooseAction: 'Выберите доступное действие ниже.',
+  anotherPlayerActs: 'Другой приключенец делает ход',
+  handPrivate: 'Ваши карты по-прежнему видны только вам.',
+  yourAdventurer: 'Ваш приключенец',
+  equipment: 'Снаряжение',
+  nothingEquipped: 'Пока ничего не надето',
+  equip: 'Надеть',
+  unequip: 'Снять',
+  roles: 'Класс и раса',
+  none: 'Нет',
+  dead: 'Мёртв — новые карты будут выданы в начале следующего хода',
+  value: 'Цена',
+  playRole: 'Выбрать роль',
+  curseTo: 'Проклясть',
+  sell: 'Продать за уровень',
+  tradeTo: 'Передать игроку',
+  charity: 'Раздать милостыню',
+  slotHead: 'Голова',
+  slotBody: 'Тело',
+  slotFeet: 'Ноги',
+  slotHands: 'Руки',
+  yourHand: 'Ваши карты',
+  closeCardDetails: 'Закрыть описание карты',
+  availableActions: 'Доступные действия',
+  combatInProgress: 'Идёт бой',
+  waitingForTurn: 'Ожидание вашего хода…',
+  roomCode: 'Код комнаты',
+  shareRoom:
+    'Сообщите этот код друзьям в той же сети Wi-Fi. После обновления страницы игра восстановится.',
+  offline: 'Не в сети',
+  you: 'Вы',
+  host: 'Ведущий',
+  starting: 'Запуск…',
+  startGame: 'Начать игру',
+  singlePlayerNote: 'В режиме разработки можно играть одному.',
+  waitingForHost: 'Ждём, когда ведущий начнёт игру…',
+  gatherParty: 'Соберите команду',
+  welcomeTitle: 'Вместе приключаться веселее.',
+  welcomeCopy:
+    'Создайте комнату или присоединитесь к друзьям, которые уже играют в вашей локальной сети.',
+  yourName: 'Ваше имя',
+  createRoom: 'Создать комнату',
+  orJoinRoom: 'или присоединиться',
+  joinRoom: 'Войти в комнату',
+  phaseLobby: 'Ожидание в комнате',
+  phaseTurnStart: 'Вышибите дверь',
+  phaseKickDoor: 'Открываем дверь',
+  phaseDoorResolution: 'Разбираемся с находкой',
+  phasePostDoor: 'Выберите следующее действие',
+  phaseLootRoom: 'Обыскиваем комнату',
+  phaseEndTurn: 'Завершите ход',
+  phaseFinished: 'Игра окончена',
+  actionKickDoor: 'Вышибить дверь',
+  actionAcceptHelp: 'Принять просьбу о помощи',
+  actionResolveCombat: 'Заявить победу',
+  actionRunAway: 'Сбежать',
+  actionLootRoom: 'Обыскать комнату',
+  actionEndTurn: 'Завершить ход',
+  cardMonster: 'Монстр',
+  cardCurse: 'Проклятие',
+  cardEquipment: 'Снаряжение',
+  cardTemporaryBonus: 'Разовый бонус',
+  cardMonsterModifier: 'Усиление монстра',
+  cardOther: 'Прочее',
+  cardClass: 'Класс',
+  cardRace: 'Раса',
+  errorConnectionLost: 'Соединение потеряно. Переподключаемся…',
+  errorServerUnavailable: 'Не удаётся подключиться к игровому серверу. Повторяем попытку…',
+  errorAlreadyInRoom: 'Это подключение уже находится в комнате.',
+  errorGameStarted: 'Игра уже началась.',
+  errorInvalidPlayerName: 'Введите имя игрока.',
+  errorInvalidRoomCode: 'Введите правильный четырёхзначный код комнаты.',
+  errorInvalidSession: 'Сохранённая игровая сессия недействительна или устарела.',
+  errorNotHost: 'Только ведущий может начать игру.',
+  errorPlayerNotFound: 'Игрок не найден в этой комнате.',
+  errorRoomFull: 'Комната заполнена: не более 6 игроков.',
+  errorRoomNotFound: 'Комнаты с таким кодом не существует.',
+  errorGameNotFinished: 'Игра ещё не завершена.',
+  errorGameNotFound: 'Игра сейчас не запущена.',
+  errorNotActivePlayer: 'Сейчас не ваш ход.',
+  errorInvalidPhase: 'Это действие сейчас недоступно.',
+  errorNotEnoughPlayers: 'Для начала игры недостаточно игроков.',
+  errorActorNotFound: 'Этот игрок не участвует в игре.',
+  errorCardNotInHand: 'Этой карты нет у вас в руке.',
+  errorCardNotEquipped: 'Этот предмет не надет.',
+  errorCardNotEquipment: 'Эта карта не является снаряжением.',
+  errorCardNotPlayable: 'Эту карту нельзя сыграть в текущий бой.',
+  errorInvalidTarget: 'Для этой карты не выбрана допустимая цель.',
+  errorInvalidHelper: 'Этот игрок не может помочь в текущем бою.',
+  errorHelpAlreadyAccepted: 'К этому бою уже присоединился помощник.',
+  errorHelpNotRequested: 'У вас нет активной просьбы о помощи.',
+  errorCombatNotWon: 'Ваша сила должна быть выше силы монстра.',
+  errorEquipmentSlotOccupied: 'Этот слот снаряжения уже занят.',
+  errorNotEnoughFreeHands: 'У вас недостаточно свободных рук.',
+  errorClassRequired: 'Для этого предмета нужен другой класс.',
+  errorRaceRequired: 'Для этого предмета нужна другая раса.',
+  errorInvalidRecipient: 'Выберите допустимого получателя.',
+  errorInvalidCardSelection: 'Выберите нужное количество карт.',
+  errorInsufficientSaleValue: 'Выбранные предметы не стоят 1 000 золотых.',
+  errorHandLimitExceeded: 'Перед завершением хода раздайте милостыню.',
+  errorCommandNotAvailable: 'Это действие пока недоступно.',
+  errorDeckEmpty: 'В этой колоде не осталось карт.',
+  errorDuplicatePlayer: 'Этот игрок уже участвует в игре.',
+  errorInsufficientCards: 'Для начала игры в колодах недостаточно карт.',
+  errorPlayerLimit: 'В игре уже максимальное количество игроков.',
+  errorUnknown: 'Что-то пошло не так. Попробуйте ещё раз.',
+};
+
+const TRANSLATIONS = { en: ENGLISH, ru: RUSSIAN } as const;
+const LOCALE_STORAGE_KEY = 'munchkin-lan.locale';
+
+const ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
+  CONNECTION_LOST: 'errorConnectionLost',
+  SERVER_UNAVAILABLE: 'errorServerUnavailable',
+  ALREADY_IN_ROOM: 'errorAlreadyInRoom',
+  GAME_ALREADY_STARTED: 'errorGameStarted',
+  INVALID_PLAYER_NAME: 'errorInvalidPlayerName',
+  INVALID_ROOM_CODE: 'errorInvalidRoomCode',
+  INVALID_SESSION: 'errorInvalidSession',
+  NOT_HOST: 'errorNotHost',
+  PLAYER_NOT_FOUND: 'errorPlayerNotFound',
+  ROOM_FULL: 'errorRoomFull',
+  ROOM_NOT_FOUND: 'errorRoomNotFound',
+  GAME_NOT_FINISHED: 'errorGameNotFinished',
+  GAME_NOT_FOUND: 'errorGameNotFound',
+  NOT_ACTIVE_PLAYER: 'errorNotActivePlayer',
+  INVALID_PHASE: 'errorInvalidPhase',
+  NOT_ENOUGH_PLAYERS: 'errorNotEnoughPlayers',
+  ACTOR_NOT_FOUND: 'errorActorNotFound',
+  CARD_NOT_IN_HAND: 'errorCardNotInHand',
+  CARD_NOT_EQUIPPED: 'errorCardNotEquipped',
+  CARD_NOT_EQUIPMENT: 'errorCardNotEquipment',
+  CARD_NOT_PLAYABLE: 'errorCardNotPlayable',
+  INVALID_TARGET: 'errorInvalidTarget',
+  INVALID_HELPER: 'errorInvalidHelper',
+  HELP_ALREADY_ACCEPTED: 'errorHelpAlreadyAccepted',
+  HELP_NOT_REQUESTED: 'errorHelpNotRequested',
+  COMBAT_NOT_WON: 'errorCombatNotWon',
+  EQUIPMENT_SLOT_OCCUPIED: 'errorEquipmentSlotOccupied',
+  NOT_ENOUGH_FREE_HANDS: 'errorNotEnoughFreeHands',
+  CLASS_REQUIRED: 'errorClassRequired',
+  RACE_REQUIRED: 'errorRaceRequired',
+  INVALID_RECIPIENT: 'errorInvalidRecipient',
+  INVALID_CARD_SELECTION: 'errorInvalidCardSelection',
+  INSUFFICIENT_SALE_VALUE: 'errorInsufficientSaleValue',
+  HAND_LIMIT_EXCEEDED: 'errorHandLimitExceeded',
+  COMMAND_NOT_AVAILABLE: 'errorCommandNotAvailable',
+  DECK_EMPTY: 'errorDeckEmpty',
+  DUPLICATE_PLAYER_ID: 'errorDuplicatePlayer',
+  INSUFFICIENT_CARDS: 'errorInsufficientCards',
+  PLAYER_LIMIT_REACHED: 'errorPlayerLimit',
+};
+
+interface CardTranslation {
+  readonly name: string;
+  readonly description: string;
+}
+
+const RUSSIAN_CARDS: Readonly<Record<string, CardTranslation>> = {
+  'dust-bunny-brigade': {
+    name: 'Бригада пылевых кроликов',
+    description: 'Удивительно организованная угроза из-под дивана.',
+  },
+  'corridor-crab': {
+    name: 'Коридорный краб',
+    description: 'Он захватил коридор и отказывается вести переговоры.',
+  },
+  'bureaucratic-ooze': {
+    name: 'Бюрократическая слизь',
+    description: 'Для каждой атаки нужны три одинаковые справки.',
+  },
+  'clockwork-yak': {
+    name: 'Заводной як',
+    description: 'Громкий, упрямый и слишком туго заведённый.',
+  },
+  'moonlit-leviathan': {
+    name: 'Лунный левиафан',
+    description: 'Он не помещается в комнате, но каким-то образом уже внутри.',
+  },
+  'curse-shortcut-tax': {
+    name: 'Проклятие! Налог на короткий путь',
+    description: 'Потеряйте один уровень за подозрительно удобный маршрут.',
+  },
+  'curse-memory-moths': {
+    name: 'Проклятие! Моль забвения',
+    description: 'Сбросьте одну случайную карту из руки.',
+  },
+  'curse-double-backtrack': {
+    name: 'Проклятие! Двойной возврат',
+    description: 'Потеряйте два уровня, но не опускайтесь ниже первого.',
+  },
+  'curse-career-fog': {
+    name: 'Проклятие! Карьерный туман',
+    description: 'Сбросьте свой текущий класс.',
+  },
+  'guild-of-echoes': {
+    name: 'Гильдия эха',
+    description: 'Звучный класс, способный использовать Двуручную закладку.',
+  },
+  'lantern-folk': {
+    name: 'Народ фонарей',
+    description: 'Светлая раса с талантом находить дорогу.',
+  },
+  'mysterious-membership-card': {
+    name: 'Таинственный членский билет',
+    description: 'Никто не помнит, как вступал, но выглядит билет официально.',
+  },
+  'spatula-of-resolve': {
+    name: 'Лопатка решимости',
+    description: 'Проверенное на кухне снаряжение с бонусом +2 к боевой силе.',
+  },
+  'helmet-of-mild-foresight': {
+    name: 'Шлем лёгкого предвидения',
+    description: 'Вы замечаете опасность примерно на секунду раньше.',
+  },
+  'boots-of-purposeful-squeaking': {
+    name: 'Сапоги уверенного скрипа',
+    description: 'Скрытность переоценена, а уверенность даёт +2 к силе.',
+  },
+  'cardboard-plate-mail': {
+    name: 'Картонные латы',
+    description: 'Зависящая от погоды защита с бонусом +3 к силе.',
+  },
+  'two-handed-bookmark': {
+    name: 'Двуручная закладка',
+    description: 'Отмечает и нужную страницу, и врагов, которых пора победить.',
+  },
+  'bottled-applause': {
+    name: 'Аплодисменты в бутылке',
+    description: 'Откройте и ненадолго получите +3 к уверенности и боевой силе.',
+  },
+  'pocket-comet': {
+    name: 'Карманная комета',
+    description: 'Маленькая, сияющая и дающая временный бонус +5.',
+  },
+  'emergency-confetti': {
+    name: 'Аварийное конфетти',
+    description: 'Красочный отвлекающий манёвр с временным бонусом +2.',
+  },
+  'inflatable-shoulder-pads': {
+    name: 'Надувные наплечники',
+    description: 'Монстр выглядит на четыре пункта внушительнее.',
+  },
+  'dramatic-entrance-music': {
+    name: 'Драматическая музыка для выхода',
+    description: 'Необязательная фанфара добавляет монстру две силы.',
+  },
+  'coupon-of-destiny': {
+    name: 'Купон судьбы',
+    description: 'Нигде не действует, но когда-нибудь наверняка пригодится.',
+  },
+  'polished-pebble-collection': {
+    name: 'Коллекция гладких камешков',
+    description: 'Несколько превосходных камешков в солидном мешочке.',
+  },
+};
+
+@Injectable({ providedIn: 'root' })
+export class LocalizationService {
+  private readonly currentLocale = signal<AppLocale>(
+    window.localStorage.getItem(LOCALE_STORAGE_KEY) === 'en' ? 'en' : 'ru',
+  );
+
+  readonly locale = this.currentLocale.asReadonly();
+
+  constructor() {
+    this.applyDocumentLanguage(this.currentLocale());
+  }
+
+  translate(key: TranslationKey): string {
+    return TRANSLATIONS[this.currentLocale()][key];
+  }
+
+  setLocale(locale: AppLocale): void {
+    this.currentLocale.set(locale);
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    this.applyDocumentLanguage(locale);
+  }
+
+  errorMessage(error: UserFacingError): string {
+    const key = ERROR_KEYS[error.code];
+    if (key !== undefined) return this.translate(key);
+    return this.currentLocale() === 'en' && error.message.length > 0
+      ? error.message
+      : this.translate('errorUnknown');
+  }
+
+  cardName(card: GameCardView): string {
+    return this.currentLocale() === 'ru'
+      ? (RUSSIAN_CARDS[card.definitionId]?.name ?? card.name)
+      : card.name;
+  }
+
+  cardDescription(card: GameCardView): string {
+    return this.currentLocale() === 'ru'
+      ? (RUSSIAN_CARDS[card.definitionId]?.description ?? card.description)
+      : card.description;
+  }
+
+  cardsCount(count: number): string {
+    if (this.currentLocale() === 'en') return `${count} ${count === 1 ? 'card' : 'cards'}`;
+    const lastTwo = count % 100;
+    const last = count % 10;
+    const noun =
+      lastTwo >= 11 && lastTwo <= 14
+        ? 'карт'
+        : last === 1
+          ? 'карта'
+          : last >= 2 && last <= 4
+            ? 'карты'
+            : 'карт';
+    return `${count} ${noun}`;
+  }
+
+  private applyDocumentLanguage(locale: AppLocale): void {
+    document.documentElement.lang = locale;
+    document.title = locale === 'ru' ? 'Манчкин по локальной сети' : 'Munchkin LAN';
+  }
+}

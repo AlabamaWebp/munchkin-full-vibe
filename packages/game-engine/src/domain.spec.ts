@@ -26,7 +26,7 @@ const definition: CardDefinition = {
 };
 
 const state: GameState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: gameId,
   status: GameStatus.LOBBY,
   phase: GamePhase.LOBBY,
