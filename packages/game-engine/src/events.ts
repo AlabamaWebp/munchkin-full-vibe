@@ -236,6 +236,12 @@ export type GameEvent =
       readonly recipientId: PlayerId | null;
       readonly count: number;
     })
+  | (PrivateEvent & {
+      readonly type: "CHARITY_CARDS_REVEALED";
+      readonly playerId: PlayerId;
+      readonly recipientId: PlayerId | null;
+      readonly cardIds: readonly CardInstanceId[];
+    })
   | (PublicEvent & {
       readonly type: "PLAYER_DIED" | "PLAYER_REVIVED";
       readonly playerId: PlayerId;

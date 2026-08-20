@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import type { GameCardView } from '@munchkin-lan/contracts';
 import { AutoFocusDirective } from './auto-focus.directive';
+import { CardArtworkComponent } from './card-artwork.component';
 
 @Component({
   selector: 'app-card-details-dialog',
@@ -30,69 +31,53 @@ import { AutoFocusDirective } from './auto-focus.directive';
             ×
           </button>
         </header>
-        @if (meta()) {
-          <div class="event-meta">{{ meta() }}</div>
-        }
-        @if (result()) {
-          <div class="event-result">{{ result() }}</div>
-        }
-        @if (currentCard(); as card) {
-          <article
-            class="card-copy"
-            [attr.data-card-type]="card.type"
-            [attr.data-card-deck]="card.deck"
-          >
-            <small>{{ typeLabel()(card) }}</small>
-            <h3>{{ cardName()(card) }}</h3>
-            <p>{{ cardDescription()(card) }}</p>
-            @if (card.goldValue !== undefined) {
-              <dl>
-                <div>
-                  <dt>{{ valueLabel() }}</dt>
-                  <dd>{{ card.goldValue }}</dd>
-                </div>
-              </dl>
-            }
-            @if (card.equipment; as equipment) {
-              <dl>
-                <div>
-                  <dt>{{ bonusLabel() }}</dt>
-                  <dd>+{{ equipment.combatBonus }}</dd>
-                </div>
-                <div>
-                  <dt>{{ slotLabel() }}</dt>
-                  <dd>{{ equipmentSlotLabel()(equipment.slot) }}</dd>
-                </div>
-              </dl>
-            }
-            @if (card.effects.length > 0) {
-              <div class="effects">
-                <strong>{{ effectsLabel() }}</strong>
-                @for (effect of card.effects; track $index) {
-                  <span>{{ effectLabel()(effect) }}</span>
-                }
-              </div>
-            }
-          </article>
-        }
-        @if (cards().length > 1) {
-          <nav class="card-picker" [attr.aria-label]="relatedCardsLabel()">
-            @for (card of cards(); track card.instanceId; let index = $index) {
-              <button
-                type="button"
-                [class.active]="index === activeIndex()"
-                (click)="activeIndex.set(index)"
-              >
-                {{ cardName()(card) }}
-              </button>
-            }
-          </nav>
-        }
-        <ng-content />
+        <div class="dialog-scroll">
+          @if (meta()) {
+            <div class="event-meta">{{ meta() }}</div>
+          }
+          @if (result()) {
+            <div class="event-result">{{ result() }}</div>
+          }
+          @if (currentCard(); as card) {
+            <article
+              class="card-copy"
+              [attr.data-card-type]="card.type"
+              [attr.data-card-deck]="card.deck"
+            >
+              <small>{{ typeLabel()(card) }}</small>
+              <h3>{{ cardName()(card) }}</h3>
+              <app-card-artwork [artKey]="card.artKey" [label]="cardName()(card)" />
+              <p>{{ cardDescription()(card) }}</p>
+              @if (facts()(card).length > 0) {
+                <dl class="card-facts">
+                  @for (fact of facts()(card); track $index) {
+                    <div>
+                      <dd>{{ fact }}</dd>
+                    </div>
+                  }
+                </dl>
+              }
+            </article>
+          }
+          @if (cards().length > 1) {
+            <nav class="card-picker" [attr.aria-label]="relatedCardsLabel()">
+              @for (card of cards(); track card.instanceId; let index = $index) {
+                <button
+                  type="button"
+                  [class.active]="index === activeIndex()"
+                  (click)="activeIndex.set(index)"
+                >
+                  {{ cardName()(card) }}
+                </button>
+              }
+            </nav>
+          }
+          <ng-content />
+        </div>
       </section>
     </div>
   `,
-  imports: [AutoFocusDirective],
+  imports: [AutoFocusDirective, CardArtworkComponent],
   styles: `
     .dialog-backdrop {
       position: fixed;
@@ -111,7 +96,7 @@ import { AutoFocusDirective } from './auto-focus.directive';
       padding: 1rem;
       flex-direction: column;
       gap: 0.8rem;
-      overflow-y: auto;
+      overflow: hidden;
       border: 1px solid #647268;
       border-radius: 1.15rem;
       background: #111d16;
@@ -119,6 +104,7 @@ import { AutoFocusDirective } from './auto-focus.directive';
     }
     header {
       display: flex;
+      flex: 0 0 auto;
       align-items: flex-start;
       justify-content: space-between;
       gap: 1rem;
@@ -135,6 +121,7 @@ import { AutoFocusDirective } from './auto-focus.directive';
     h3 {
       margin: 0;
       font-family: Georgia, serif;
+      overflow-wrap: anywhere;
     }
     .close {
       width: 2.75rem;
@@ -205,9 +192,23 @@ import { AutoFocusDirective } from './auto-focus.directive';
       margin-top: 0.35rem;
       font-size: 1.5rem;
     }
+    .card-copy app-card-artwork {
+      margin-top: 0.8rem;
+    }
     .card-copy p {
       color: #cbd5cd;
       line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    .dialog-scroll {
+      display: grid;
+      min-height: 0;
+      padding: 0 0.15rem 0.15rem;
+      gap: 0.8rem;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
     }
     dl {
       display: grid;
@@ -225,17 +226,16 @@ import { AutoFocusDirective } from './auto-focus.directive';
     dd {
       margin: 0;
       font-weight: 800;
+      overflow-wrap: anywhere;
     }
-    .effects {
-      display: grid;
-      margin-top: 0.8rem;
-      gap: 0.3rem;
-      color: #dce4de;
-      font-size: 0.8rem;
+    .card-facts div {
+      display: block;
+      padding: 0.42rem 0.55rem;
+      border-radius: 0.55rem;
+      background: rgba(4, 10, 6, 0.24);
     }
-    .effects span::before {
-      content: '• ';
-      color: #efc66d;
+    .card-facts dd {
+      line-height: 1.35;
     }
     .card-picker {
       display: flex;
@@ -261,14 +261,14 @@ import { AutoFocusDirective } from './auto-focus.directive';
     }
     @media (max-width: 38rem) {
       .dialog-backdrop {
-        padding: 0;
+        padding: max(0px, env(safe-area-inset-top)) 0 max(0px, env(safe-area-inset-bottom));
         place-items: end stretch;
       }
       .card-dialog {
         width: 100%;
-        max-height: min(88dvh, 46rem);
+        max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         border-radius: 1.2rem 1.2rem 0 0;
-        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        padding-bottom: 1rem;
       }
     }
   `,
@@ -281,17 +281,11 @@ export class CardDetailsDialogComponent {
   readonly meta = input('');
   readonly result = input('');
   readonly closeLabel = input.required<string>();
-  readonly effectsLabel = input.required<string>();
-  readonly bonusLabel = input.required<string>();
-  readonly valueLabel = input.required<string>();
-  readonly slotLabel = input.required<string>();
   readonly relatedCardsLabel = input.required<string>();
+  readonly facts = input.required<(card: GameCardView) => readonly string[]>();
   readonly cardName = input.required<(card: GameCardView) => string>();
   readonly cardDescription = input.required<(card: GameCardView) => string>();
   readonly typeLabel = input.required<(card: GameCardView) => string>();
-  readonly effectLabel = input.required<(effect: GameCardView['effects'][number]) => string>();
-  readonly equipmentSlotLabel =
-    input.required<(slot: NonNullable<GameCardView['equipment']>['slot']) => string>();
   readonly closed = output<void>();
   readonly activeIndex = signal(0);
 

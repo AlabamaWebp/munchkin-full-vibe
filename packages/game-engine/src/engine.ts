@@ -158,6 +158,37 @@ function findDefinition(state: GameState, card: CardInstance): CardDefinition {
   return definition;
 }
 
+function revalidatePlayerEquipment(
+  state: GameState,
+  playerId: PlayerId,
+): { readonly state: GameState; readonly events: readonly GameEvent[] } {
+  const player = state.players.find((candidate) => candidate.id === playerId);
+  if (player === undefined) return { state, events: [] };
+  const incompatible = player.equipment.filter(
+    (card) =>
+      equipmentRestriction(player, findDefinition(state, card)) !== null,
+  );
+  if (incompatible.length === 0) return { state, events: [] };
+
+  const incompatibleIds = new Set(incompatible.map((card) => card.instanceId));
+  return {
+    state: updatePlayer(state, playerId, (current) => ({
+      ...current,
+      equipment: current.equipment.filter(
+        (card) => !incompatibleIds.has(card.instanceId),
+      ),
+      hand: [...current.hand, ...incompatible],
+    })),
+    events: incompatible.map((card) => ({
+      type: "ITEM_UNEQUIPPED" as const,
+      visibility: "PUBLIC" as const,
+      playerId,
+      cardId: card.instanceId,
+      definitionId: card.definitionId,
+    })),
+  };
+}
+
 function createCombatMonster(
   state: GameState,
   monster: CardInstance,
@@ -497,6 +528,9 @@ function applyEffects(
               : { raceCard: null }),
           }));
           nextState = addToDiscard(nextState, [card]);
+          const revalidated = revalidatePlayerEquipment(nextState, playerId);
+          nextState = revalidated.state;
+          events.push(...revalidated.events);
         }
         break;
       }
@@ -1249,23 +1283,8 @@ function playRole(
       : { raceCard: card }),
   }));
   if (previous !== null) nextState = addToDiscard(nextState, [previous]);
-  const updated = nextState.players.find(
-    (candidate) => candidate.id === actorId,
-  )!;
-  const invalidEquipment = updated.equipment.filter(
-    (item) =>
-      equipmentRestriction(updated, findDefinition(nextState, item)) !== null,
-  );
-  if (invalidEquipment.length > 0) {
-    const invalidIds = new Set(invalidEquipment.map((item) => item.instanceId));
-    nextState = updatePlayer(nextState, actorId, (current) => ({
-      ...current,
-      equipment: current.equipment.filter(
-        (item) => !invalidIds.has(item.instanceId),
-      ),
-      hand: [...current.hand, ...invalidEquipment],
-    }));
-  }
+  const revalidated = revalidatePlayerEquipment(nextState, actorId);
+  nextState = revalidated.state;
   return succeed(nextState, [
     {
       type: "ROLE_PLAYED",
@@ -1275,6 +1294,7 @@ function playRole(
       definitionId: card.definitionId,
       role: definition.type,
     },
+    ...revalidated.events,
   ]);
 }
 
@@ -1471,6 +1491,26 @@ function giveCharity(
       recipientId,
       count: selected.length,
     },
+    {
+      type: "CHARITY_CARDS_REVEALED",
+      visibility: "PRIVATE",
+      recipientPlayerId: actorId,
+      playerId: actorId,
+      recipientId,
+      cardIds: selected.map((card) => card.instanceId),
+    },
+    ...(recipientId === null
+      ? []
+      : [
+          {
+            type: "CHARITY_CARDS_REVEALED" as const,
+            visibility: "PRIVATE" as const,
+            recipientPlayerId: recipientId,
+            playerId: actorId,
+            recipientId,
+            cardIds: selected.map((card) => card.instanceId),
+          },
+        ]),
   ]);
 }
 

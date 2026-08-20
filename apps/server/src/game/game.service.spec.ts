@@ -84,4 +84,35 @@ describe('GameService equipment transport', () => {
       error: { code: 'INVALID_RECIPIENT' },
     });
   });
+
+  it('validates selected charity cards and recipient at the transport boundary', () => {
+    const service = new GameService();
+    expect(
+      service.startGame('GIVE', [
+        { playerId: 'player-1', name: 'Ada' },
+        { playerId: 'player-2', name: 'Grace' },
+      ]),
+    ).toEqual({ success: true });
+
+    expect(
+      service.execute('GIVE', 'player-1', {
+        type: 'GIVE_CHARITY',
+        cardIds: [' '],
+        recipientId: 'player-2',
+      }),
+    ).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_CARD_SELECTION' },
+    });
+    expect(
+      service.execute('GIVE', 'player-1', {
+        type: 'GIVE_CHARITY',
+        cardIds: [],
+        recipientId: ' ',
+      }),
+    ).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_RECIPIENT' },
+    });
+  });
 });

@@ -312,8 +312,10 @@ Add after the core loop works end-to-end:
 - Class and Race cards may be played only by the active player during
   `TURN_START`, `POST_DOOR`, or `END_TURN`, outside combat;
 - equipment may declare a required Class or Race by definition id; the engine
-  rejects equipping it without that role, and a role replacement returns newly
-  illegal equipment to its owner's hand;
+  rejects equipping it without that role. After every Class or Race loss or
+  replacement, including `DISCARD_ROLE` Curse effects, the engine revalidates
+  all equipped items, returns every newly illegal item to its owner's private
+  hand, and emits one public unequip event per item without exposing the hand;
 - a Curse held in hand may target any player. Its typed effects resolve
   immediately and the Curse is discarded; expanded effects include losing a
   Class or Race and death;
@@ -323,10 +325,14 @@ Add after the core loop works end-to-end:
 - during their own non-combat turn, a player may give owned equipment to another
   player. The recipient receives it into their private hand and equips it
   separately;
-- the end-turn hand limit is five cards. The active player resolves charity with
-  one action; the engine randomly selects every excess card and gives them to a
-  lowest-level player. If the active player is tied for lowest level, the random
-  excess cards are discarded instead;
+- the end-turn hand limit is five cards. `GIVE_CHARITY` requires the active
+  player to select exactly every excess hand card and, when not at minimum
+  level, one recipient among all minimum-level players. A minimum-level actor
+  instead discards the selected cards. The separate random option remains
+  server-authoritative and selects the excess cards for the player;
+- charity publishes only sender, recipient (when any), and count to everyone.
+  The sender and recipient additionally receive the exact card identities in
+  their private reconnect-safe history; no other player receives them;
 - death keeps the player's level but discards their hand, equipment, Class, and
   Race. The player remains dead until their next turn, then returns after an
   atomic draw of exactly four Door and four Treasure cards using the normal deck

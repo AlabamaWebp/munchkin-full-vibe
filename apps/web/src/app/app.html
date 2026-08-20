@@ -53,38 +53,69 @@
 
   @if (game(); as currentGame) {
     <section class="game-screen" aria-labelledby="turn-title">
-      <div class="turn-banner">
-        <div>
-          <p class="eyebrow">{{ t('turn') }} {{ currentGame.turnNumber }}</p>
-          <h2 id="turn-title">{{ turnStatusLabel(currentGame) }}</h2>
-          @if (currentGame.status !== 'FINISHED') {
-            <p class="expected-action">
-              {{ t('currentTurn') }}:
-              {{ lookupPlayerName(currentGame, currentGame.activePlayerId) }} ·
-              {{ expectedActionLabel(currentGame) }}
+      <div class="game-overview">
+        <div class="turn-banner">
+          <div class="turn-copy">
+            <p class="eyebrow">
+              {{ t('turn') }} {{ currentGame.turnNumber }} · {{ phaseLabel(currentGame.phase) }}
             </p>
-          }
-        </div>
-        <div class="turn-actions">
-          <div class="deck-counts" [attr.aria-label]="t('deckSizes')">
-            <span
-              >{{ t('door') }} <b>{{ currentGame.deckCounts.door }}</b></span
-            >
-            <span
-              >{{ t('treasure') }} <b>{{ currentGame.deckCounts.treasure }}</b></span
-            >
+            <h2 id="turn-title">{{ turnStatusLabel(currentGame) }}</h2>
+            @if (
+              currentGame.status !== 'FINISHED' &&
+              (currentGame.expectedAction.playerId === currentGame.viewerPlayerId ||
+                currentGame.expectedAction.type === 'COMBAT_REACTIONS')
+            ) {
+              <p class="expected-action">{{ expectedActionLabel(currentGame) }}</p>
+            }
           </div>
-          <button
-            class="history-button"
-            type="button"
-            [attr.aria-expanded]="historyOpen()"
-            aria-controls="game-history-dialog"
-            (click)="historyOpen.set(true)"
-          >
-            {{ t('gameHistory') }}
-            <span>{{ currentGame.gameLog.length }}</span>
-          </button>
+          <div class="turn-actions">
+            <div class="deck-counts" [attr.aria-label]="t('deckSizes')">
+              <span
+                >{{ t('door') }} <b>{{ currentGame.deckCounts.door }}</b></span
+              >
+              <span
+                >{{ t('treasure') }} <b>{{ currentGame.deckCounts.treasure }}</b></span
+              >
+            </div>
+            <button
+              class="history-button"
+              type="button"
+              [attr.aria-expanded]="historyOpen()"
+              aria-controls="game-history-dialog"
+              (click)="historyOpen.set(true)"
+            >
+              {{ t('gameHistory') }}
+              <span>{{ currentGame.gameLog.length }}</span>
+            </button>
+          </div>
         </div>
+
+        @if (recentPublicEvents().length > 0) {
+          <div class="recent-events" aria-live="polite">
+            <ol>
+              @for (entry of recentPublicEvents(); track entry.sequence) {
+                <li [class.has-details]="logEntryCards(entry).length > 0">
+                  <span>{{ gameLogEntryLabel(currentGame, entry) }}</span>
+                  @if (logEntryCards(entry).length > 0) {
+                    <button
+                      type="button"
+                      class="event-details-button"
+                      [attr.aria-label]="
+                        t('openEventDetails') + ': ' + gameLogEntryLabel(currentGame, entry)
+                      "
+                      (click)="openLogEntry(entry)"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 11v6M12 7.5v.5" />
+                      </svg>
+                    </button>
+                  }
+                </li>
+              }
+            </ol>
+          </div>
+        }
       </div>
 
       @if (error(); as currentError) {
@@ -126,14 +157,32 @@
                       }
                       #{{ entry.sequence }}
                     </span>
-                    @if (logEntryCards(entry).length > 0) {
-                      <button type="button" (click)="openLogEntry(entry)">
-                        <span>{{ gameLogEntryLabel(currentGame, entry) }}</span>
-                        <small>{{ t('openEventDetails') }} ›</small>
-                      </button>
-                    } @else {
+                    <div class="history-entry-content">
+                      @if (logEntryCards(entry)[0]; as historyCard) {
+                        <app-card-artwork
+                          class="history-card-art"
+                          [artKey]="historyCard.artKey"
+                          [label]="cardName(historyCard)"
+                          [compact]="true"
+                        />
+                      }
                       <p>{{ gameLogEntryLabel(currentGame, entry) }}</p>
-                    }
+                      @if (logEntryCards(entry).length > 0) {
+                        <button
+                          type="button"
+                          class="event-details-button"
+                          [attr.aria-label]="
+                            t('openEventDetails') + ': ' + gameLogEntryLabel(currentGame, entry)
+                          "
+                          (click)="openLogEntry(entry)"
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 11v6M12 7.5v.5" />
+                          </svg>
+                        </button>
+                      }
+                    </div>
                   </li>
                 }
               </ol>
@@ -159,6 +208,7 @@
                     [name]="cardName(card)"
                     [kicker]="cardTypeLabel(card.type)"
                     [badge]="lookupPlayerName(currentGame, entry.playerId ?? '')"
+                    [facts]="cardFacts(card)"
                     [ariaLabel]="t('openEventDetails') + ': ' + cardName(card)"
                     [compact]="true"
                     (opened)="openLogEntry(entry)"
@@ -185,25 +235,6 @@
             <span>✓ {{ gameLogEntryLabel(currentGame, entry) }}</span>
           }
         </div>
-      }
-
-      @if (recentPublicEvents().length > 0) {
-        <details class="recent-events">
-          <summary>{{ t('recentEvents') }}</summary>
-          <ol>
-            @for (entry of recentPublicEvents(); track entry.sequence) {
-              <li>
-                @if (logEntryCards(entry).length > 0) {
-                  <button type="button" (click)="openLogEntry(entry)">
-                    {{ gameLogEntryLabel(currentGame, entry) }}
-                  </button>
-                } @else {
-                  {{ gameLogEntryLabel(currentGame, entry) }}
-                }
-              </li>
-            }
-          </ol>
-        </details>
       }
 
       @if (currentGame.pendingDecision; as decision) {
@@ -292,6 +323,93 @@
             >
               {{ t('confirmSale') }}
             </button>
+          </section>
+        </div>
+      }
+
+      @if (charityOpen()) {
+        <div class="history-backdrop">
+          <section
+            class="history-dialog sale-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="charity-title"
+          >
+            <header>
+              <div>
+                <p class="eyebrow">{{ t('charityDescription') }}</p>
+                <h2 id="charity-title">{{ t('charityTitle') }}</h2>
+              </div>
+              <button
+                class="history-close"
+                type="button"
+                [attr.aria-label]="t('closeCharity')"
+                (click)="closeCharity()"
+              >
+                ×
+              </button>
+            </header>
+            <div class="selection-list sale-list">
+              @for (card of currentGame.self.hand; track card.instanceId) {
+                <button
+                  type="button"
+                  [class.selected]="charityCardIds().includes(card.instanceId)"
+                  [attr.aria-pressed]="charityCardIds().includes(card.instanceId)"
+                  (click)="toggleCharityCard(currentGame, card.instanceId)"
+                >
+                  <strong>{{ cardName(card) }}</strong>
+                  <span>{{ cardTypeLabel(card.type) }}</span>
+                </button>
+              }
+            </div>
+            <p>
+              {{ t('selectedCards') }}: {{ charityCardIds().length }} /
+              {{ currentGame.expandedRuleActions.charityCardCount }}
+            </p>
+            @if (currentGame.expandedRuleActions.charityRecipientIds.length > 0) {
+              <fieldset class="sale-summary charity-recipients">
+                <legend>{{ t('charityRecipient') }}</legend>
+                @for (
+                  recipientId of currentGame.expandedRuleActions.charityRecipientIds;
+                  track recipientId
+                ) {
+                  <label>
+                    <input
+                      type="radio"
+                      name="charity-recipient"
+                      [value]="recipientId"
+                      [ngModel]="charityRecipientId()"
+                      (ngModelChange)="charityRecipientId.set($event)"
+                    />
+                    {{ lookupPlayerName(currentGame, recipientId) }}
+                  </label>
+                }
+              </fieldset>
+            } @else {
+              <p class="charity-discard-hint">{{ t('charityDiscardHint') }}</p>
+            }
+            <div class="confirmation-actions charity-actions">
+              <button
+                type="button"
+                [disabled]="pending()"
+                (click)="resolveRandomCharity(currentGame)"
+              >
+                {{ t('randomCharity') }}
+              </button>
+              <button
+                class="primary"
+                type="button"
+                [disabled]="
+                  pending() ||
+                  charityCardIds().length !== currentGame.expandedRuleActions.charityCardCount ||
+                  (currentGame.expandedRuleActions.charityRecipientIds.length > 0 &&
+                    charityRecipientId() === null)
+                "
+                (click)="confirmCharity(currentGame)"
+              >
+                {{ t('confirmCharity') }}
+              </button>
+            </div>
           </section>
         </div>
       }
@@ -532,6 +650,7 @@
                           (combatCardBonus(entry.card) >= 0 ? '+' : '') +
                           combatCardBonus(entry.card)
                         "
+                        [facts]="cardFacts(entry.card)"
                         [ariaLabel]="t('openCardDetails') + ': ' + cardName(entry.card)"
                         [compact]="true"
                         (opened)="openCard(entry.card)"
@@ -553,9 +672,22 @@
                           : t('clone')
                       "
                       [badge]="t('combatPower') + ' ' + monster.currentStrength"
+                      [facts]="
+                        cardFacts(
+                          monster.monster,
+                          monster.currentStrength,
+                          monster.currentTreasures
+                        )
+                      "
                       [ariaLabel]="t('openCardDetails') + ': ' + cardName(monster.monster)"
                       [compact]="true"
-                      (opened)="openCard(monster.monster)"
+                      (opened)="
+                        openMonsterCard(
+                          monster.monster,
+                          monster.currentStrength,
+                          monster.currentTreasures
+                        )
+                      "
                     />
                     <div class="power-breakdown">
                       <span
@@ -581,6 +713,7 @@
                           [badge]="
                             (played.strengthModifier >= 0 ? '+' : '') + played.strengthModifier
                           "
+                          [facts]="cardFacts(played.card)"
                           [ariaLabel]="t('openCardDetails') + ': ' + cardName(played.card)"
                           [compact]="true"
                           (opened)="openCard(played.card)"
@@ -740,6 +873,7 @@
                 [badge]="
                   isCardPlayable(currentGame, card) ? t('playableNow') : cardTypeLabel(card.type)
                 "
+                [facts]="cardFacts(card)"
                 [ariaLabel]="cardAriaLabel(currentGame, card)"
                 [playable]="isCardPlayable(currentGame, card)"
                 [unavailable]="!isCardPlayable(currentGame, card)"
@@ -756,16 +890,11 @@
             [eyebrow]="cardTypeLabel(card.type)"
             [result]="cardUnavailableReason(currentGame, card)"
             [closeLabel]="t('closeCardDetails')"
-            [effectsLabel]="t('cardEffects')"
-            [bonusLabel]="t('equipmentBonus')"
-            [valueLabel]="t('value')"
-            [slotLabel]="t('equipmentSlot')"
             [relatedCardsLabel]="t('relatedCards')"
+            [facts]="selectedCardFacts"
             [cardName]="cardName"
             [cardDescription]="cardDescription"
             [typeLabel]="cardTypeForDialog"
-            [effectLabel]="effectForDialog"
-            [equipmentSlotLabel]="slotForDialog"
             (closed)="closeCardDetails()"
           >
             <div class="dialog-actions">
@@ -858,16 +987,11 @@
             [meta]="logEntryMeta(currentGame, entry)"
             [result]="gameLogEntryLabel(currentGame, entry)"
             [closeLabel]="t('closeCardDetails')"
-            [effectsLabel]="t('cardEffects')"
-            [bonusLabel]="t('equipmentBonus')"
-            [valueLabel]="t('value')"
-            [slotLabel]="t('equipmentSlot')"
             [relatedCardsLabel]="t('relatedCards')"
+            [facts]="cardFacts"
             [cardName]="cardName"
             [cardDescription]="cardDescription"
             [typeLabel]="cardTypeForDialog"
-            [effectLabel]="effectForDialog"
-            [equipmentSlotLabel]="slotForDialog"
             (closed)="closeCardDetails()"
           />
         }
@@ -895,44 +1019,46 @@
                   ×
                 </button>
               </header>
-              <div class="character-stats">
-                <span
-                  >{{ t('level') }} <b>{{ player.level }}</b></span
-                >
-                <span
-                  >{{ t('combatPower') }} <b>{{ player.combatPower }}</b></span
-                >
-                <span
-                  >{{ t('equipmentBonus') }} <b>+{{ player.equipmentCombatBonus }}</b></span
-                >
-                <span
-                  >{{ t('cardsInHand') }} <b>{{ player.handCount }}</b></span
-                >
+              <div class="character-scroll">
+                <div class="character-stats">
+                  <span
+                    >{{ t('level') }} <b>{{ player.level }}</b></span
+                  >
+                  <span
+                    >{{ t('combatPower') }} <b>{{ player.combatPower }}</b></span
+                  >
+                  <span
+                    >{{ t('equipmentBonus') }} <b>+{{ player.equipmentCombatBonus }}</b></span
+                  >
+                  <span
+                    >{{ t('cardsInHand') }} <b>{{ player.handCount }}</b></span
+                  >
+                </div>
+                <div class="character-statuses">
+                  <span>{{ player.isDead ? '☠ ' + t('deadShort') : '♥ ' + t('alive') }}</span>
+                  <span>{{
+                    isPlayerConnected(player.playerId) ? '● ' + t('connected') : '○ ' + t('offline')
+                  }}</span>
+                  @if (player.playerId === currentGame.activePlayerId) {
+                    <span>▶ {{ t('activePlayer') }}</span>
+                  }
+                  @if (player.playerId === currentGame.combat?.playerId) {
+                    <span>⚔ {{ t('inCombat') }}</span>
+                  }
+                  @if (player.playerId === currentGame.combat?.helperId) {
+                    <span>+ {{ t('helperJoined') }}</span>
+                  }
+                </div>
+                <app-equipment-layout
+                  [player]="player"
+                  [labels]="equipmentLabels()"
+                  [cardName]="cardName"
+                  (cardOpened)="openCard($event)"
+                />
+                @if (player.playerId !== currentGame.viewerPlayerId) {
+                  <p class="information-only">{{ t('informationOnly') }}</p>
+                }
               </div>
-              <div class="character-statuses">
-                <span>{{ player.isDead ? '☠ ' + t('deadShort') : '♥ ' + t('alive') }}</span>
-                <span>{{
-                  isPlayerConnected(player.playerId) ? '● ' + t('connected') : '○ ' + t('offline')
-                }}</span>
-                @if (player.playerId === currentGame.activePlayerId) {
-                  <span>▶ {{ t('activePlayer') }}</span>
-                }
-                @if (player.playerId === currentGame.combat?.playerId) {
-                  <span>⚔ {{ t('inCombat') }}</span>
-                }
-                @if (player.playerId === currentGame.combat?.helperId) {
-                  <span>+ {{ t('helperJoined') }}</span>
-                }
-              </div>
-              <app-equipment-layout
-                [player]="player"
-                [labels]="equipmentLabels()"
-                [cardName]="cardName"
-                (cardOpened)="openCard($event)"
-              />
-              @if (player.playerId !== currentGame.viewerPlayerId) {
-                <p class="information-only">{{ t('informationOnly') }}</p>
-              }
             </section>
           </div>
         }
@@ -1025,7 +1151,7 @@
             </button>
           }
           @if (currentGame.expandedRuleActions.charityCardCount > 0) {
-            <button type="button" [disabled]="pending()" (click)="resolveCharity(currentGame)">
+            <button type="button" [disabled]="pending()" (click)="openCharity(currentGame)">
               {{ t('charity') }} ({{ currentGame.expandedRuleActions.charityCardCount }})
             </button>
           }

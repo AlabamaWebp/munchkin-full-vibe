@@ -3,6 +3,7 @@ import {
   createGame,
   createSeededRandomSource,
   executeCommand,
+  GamePhase,
   parseGameId,
   parseEncounterId,
   parsePlayerId,
@@ -11,6 +12,85 @@ import {
 import { createGameView } from './game-view';
 
 describe('createGameView', () => {
+  it('keeps charity card identities private to the sender and recipient after projection', () => {
+    const adaId = parsePlayerId('charity-ada');
+    const graceId = parsePlayerId('charity-grace');
+    const linusId = parsePlayerId('charity-linus');
+    const random = createSeededRandomSource(704);
+    let state = createGame({ id: parseGameId('GIVE') });
+    for (const [actorId, name] of [
+      [adaId, 'Ada'],
+      [graceId, 'Grace'],
+      [linusId, 'Linus'],
+    ] as const) {
+      const added = executeCommand(
+        state,
+        { type: 'ADD_PLAYER', actorId, name },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: adaId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    state = {
+      ...started.state,
+      activePlayerId: adaId,
+      phase: GamePhase.END_TURN,
+      players: started.state.players.map((player) => ({
+        ...player,
+        level: player.id === adaId ? 3 : player.id === graceId ? 1 : 2,
+      })),
+    };
+    const sender = state.players.find((player) => player.id === adaId)!;
+    const selected = sender.hand.slice(0, sender.hand.length - 5);
+    const result = executeCommand(
+      state,
+      {
+        type: 'GIVE_CHARITY',
+        actorId: adaId,
+        cardIds: selected.map((card) => card.instanceId),
+        recipientId: graceId,
+      },
+      { random },
+    );
+    if (!result.success) throw new Error(result.error.message);
+
+    const adaView = createGameView(result.state, adaId);
+    const graceView = createGameView(result.state, graceId);
+    const linusView = createGameView(result.state, linusId);
+    for (const view of [adaView, graceView]) {
+      expect(
+        view.gameLog.find((entry) => entry.type === 'CHARITY_CARDS_REVEALED'),
+      ).toMatchObject({
+        visibility: 'PRIVATE',
+        playerId: adaId,
+        targetPlayerId: graceId,
+        cards: selected.map((card) => ({ instanceId: card.instanceId })),
+      });
+    }
+    expect(
+      linusView.gameLog.find(
+        (entry) => entry.type === 'CHARITY_CARDS_REVEALED',
+      ),
+    ).toBeUndefined();
+    expect(
+      linusView.gameLog.find((entry) => entry.type === 'CHARITY_RESOLVED'),
+    ).toMatchObject({
+      visibility: 'PUBLIC',
+      playerId: adaId,
+      targetPlayerId: graceId,
+      count: selected.length,
+    });
+    for (const card of selected) {
+      expect(JSON.stringify(linusView)).not.toContain(card.instanceId);
+    }
+  });
+
   it('shows the viewer hand while exposing only another hand count', () => {
     const adaId = parsePlayerId('ada');
     const graceId = parsePlayerId('grace');
@@ -108,6 +188,61 @@ describe('createGameView', () => {
         }
       }
     }
+  });
+
+  it('projects automatic unequip publicly without exposing the rest of the returned hand', () => {
+    const adaId = parsePlayerId('unequip-ada');
+    const graceId = parsePlayerId('unequip-grace');
+    const random = createSeededRandomSource(143);
+    let state = createGame({ id: parseGameId('ROLE') });
+    for (const [actorId, name] of [
+      [adaId, 'Ada'],
+      [graceId, 'Grace'],
+    ] as const) {
+      const added = executeCommand(
+        state,
+        { type: 'ADD_PLAYER', actorId, name },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: adaId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const returned = started.state.players[0]!.hand[0]!;
+    const stillHidden = started.state.players[0]!.hand[1]!;
+    state = {
+      ...started.state,
+      eventLog: [
+        ...started.state.eventLog,
+        {
+          sequence: started.state.eventLog.length + 1,
+          turnNumber: started.state.turnNumber,
+          phase: GamePhase.TURN_START,
+          event: {
+            type: 'ITEM_UNEQUIPPED',
+            visibility: 'PUBLIC',
+            playerId: adaId,
+            cardId: returned.instanceId,
+            definitionId: returned.definitionId,
+          },
+        },
+      ],
+    };
+
+    const graceView = createGameView(state, graceId);
+    expect(
+      graceView.gameLog.find(
+        (entry) =>
+          entry.type === 'ITEM_UNEQUIPPED' &&
+          entry.card?.instanceId === returned.instanceId,
+      ),
+    ).toBeDefined();
+    expect(JSON.stringify(graceView)).not.toContain(stillHidden.instanceId);
   });
 
   it('offers actions only to the active player in a valid phase', () => {

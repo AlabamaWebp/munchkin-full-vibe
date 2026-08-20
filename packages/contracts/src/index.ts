@@ -286,6 +286,7 @@ export type GameLogEventType =
   | "ITEMS_SOLD"
   | "ITEM_TRADED"
   | "CHARITY_RESOLVED"
+  | "CHARITY_CARDS_REVEALED"
   | "PLAYER_DIED"
   | "PLAYER_REVIVED"
   | "TURN_ENDED"

@@ -341,7 +341,14 @@ describe('App', () => {
     await fixture.whenStable();
     expect(compiled.querySelector('.history-dialog')?.textContent).toContain('История игры');
     expect(compiled.querySelector('.history-dialog')?.textContent).toContain('Ada надел Sword.');
-    compiled.querySelector<HTMLButtonElement>('.game-history-list li.has-details button')?.click();
+    const eventDetailsButton = compiled.querySelector<HTMLButtonElement>(
+      '.game-history-list li.has-details .event-details-button',
+    );
+    expect(eventDetailsButton?.textContent?.trim()).toBe('');
+    expect(eventDetailsButton?.getAttribute('aria-label')).toContain(
+      'Открыть подробности события: Ada надел Sword.',
+    );
+    eventDetailsButton?.click();
     await fixture.whenStable();
     expect(compiled.querySelector('app-card-details-dialog')?.textContent).toContain(
       'A useful sword.',
@@ -415,25 +422,89 @@ describe('App', () => {
     expect((reloaded.nativeElement as HTMLElement).querySelector('.public-event-zone')).toBeNull();
   });
 
-  it('opens a public character with empty slots and a two-handed item spanning both hands', async () => {
-    const greatSword: GameCardView = {
-      instanceId: 'great-sword-1',
-      definitionId: 'great-sword',
-      artKey: 'test.great-sword',
-      name: 'Great Sword',
-      description: 'It needs both hands.',
+  it('combines the expected action with only the three latest public events', async () => {
+    const player = playerView();
+    lobbyClient.showGame({
+      ...gameView(player),
+      gameLog: (['PLAYER_ADDED', 'GAME_STARTED', 'TURN_STARTED', 'TURN_ENDED'] as const).map(
+        (type, index) => ({
+          sequence: index + 1,
+          turnNumber: index + 1,
+          phase: 'TURN_START' as const,
+          type,
+          visibility: 'PUBLIC' as const,
+          playerId: player.playerId,
+        }),
+      ),
+    });
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const overview = (fixture.nativeElement as HTMLElement).querySelector('.game-overview');
+
+    expect(overview?.querySelector('.expected-action')?.textContent).toContain(
+      'Ждём действия от игрока: Ada',
+    );
+    expect(overview?.querySelectorAll('.recent-events li').length).toBe(3);
+    expect(overview?.textContent).not.toContain('присоединился к игре');
+    expect(overview?.textContent).toContain('завершил ход');
+  });
+
+  it('opens a scrollable public character with every slot filled and long names', async () => {
+    const equipment = (
+      instanceId: string,
+      slot: 'HEAD' | 'BODY' | 'FEET' | 'HANDS',
+      name: string,
+    ): GameCardView => ({
+      instanceId,
+      definitionId: instanceId,
+      artKey: `test.${instanceId}`,
+      name,
+      description: 'Filled equipment slot.',
       type: 'EQUIPMENT',
       deck: 'TREASURE',
-      effects: [{ type: 'COMBAT_BONUS', amount: 4 }],
+      effects: [{ type: 'COMBAT_BONUS', amount: 1 }],
       equipment: {
-        slot: 'HANDS',
-        hands: 2,
-        combatBonus: 4,
+        slot,
+        hands: slot === 'HANDS' ? 1 : 0,
+        combatBonus: 1,
         restrictions: [],
-        value: 800,
+        value: 400,
       },
+    });
+    const classCard: GameCardView = {
+      instanceId: 'class-1',
+      definitionId: 'class-1',
+      artKey: 'test.class',
+      name: 'Extremely Long Adventuring Guild Specialist',
+      description: 'A class.',
+      type: 'CLASS',
+      deck: 'DOOR',
+      effects: [],
     };
-    const player = playerView({ equipment: [greatSword], equipmentCombatBonus: 4, combatPower: 5 });
+    const raceCard: GameCardView = {
+      ...classCard,
+      instanceId: 'race-1',
+      definitionId: 'race-1',
+      artKey: 'test.race',
+      name: 'Remarkably Long Forest-Dwelling People',
+      type: 'RACE',
+    };
+    const filledEquipment = [
+      equipment('head-1', 'HEAD', 'Unreasonably Elaborate Ceremonial Helmet'),
+      equipment('body-1', 'BODY', 'Impossibly Long Reinforced Traveling Coat'),
+      equipment('feet-1', 'FEET', 'Extraordinary Boots of Unending Expeditions'),
+      equipment('left-1', 'HANDS', 'Left-Handed Instrument of Considerable Length'),
+      equipment('right-1', 'HANDS', 'Right-Handed Implement with a Very Long Name'),
+    ];
+    const player = playerView({
+      name: 'Ada with a Surprisingly Long Character Name',
+      equipment: filledEquipment,
+      equipmentCombatBonus: 5,
+      combatPower: 6,
+      classCard,
+      raceCard,
+    });
     lobbyClient.showGame(gameView(player));
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -442,12 +513,15 @@ describe('App', () => {
     compiled.querySelector<HTMLButtonElement>('.player-card')?.click();
     await fixture.whenStable();
 
-    expect(compiled.querySelector('.character-dialog')?.textContent).toContain('Карт в руке 0');
-    expect(compiled.querySelector('.two-handed')?.textContent).toContain('Great Sword');
-    expect(compiled.querySelector('.two-handed')?.textContent).toContain('Двуручный предмет');
-    expect(compiled.querySelectorAll('app-equipment-layout .empty').length).toBeGreaterThanOrEqual(
-      5,
-    );
+    const dialog = compiled.querySelector('.character-dialog');
+    expect(dialog?.textContent).toContain('Ada with a Surprisingly Long Character Name');
+    expect(dialog?.querySelector('.character-scroll')).not.toBeNull();
+    expect(dialog?.querySelector('header .history-close')).not.toBeNull();
+    expect(dialog?.textContent).toContain('Unreasonably Elaborate Ceremonial Helmet');
+    expect(dialog?.textContent).toContain('Right-Handed Implement with a Very Long Name');
+    expect(dialog?.textContent).toContain('Extremely Long Adventuring Guild Specialist');
+    expect(dialog?.textContent).toContain('Remarkably Long Forest-Dwelling People');
+    expect(dialog?.querySelectorAll('app-equipment-layout .empty').length).toBe(0);
   });
 
   it('keeps an unavailable hand card visible and explains why it cannot be played', async () => {
@@ -477,6 +551,99 @@ describe('App', () => {
       'Для этой карты нужен активный бой.',
     );
     expect(lobbyClient.sendGameCommand).not.toHaveBeenCalled();
+  });
+
+  it('renders complete Monster, weapon, modifier, and Curse metadata on shared card faces', async () => {
+    const cards: readonly GameCardView[] = [
+      {
+        instanceId: 'monster-long-1',
+        definitionId: 'monster-long',
+        artKey: 'door.monster.long',
+        name: 'A Monster Name Long Enough to Wrap Across Several Lines',
+        description: 'A long Monster description.',
+        type: 'MONSTER',
+        deck: 'DOOR',
+        effects: [],
+        monster: {
+          level: 14,
+          levelRewards: 2,
+          treasureRewards: 4,
+          badStuff: [{ type: 'DISCARD_CHOSEN_CARDS', zone: 'EQUIPMENT', count: 2 }],
+        },
+      },
+      {
+        instanceId: 'weapon-1',
+        definitionId: 'guild-weapon',
+        artKey: 'treasure.equipment.guild-weapon',
+        name: 'Exceptionally Long Two-Handed Guild Weapon',
+        description: 'A restricted weapon.',
+        type: 'EQUIPMENT',
+        deck: 'TREASURE',
+        goldValue: 900,
+        play: { timings: ['TURN'], target: 'SELF' },
+        effects: [],
+        equipment: {
+          slot: 'HANDS',
+          hands: 2,
+          combatBonus: 5,
+          restrictions: [{ type: 'CLASS', definitionId: 'guild-of-echoes' }],
+          value: 900,
+        },
+      },
+      {
+        instanceId: 'modifier-1',
+        definitionId: 'modifier',
+        artKey: 'treasure.modifier.reward-change',
+        name: 'Executive Monster Promotion with a Very Long Contract',
+        description: 'Changes strength and treasure.',
+        type: 'MONSTER_MODIFIER',
+        deck: 'TREASURE',
+        goldValue: 500,
+        play: {
+          timings: ['ACTIVE_COMBAT', 'VICTORY_REACTION'],
+          target: 'MONSTER_ENCOUNTER',
+        },
+        effects: [{ type: 'MODIFY_MONSTER', strength: 5, treasures: 2 }],
+      },
+      {
+        instanceId: 'curse-1',
+        definitionId: 'curse',
+        artKey: 'door.curse.long',
+        name: 'Curse with an Unreasonably Detailed Application Window',
+        description: 'Requires an exact target and timing.',
+        type: 'CURSE',
+        deck: 'DOOR',
+        play: { timings: ['WHEN_DRAWN', 'TURN'], target: 'ANY_PLAYER' },
+        effects: [{ type: 'DISCARD_CHOSEN_CARDS', zone: 'HAND', count: 2 }],
+      },
+    ];
+    const player = playerView({ handCount: cards.length });
+    lobbyClient.showGame(gameView(player, cards));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const handText = compiled.querySelector('.hand')?.textContent ?? '';
+
+    expect(handText).toContain('Уровень: 14');
+    expect(handText).toContain('Награда уровнями: 2');
+    expect(handText).toContain('Сокровища: 4');
+    expect(handText).toContain('Непотребство: Выбрать надетые предметы для сброса: 2');
+    expect(handText).toContain('Занято рук: 2');
+    expect(handText).toContain('Бонус снаряжения: +5');
+    expect(handText).toContain('Ограничения: Класс: Гильдия эха');
+    expect(handText).toContain('Цена: 900');
+    expect(handText).toContain('Сила монстра +5, сокровищ +2');
+    expect(handText).toContain('Цель: один монстр в бою');
+    expect(handText).toContain('Выбрать карты для сброса 2 · Ваши карты');
+    expect(handText).toContain('Время применения: при открытии, в свой ход');
+    expect(compiled.querySelectorAll('.hand [data-art-key]')).toHaveLength(cards.length);
+
+    compiled.querySelector<HTMLButtonElement>('.hand app-game-card:last-child button')?.click();
+    await fixture.whenStable();
+    expect(compiled.querySelector('.card-dialog .dialog-scroll')).not.toBeNull();
+    expect(compiled.querySelector('.card-dialog')?.textContent).toContain('Цель: любой игрок');
+    expect(compiled.querySelectorAll('[data-art-key="door.curse.long"]')).toHaveLength(2);
   });
 
   it('does not offer out-of-turn item actions and names the player ending the turn', async () => {
@@ -785,12 +952,12 @@ describe('App', () => {
             sourceCard: monster,
             clonedFromEncounterId: null,
             baseStrength: 3,
-            strengthModifier: 0,
-            currentStrength: 3,
+            strengthModifier: 5,
+            currentStrength: 8,
             baseLevelRewards: 1,
             baseTreasureRewards: 2,
-            treasureModifier: 0,
-            currentTreasures: 2,
+            treasureModifier: 2,
+            currentTreasures: 4,
             playedCards: [],
           },
           {
@@ -809,7 +976,7 @@ describe('App', () => {
           },
         ],
         playerPower: 4,
-        monsterPower: 6,
+        monsterPower: 11,
         requestedHelperId: null,
         helperId: null,
         helperContribution: 0,
@@ -857,9 +1024,20 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     expect(compiled.querySelector('.player-side')?.textContent).toContain('Итого 4');
-    expect(compiled.querySelector('.monster-side')?.textContent).toContain('Итого 6');
+    expect(compiled.querySelector('.monster-side')?.textContent).toContain('Итого 11');
     expect(compiled.querySelectorAll('.monster-combatant')).toHaveLength(2);
+    expect(compiled.querySelector('.monster-combatant app-game-card')?.textContent).toContain(
+      'Уровень: 3 · Текущий уровень: 8',
+    );
     expect(compiled.textContent).toContain('История боя');
+    compiled.querySelector<HTMLButtonElement>('.monster-combatant app-game-card button')?.click();
+    await fixture.whenStable();
+    expect(compiled.querySelector('.card-dialog')?.textContent).toContain(
+      'Уровень: 3 · Текущий уровень: 8',
+    );
+    expect(compiled.querySelector('.card-dialog')?.textContent).toContain('Сокровища: 2 → 4');
+    compiled.querySelector<HTMLButtonElement>('.card-dialog .close')?.click();
+    await fixture.whenStable();
     const helpButton = Array.from(compiled.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Позвать на помощь: Grace'),
     );
@@ -898,6 +1076,91 @@ describe('App', () => {
       type: 'REQUEST_HELP',
       helperId: 'player-2',
     });
+  });
+
+  it('uses the mobile charity dialog for exact selection and keeps a random option', async () => {
+    const hand = Array.from({ length: 7 }, (_, index): GameCardView => ({
+      instanceId: `charity-card-${index}`,
+      definitionId: `charity-definition-${index}`,
+      artKey: `test.charity-${index}`,
+      name: `Charity ${index + 1}`,
+      description: 'A test card.',
+      type: 'EQUIPMENT',
+      deck: 'TREASURE',
+      effects: [],
+      equipment: {
+        slot: 'HANDS',
+        hands: 1,
+        combatBonus: 0,
+        restrictions: [],
+        value: 100,
+      },
+    }));
+    const ada = playerView({ playerId: 'player-1', name: 'Ada', level: 3, handCount: 7 });
+    const grace = playerView({ playerId: 'player-2', name: 'Grace', level: 1 });
+    const linus = playerView({ playerId: 'player-3', name: 'Linus', level: 1 });
+    lobbyClient.showGame({
+      ...gameView(ada, hand),
+      phase: 'END_TURN',
+      players: [ada, grace, linus],
+      expandedRuleActions: {
+        ...gameView(ada).expandedRuleActions,
+        charityCardCount: 2,
+        charityRecipientIds: ['player-2', 'player-3'],
+      },
+    });
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const handGrid = compiled.querySelector<HTMLElement>('.hand');
+    expect(handGrid).not.toBeNull();
+    expect(handGrid!.querySelectorAll('app-game-card')).toHaveLength(7);
+    expect(getComputedStyle(handGrid!).display).toBe('grid');
+    expect(getComputedStyle(handGrid!).overflowX).not.toBe('auto');
+    expect(getComputedStyle(handGrid!).gridTemplateColumns).toContain('repeat(2');
+    expect(
+      getComputedStyle(handGrid!.querySelector<HTMLButtonElement>('app-game-card button')!)
+        .minWidth,
+    ).toBe('9.25rem');
+    const charityButton = Array.from(compiled.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Милостыня'),
+    );
+    charityButton?.click();
+    fixture.detectChanges();
+
+    const dialog = compiled
+      .querySelector<HTMLElement>('#charity-title')
+      ?.closest('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    const cardButtons = Array.from(
+      dialog!.querySelectorAll<HTMLButtonElement>('.selection-list button'),
+    );
+    cardButtons[0]!.click();
+    cardButtons[1]!.click();
+    const graceRadio = dialog!.querySelector<HTMLInputElement>('input[name="charity-recipient"]');
+    expect(graceRadio).not.toBeNull();
+    graceRadio!.click();
+    graceRadio!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const confirm = Array.from(
+      dialog!.querySelectorAll<HTMLButtonElement>('.charity-actions button'),
+    ).find((button) => button.textContent?.includes('Подтвердить'));
+    expect(confirm?.disabled).toBe(false);
+    confirm!.click();
+    expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({
+      type: 'GIVE_CHARITY',
+      cardIds: ['charity-card-0', 'charity-card-1'],
+      recipientId: 'player-2',
+    });
+
+    charityButton?.click();
+    fixture.detectChanges();
+    const randomButton = Array.from(
+      compiled.querySelectorAll<HTMLButtonElement>('.charity-actions button'),
+    ).find((button) => button.textContent?.includes('случайно'));
+    randomButton!.click();
+    expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({ type: 'GIVE_RANDOM_CHARITY' });
   });
 
   it('shows reconnect-safe reaction status and dispatches the versioned pass', async () => {

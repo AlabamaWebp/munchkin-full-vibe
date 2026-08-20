@@ -145,8 +145,9 @@ export interface EquipmentLayoutLabels {
       text-align: left;
     }
     button strong {
-      overflow: hidden;
-      text-overflow: ellipsis;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      line-height: 1.25;
     }
     button span {
       color: #efc66d;

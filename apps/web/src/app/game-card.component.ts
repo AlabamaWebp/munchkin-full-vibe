@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import type { GameCardView } from '@munchkin-lan/contracts';
+import { CardArtworkComponent } from './card-artwork.component';
 
 @Component({
   selector: 'app-game-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CardArtworkComponent],
   template: `
     <button
       type="button"
@@ -16,10 +18,20 @@ import type { GameCardView } from '@munchkin-lan/contracts';
       [attr.aria-label]="ariaLabel()"
       (click)="opened.emit(card())"
     >
-      <small>{{ kicker() }}</small>
-      <strong>{{ name() }}</strong>
+      <div class="card-heading">
+        <small>{{ kicker() }}</small>
+        <strong>{{ name() }}</strong>
+      </div>
+      <app-card-artwork [artKey]="card().artKey" [label]="name()" />
+      @if (facts().length > 0) {
+        <ul class="facts">
+          @for (fact of facts(); track $index) {
+            <li>{{ fact }}</li>
+          }
+        </ul>
+      }
       @if (badge()) {
-        <span>{{ badge() }}</span>
+        <span class="badge">{{ badge() }}</span>
       }
       @if (playable()) {
         <em aria-hidden="true">✓</em>
@@ -31,19 +43,20 @@ import type { GameCardView } from '@munchkin-lan/contracts';
   styles: `
     :host {
       display: block;
-      min-width: 0;
+      min-width: 9.25rem;
     }
     .game-card {
       position: relative;
       display: flex;
-      width: 8.3rem;
-      min-width: 8.3rem;
-      height: 10.8rem;
+      width: 100%;
+      min-width: 9.25rem;
+      min-height: 17rem;
+      height: 100%;
       margin: 0;
       padding: 0.8rem;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.35rem;
+      gap: 0.55rem;
       border: 1px solid #76623a;
       border-radius: 0.9rem;
       color: #f7faf8;
@@ -102,7 +115,10 @@ import type { GameCardView } from '@munchkin-lan/contracts';
       width: 100%;
       min-width: 0;
       height: auto;
-      min-height: 4.25rem;
+      min-height: 0;
+    }
+    :host:has(.game-card.compact) {
+      min-width: 0;
     }
     .game-card.playable {
       border-color: #8bd49e;
@@ -114,6 +130,11 @@ import type { GameCardView } from '@munchkin-lan/contracts';
       border-color: #526057;
       filter: saturate(0.55);
     }
+    .card-heading {
+      display: grid;
+      min-width: 0;
+      gap: 0.25rem;
+    }
     small {
       color: #c6d1c8;
       font-size: 0.65rem;
@@ -122,12 +143,39 @@ import type { GameCardView } from '@munchkin-lan/contracts';
       text-transform: uppercase;
     }
     strong {
+      min-width: 0;
+      font-family: Georgia, serif;
+      font-size: 1rem;
       line-height: 1.15;
+      overflow-wrap: anywhere;
     }
-    span {
+    app-card-artwork {
+      width: 100%;
+    }
+    .facts {
+      display: grid;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      gap: 0.22rem;
+      list-style: none;
+      color: #d4ddd6;
+      font-size: 0.66rem;
+      line-height: 1.25;
+    }
+    .facts li {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .facts li::before {
+      color: #efc66d;
+      content: '• ';
+    }
+    .badge {
       margin-top: auto;
       color: #b5c0b8;
       font-size: 0.7rem;
+      overflow-wrap: anywhere;
     }
     em {
       position: absolute;
@@ -151,6 +199,7 @@ export class GameCardComponent {
   readonly name = input.required<string>();
   readonly kicker = input.required<string>();
   readonly badge = input('');
+  readonly facts = input<readonly string[]>([]);
   readonly ariaLabel = input.required<string>();
   readonly compact = input(false);
   readonly playable = input(false);

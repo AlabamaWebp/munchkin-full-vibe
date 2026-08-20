@@ -47,6 +47,22 @@ const race = definition({
   deck: DeckType.DOOR,
   effects: [],
 });
+const otherRole = definition({
+  id: "signal-class",
+  name: "Signal",
+  description: "Class",
+  type: CardType.CLASS,
+  deck: DeckType.DOOR,
+  effects: [],
+});
+const otherRace = definition({
+  id: "copper-race",
+  name: "Copper",
+  description: "Race",
+  type: CardType.RACE,
+  deck: DeckType.DOOR,
+  effects: [],
+});
 const item = definition({
   id: "echo-blade",
   name: "Echo blade",
@@ -70,6 +86,34 @@ const cheap = definition({
   effects: [],
   equipment: { slot: EquipmentSlot.HEAD, value: 400 },
 });
+const classHelm = definition({
+  id: "echo-helm",
+  name: "Echo helm",
+  description: "Restricted",
+  type: CardType.EQUIPMENT,
+  deck: DeckType.TREASURE,
+  effects: [],
+  equipment: {
+    slot: EquipmentSlot.HEAD,
+    hands: 0,
+    value: 400,
+    restrictions: [{ type: "CLASS", definitionId: role.id }],
+  },
+});
+const raceBoots = definition({
+  id: "lantern-boots",
+  name: "Lantern boots",
+  description: "Restricted",
+  type: CardType.EQUIPMENT,
+  deck: DeckType.TREASURE,
+  effects: [],
+  equipment: {
+    slot: EquipmentSlot.FEET,
+    hands: 0,
+    value: 400,
+    restrictions: [{ type: "RACE", definitionId: race.id }],
+  },
+});
 const curse = definition({
   id: "role-curse",
   name: "Role curse",
@@ -77,6 +121,14 @@ const curse = definition({
   type: CardType.CURSE,
   deck: DeckType.DOOR,
   effects: [{ type: "DISCARD_ROLE", role: "CLASS" }],
+});
+const raceCurse = definition({
+  id: "race-curse",
+  name: "Race curse",
+  description: "Lose race",
+  type: CardType.CURSE,
+  deck: DeckType.DOOR,
+  effects: [{ type: "DISCARD_ROLE", role: "RACE" }],
 });
 const fatalMonster = definition({
   id: "fatal",
@@ -123,7 +175,19 @@ function state(players: readonly PlayerState[]): GameState {
     phase: GamePhase.TURN_START,
     players,
     activePlayerId: adaId,
-    cardDefinitions: [role, race, item, cheap, curse, fatalMonster],
+    cardDefinitions: [
+      role,
+      otherRole,
+      race,
+      otherRace,
+      item,
+      classHelm,
+      raceBoots,
+      cheap,
+      curse,
+      raceCurse,
+      fatalMonster,
+    ],
     doorDeck: [],
     treasureDeck: [],
     doorDiscard: [],
@@ -192,6 +256,79 @@ describe("expanded rules", () => {
         { random },
       ).success,
     ).toBe(true);
+  });
+
+  it("revalidates and publicly unequips every incompatible item after a class replacement", () => {
+    const replacement = card("replacement-class", otherRole.id);
+    const blade = card("equipped-blade", item.id);
+    const helm = card("equipped-helm", classHelm.id);
+    const currentRole = card("current-class", role.id);
+    const initialPlayer = {
+      ...player(adaId, 2, [replacement]),
+      classCard: currentRole,
+      equipment: [blade, helm],
+    };
+
+    const result = executeCommand(
+      state([initialPlayer, player(bobId, 1, [])]),
+      { type: "PLAY_ROLE", actorId: adaId, cardId: replacement.instanceId },
+      { random },
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.state.players[0]?.equipment).toEqual([]);
+    expect(result.state.players[0]?.hand).toEqual([blade, helm]);
+    expect(
+      result.events.filter((event) => event.type === "ITEM_UNEQUIPPED"),
+    ).toEqual([
+      expect.objectContaining({
+        visibility: "PUBLIC",
+        cardId: blade.instanceId,
+      }),
+      expect.objectContaining({
+        visibility: "PUBLIC",
+        cardId: helm.instanceId,
+      }),
+    ]);
+  });
+
+  it("revalidates race equipment after a DISCARD_ROLE Curse", () => {
+    const curseCard = card("race-curse-card", raceCurse.id);
+    const raceCard = card("current-race", race.id);
+    const boots = card("equipped-boots", raceBoots.id);
+    const target = {
+      ...player(bobId, 2, []),
+      raceCard,
+      equipment: [boots],
+    };
+
+    const result = executeCommand(
+      state([player(adaId, 1, [curseCard]), target]),
+      {
+        type: "PLAY_CARD",
+        actorId: adaId,
+        cardId: curseCard.instanceId,
+        target: { type: "PLAYER", playerId: bobId },
+      },
+      { random },
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.state.players[1]).toMatchObject({
+      raceCard: null,
+      equipment: [],
+      hand: [boots],
+    });
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        type: "ITEM_UNEQUIPPED",
+        visibility: "PUBLIC",
+        playerId: bobId,
+        cardId: boots.instanceId,
+      }),
+    );
   });
 
   it("sells enough item value for engine-calculated levels and rejects too little", () => {
@@ -304,7 +441,74 @@ describe("expanded rules", () => {
     if (given.success) {
       expect(given.state.players[0]?.hand).toHaveLength(HAND_LIMIT);
       expect(given.state.players[1]?.hand).toHaveLength(2);
+      expect(given.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "CHARITY_RESOLVED",
+            visibility: "PUBLIC",
+            count: 2,
+          }),
+          expect.objectContaining({
+            type: "CHARITY_CARDS_REVEALED",
+            visibility: "PRIVATE",
+            recipientPlayerId: adaId,
+            cardIds: cards.slice(0, 2).map((entry) => entry.instanceId),
+          }),
+          expect.objectContaining({
+            type: "CHARITY_CARDS_REVEALED",
+            visibility: "PRIVATE",
+            recipientPlayerId: bobId,
+            cardIds: cards.slice(0, 2).map((entry) => entry.instanceId),
+          }),
+        ]),
+      );
     }
+  });
+
+  it("rejects the wrong charity count and a non-minimum-level recipient atomically", () => {
+    const cards = Array.from({ length: HAND_LIMIT + 2 }, (_, index) =>
+      card(`invalid-charity-${index}`, cheap.id),
+    );
+    const caraId = parsePlayerId("cara");
+    const initial = {
+      ...state([
+        player(adaId, 4, cards),
+        player(bobId, 1, []),
+        player(caraId as typeof adaId, 2, []),
+      ]),
+      phase: GamePhase.END_TURN,
+    };
+    const wrongCount = executeCommand(
+      initial,
+      {
+        type: "GIVE_CHARITY",
+        actorId: adaId,
+        cardIds: [cards[0]!.instanceId],
+        recipientId: bobId,
+      },
+      { random },
+    );
+    expect(wrongCount).toMatchObject({
+      success: false,
+      state: initial,
+      events: [],
+    });
+    const wrongRecipient = executeCommand(
+      initial,
+      {
+        type: "GIVE_CHARITY",
+        actorId: adaId,
+        cardIds: cards.slice(0, 2).map((entry) => entry.instanceId),
+        recipientId: caraId,
+      },
+      { random },
+    );
+    expect(wrongRecipient).toMatchObject({
+      success: false,
+      state: initial,
+      events: [],
+      error: { code: "INVALID_RECIPIENT" },
+    });
   });
 
   it("lets the engine choose random excess charity cards", () => {
@@ -324,7 +528,56 @@ describe("expanded rules", () => {
     if (given.success) {
       expect(given.state.players[0]?.hand).toHaveLength(HAND_LIMIT);
       expect(given.state.players[1]?.hand).toEqual(cards.slice(0, 2));
+      expect(given.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "CHARITY_CARDS_REVEALED",
+            recipientPlayerId: adaId,
+            cardIds: cards.slice(0, 2).map((entry) => entry.instanceId),
+          }),
+          expect.objectContaining({
+            type: "CHARITY_CARDS_REVEALED",
+            recipientPlayerId: bobId,
+            cardIds: cards.slice(0, 2).map((entry) => entry.instanceId),
+          }),
+        ]),
+      );
     }
+  });
+
+  it("discards selected charity when the actor is tied for minimum level", () => {
+    const cards = Array.from({ length: HAND_LIMIT + 1 }, (_, index) =>
+      card(`discard-charity-${index}`, cheap.id),
+    );
+    const selected = cards[0]!;
+    const initial = {
+      ...state([player(adaId, 1, cards), player(bobId, 1, [])]),
+      phase: GamePhase.END_TURN,
+    };
+    const result = executeCommand(
+      initial,
+      {
+        type: "GIVE_CHARITY",
+        actorId: adaId,
+        cardIds: [selected.instanceId],
+        recipientId: null,
+      },
+      { random },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.state.treasureDiscard).toContainEqual(selected);
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        type: "CHARITY_CARDS_REVEALED",
+        recipientPlayerId: adaId,
+        recipientId: null,
+        cardIds: [selected.instanceId],
+      }),
+    );
+    expect(
+      result.events.filter((event) => event.type === "CHARITY_CARDS_REVEALED"),
+    ).toHaveLength(1);
   });
 
   it("applies death, discards possessions, and marks the player for revival", () => {

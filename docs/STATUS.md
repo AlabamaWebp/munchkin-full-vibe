@@ -3,7 +3,7 @@
 Current milestone:
 
 ```text
-Milestone 12.3 — Complete original card catalog metadata (complete)
+Milestone 12.4 — Mobile-first card presentation (complete)
 ```
 
 ## Implemented
@@ -106,14 +106,28 @@ Milestone 12.3 — Complete original card catalog metadata (complete)
 - reusable standalone card-face, card-details, focus-management, and equipment-slot
   components shared by the hand, public-event area, game history, combat, and
   character sheet;
+- a multi-row private-hand grid with two readable cards per row at the 360 px
+  minimum target, no horizontal carousel, stable minimum card widths, and natural
+  wrapping through every later row;
+- one deterministic copyright-safe illustration placeholder derived from each
+  definition's stable `artKey`, reused unchanged in the hand, public-event stack,
+  history thumbnails, combat, and card-details dialog;
+- complete localized card-face and detail metadata for Monster base/current level,
+  level/Treasure rewards and bad stuff; equipment slot, occupied hands, bonus,
+  value, and Class/Race restrictions; Treasure values; modifier strength/Treasure
+  changes; and typed permitted timing/target presentation;
+- independently scrollable safe-area-aware card details with a persistent header,
+  wrapping titles/facts, and explicit base-to-current Monster strength and Treasure
+  values for modified and cloned encounters;
 - a non-blocking central stack for newly revealed or publicly played cards, based
   on the existing authoritative game log and persisted per-viewer sequence
   acknowledgement so refresh/reconnect does not replay already seen notices;
 - interactive game-history entries that open all viewer-visible related cards,
   localized effects, source/target, turn, phase, and actual server-confirmed result;
-- responsive public character dialogs/bottom sheets with level, combat and
-  equipment power, private hand count only, life/connection/combat roles, empty
-  Head/Body/Feet/left-hand/right-hand/Class/Race slots, and a two-handed layout;
+- responsive public character dialogs/bottom sheets constrained to safe-area-aware
+  `100dvh`, with an always-accessible header/close control and an independently
+  scrollable body for stats, statuses, and fully populated equipment; long player,
+  equipment, Class, and Race names wrap without creating page overflow;
 - a two-sided combat board with authoritative player, equipment, temporary,
   helper, Monster-base, and Monster-modifier breakdowns, plus clickable combat
   cards retained from the existing public combat history;
@@ -124,7 +138,7 @@ Milestone 12.3 — Complete original card catalog metadata (complete)
   equipment events, with `prefers-reduced-motion` support;
 - keyboard-accessible dialogs with programmatic initial focus, visible focus,
   Escape handling, localized RU/EN strings, and verified zero page overflow at
-  360, 390, and 412 px (excluding intentional hand scrolling);
+  360, 390, and 412 px, including multi-row hands without horizontal scrolling;
 
 - process-lifetime player sessions with random reconnect credentials stored by
   Angular in `localStorage`;
@@ -143,8 +157,8 @@ Milestone 12.3 — Complete original card catalog metadata (complete)
 - synchronized deck counts, turn, phase, public player information, equipment,
   combat monster, and available server-derived actions;
 - a mobile-first game screen with a player rail, central table/combat area,
-  character and equipment panel, horizontally scrollable private hand, card
-  details, connection feedback, and a persistent action bar;
+  character and equipment panel, wrapping private-hand grid, card details,
+  connection feedback, and a persistent action bar;
 - complete Russian localization of the home, lobby, game, connection/error,
   accessibility, and current card-content UI, used by default;
 - an RU/EN language switcher that updates the page language, card text, plural
@@ -223,15 +237,19 @@ Milestone 12.3 — Complete original card catalog metadata (complete)
   invalid actors and winning-combat rejection; projection and Angular coverage
   for the new action and visible outcome.
 - public single-card Class and Race zones, authoritative role replacement, and
-  typed role restrictions for equipment, including automatic unequipping after
-  an incompatible role replacement;
+  typed role restrictions for equipment, including shared full-equipment
+  revalidation after role replacement or `DISCARD_ROLE` Curse effects, public
+  unequip events, and private-hand return for every incompatible item;
 - player-targeted Curse play from private hands, including typed role loss and
   death effects without card-name checks;
 - data-driven equipment values and authoritative sales, with one engine-derived
   level per complete 1,000 gold and atomic validation of item selections;
 - equipment trading into another player's private hand outside combat;
-- a five-card end-turn hand limit and authoritative charity to a lowest-level
-  player, or discard when the active player is tied for lowest level;
+- a five-card end-turn hand limit and authoritative selected or random charity
+  to a chosen lowest-level player, or discard when the active player is tied for
+  lowest level; a mobile exact-count selection dialog keeps the random option;
+- public charity summaries reveal only sender, recipient, and count, while
+  sender/recipient reconnect-safe private history includes the exact cards;
 - explicit death and revival: death keeps level while discarding possessions
   and roles; the player revives with replacement cards on their next turn;
 - player-specific projections and localized mobile controls for roles, Curses,
@@ -258,9 +276,12 @@ Milestone 12.3 — Complete original card catalog metadata (complete)
   without leaking another player's hidden cards;
 - an always-available localized Game History button and mobile dialog showing the
   complete chronological history during play and after victory.
-- a compact synchronized latest-actions panel derived from public authoritative
-  events, including explicit level-loss, pending-discard, and discard-summary
-  outcomes visible to every player without opening the full history;
+- one compact synchronized turn/activity panel that keeps the expected actor and
+  action visible beside the three latest public authoritative events, including
+  explicit level-loss, pending-discard, and discard-summary outcomes;
+- history rows keep event text as the primary flexible content and expose card
+  details through localized icon-only trailing controls with 44 px tap targets
+  and complete accessible names;
 - typed player-choice discard effects with a reconnect-safe pending decision,
   exact server validation, blocked unrelated commands, private selectable card
   identities, and public waiting/result summaries;
@@ -269,9 +290,8 @@ Milestone 12.3 — Complete original card catalog metadata (complete)
 - a multi-item sale dialog covering hand and equipped items, with a running
   authoritative-input total, complete 1,000-value level preview, unused-remainder
   preview, and atomic confirmation;
-- server-random charity through the retained localized "Remove random excess
-  cards" action, without trusting the client to select which excess cards leave
-  the hand.
+- server-random charity remains available beside the exact-card charity dialog;
+  both paths use the existing authoritative charity mechanics.
 
 ## Verification
 
@@ -280,9 +300,9 @@ the browser supports the Fullscreen API. It tracks browser-driven fullscreen
 changes, including exiting with Escape, and remains available in the lobby and
 during play.
 
-Verified on 2026-08-20 after the complete-card-catalog extension:
+Verified on 2026-08-20 after the mobile-first card presentation pass:
 
-- `npm test` — succeeded; 22 test files/suites and 152 tests passed across all
+- `npm test` — succeeded; 24 test files/suites and 164 tests passed across all
   workspaces;
 - `npm run test:e2e --workspace @munchkin-lan/server -- --runInBand` — succeeded;
   2 suites and 3 HTTP/Socket.IO end-to-end tests passed;
@@ -290,10 +310,17 @@ Verified on 2026-08-20 after the complete-card-catalog extension:
 - `npm run build` — succeeded for shared packages, Angular, and NestJS;
 - `npm run format:check` — succeeded across the repository.
 
-The earlier Milestone 12.1 live inspection covered 360, 390, and 412 px layouts,
-public events, reconnect/reload acknowledgement, bottom sheets, keyboard Escape,
-focus, and horizontal overflow. The new selection flow is covered by the Angular
-component tests and production build listed above.
+The focused mobile UI inspection on 2026-08-20 used a live one-player LAN match
+with a long player name and eight-card hand at 360, 390, and 412 px. At 360 px it
+rendered two 153 px cards in each of four rows; at 390 and 412 px the two columns
+grew to 168 and 179 px. Every width had equal hand client/scroll width, zero page
+overflow, and no card overlap. The same `artKey` placeholder was confirmed in the
+hand, public zone, history, and details. A 360 × 640 details sheet kept its 73 px
+header visible while the 520 px content viewport scrolled long metadata. The
+multi-Monster fixture rendered two ordered encounter cards without overflow and
+showed base/current level 8/13 plus Treasure reward 2→4. Long card/player text,
+all metadata categories, and multi-row behavior are additionally covered by the
+Angular component fixtures.
 
 ## Intentional scope limits
 

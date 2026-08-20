@@ -316,6 +316,16 @@ function projectLogEntry(
           : { targetPlayerId: event.recipientId }),
         count: event.count,
       };
+    case 'CHARITY_CARDS_REVEALED':
+      return {
+        ...base,
+        playerId: event.playerId,
+        ...(event.recipientId === null
+          ? {}
+          : { targetPlayerId: event.recipientId }),
+        cards: logCards(state, event.cardIds),
+        count: event.cardIds.length,
+      };
     case 'GAME_FINISHED':
       return {
         ...base,

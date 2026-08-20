@@ -102,6 +102,8 @@ const ENGLISH = {
   logToPlayer: 'to',
   logCharityGiven: 'gave charity cards:',
   logCharityDiscarded: 'discarded charity cards:',
+  logCharityCardsGiven: 'gave these charity cards:',
+  logCharityCardsDiscarded: 'discarded these charity cards:',
   logPlayerDied: 'died.',
   logPlayerRevived: 'returned to the adventure.',
   logGameFinished: 'won the game at level',
@@ -134,7 +136,15 @@ const ENGLISH = {
   curseTo: 'Curse',
   sell: 'Sell for a level',
   tradeTo: 'Give to',
-  charity: 'Remove random excess cards',
+  charity: 'Charity',
+  charityTitle: 'Resolve charity',
+  charityDescription: 'Choose exactly the excess cards to remove from your hand.',
+  closeCharity: 'Close charity',
+  charityRecipient: 'Recipient among the lowest-level players',
+  charityDiscardHint:
+    'Because you are among the lowest-level players, these cards will be discarded.',
+  randomCharity: 'Choose randomly',
+  confirmCharity: 'Confirm charity',
   recentEvents: 'Latest actions',
   publicEvents: 'Cards on the table',
   publicEventsHint: 'New public card events appear here without blocking play.',
@@ -228,6 +238,28 @@ const ENGLISH = {
   effectDiscardChosen: 'Choose cards to discard',
   effectDiscardRole: 'Discard role',
   effectDeath: 'Death',
+  cardLevelReward: 'Level reward',
+  cardTreasureReward: 'Treasures',
+  cardCurrentLevel: 'Current level',
+  cardBadStuff: 'Bad stuff',
+  cardHands: 'Hands used',
+  cardPrice: 'Price',
+  cardRestrictions: 'Restrictions',
+  cardNoRestrictions: 'none',
+  cardClassRestriction: 'Class',
+  cardRaceRestriction: 'Race',
+  cardTiming: 'Timing',
+  cardTarget: 'Target',
+  timingTurn: 'during your turn',
+  timingActiveCombat: 'during combat',
+  timingVictoryReaction: 'during the victory reaction',
+  timingWhenDrawn: 'when drawn',
+  targetSelf: 'self',
+  targetAnyPlayer: 'any player',
+  targetCombatPlayers: 'active adventurer or helper',
+  targetCombatPlayer: 'one combat participant',
+  targetMonsterEncounter: 'one Monster encounter',
+  targetHandMonster: 'a Monster from your hand',
   decisionRequired: 'Decision required',
   chooseCardsToDiscard: 'Choose exactly this many cards to discard',
   playerChoosingCards: 'is choosing cards to discard…',
@@ -440,6 +472,8 @@ const RUSSIAN: Record<TranslationKey, string> = {
   logToPlayer: 'игроку',
   logCharityGiven: 'передал карт как милостыню:',
   logCharityDiscarded: 'сбросил карт при раздаче милостыни:',
+  logCharityCardsGiven: 'передал эти карты как милостыню:',
+  logCharityCardsDiscarded: 'сбросил эти карты при раздаче милостыни:',
   logPlayerDied: 'погиб.',
   logPlayerRevived: 'вернулся в приключение.',
   logGameFinished: 'выиграл игру на уровне',
@@ -472,7 +506,15 @@ const RUSSIAN: Record<TranslationKey, string> = {
   curseTo: 'Проклясть',
   sell: 'Продать за уровень',
   tradeTo: 'Передать игроку',
-  charity: 'Убрать случайные',
+  charity: 'Милостыня',
+  charityTitle: 'Раздать милостыню',
+  charityDescription: 'Выберите точное количество лишних карт из руки.',
+  closeCharity: 'Закрыть милостыню',
+  charityRecipient: 'Получатель среди игроков минимального уровня',
+  charityDiscardHint:
+    'Вы среди игроков минимального уровня, поэтому выбранные карты уйдут в сброс.',
+  randomCharity: 'Выбрать случайно',
+  confirmCharity: 'Подтвердить милостыню',
   recentEvents: 'Последние действия',
   publicEvents: 'Карты на столе',
   publicEventsHint: 'Новые публичные карточные события появляются здесь и не блокируют игру.',
@@ -567,6 +609,28 @@ const RUSSIAN: Record<TranslationKey, string> = {
   effectDiscardChosen: 'Выбрать карты для сброса',
   effectDiscardRole: 'Сбросить роль',
   effectDeath: 'Смерть',
+  cardLevelReward: 'Награда уровнями',
+  cardTreasureReward: 'Сокровища',
+  cardCurrentLevel: 'Текущий уровень',
+  cardBadStuff: 'Непотребство',
+  cardHands: 'Занято рук',
+  cardPrice: 'Цена',
+  cardRestrictions: 'Ограничения',
+  cardNoRestrictions: 'нет',
+  cardClassRestriction: 'Класс',
+  cardRaceRestriction: 'Раса',
+  cardTiming: 'Время применения',
+  cardTarget: 'Цель',
+  timingTurn: 'в свой ход',
+  timingActiveCombat: 'во время боя',
+  timingVictoryReaction: 'в окне реакции на победу',
+  timingWhenDrawn: 'при открытии',
+  targetSelf: 'на себя',
+  targetAnyPlayer: 'любой игрок',
+  targetCombatPlayers: 'активный игрок или помощник',
+  targetCombatPlayer: 'один участник боя',
+  targetMonsterEncounter: 'один монстр в бою',
+  targetHandMonster: 'монстр с вашей руки',
   decisionRequired: 'Требуется решение',
   chooseCardsToDiscard: 'Выберите ровно столько карт для сброса',
   playerChoosingCards: 'выбирает карты для сброса…',
@@ -948,6 +1012,16 @@ export class LocalizationService {
     return this.currentLocale() === 'ru'
       ? (RUSSIAN_CARDS[card.definitionId]?.description ?? card.description)
       : card.description;
+  }
+
+  definitionName(definitionId: string): string {
+    const translated = RUSSIAN_CARDS[definitionId]?.name;
+    if (this.currentLocale() === 'ru' && translated !== undefined) return translated;
+    return definitionId
+      .split('-')
+      .filter(Boolean)
+      .map((part) => `${part.at(0)?.toUpperCase() ?? ''}${part.slice(1)}`)
+      .join(' ');
   }
 
   cardsCount(count: number): string {

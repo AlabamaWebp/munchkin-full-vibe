@@ -5,6 +5,8 @@ import {
   type AvailableGameAction,
   type GameCardView,
   type GameCardType,
+  type GameCardPlayTiming,
+  type GameCardTarget,
   type GameBadStuffEffectView,
   type GameCardUnavailableReason,
   type GameClientCommand,
@@ -18,6 +20,7 @@ import {
 } from '@munchkin-lan/contracts';
 import { CardDetailsDialogComponent } from './card-details-dialog.component';
 import { AutoFocusDirective } from './auto-focus.directive';
+import { CardArtworkComponent } from './card-artwork.component';
 import { EquipmentLayoutComponent, type EquipmentLayoutLabels } from './equipment-layout.component';
 import { GameCardComponent } from './game-card.component';
 import { LobbyClient } from './lobby-client';
@@ -28,6 +31,7 @@ import { LocalizationService, type AppLocale } from './localization';
   imports: [
     FormsModule,
     AutoFocusDirective,
+    CardArtworkComponent,
     CardDetailsDialogComponent,
     EquipmentLayoutComponent,
     GameCardComponent,
@@ -43,6 +47,11 @@ export class App {
   protected readonly playerName = signal('');
   protected readonly roomCode = signal('');
   protected readonly selectedCard = signal<GameCardView | null>(null);
+  private readonly selectedMonsterPresentation = signal<{
+    readonly cardId: string;
+    readonly currentLevel: number;
+    readonly currentTreasures: number;
+  } | null>(null);
   protected readonly selectedLogEntry = signal<GameLogEntryView | null>(null);
   protected readonly selectedPlayerId = signal<string | null>(null);
   protected readonly publicCardEvents = signal<readonly GameLogEntryView[]>([]);
@@ -65,6 +74,9 @@ export class App {
   protected readonly historyOpen = signal(false);
   protected readonly saleOpen = signal(false);
   protected readonly saleCardIds = signal<readonly string[]>([]);
+  protected readonly charityOpen = signal(false);
+  protected readonly charityCardIds = signal<readonly string[]>([]);
+  protected readonly charityRecipientId = signal<string | null>(null);
   protected readonly lookForTroubleOpen = signal(false);
   protected readonly lookForTroubleCardId = signal<string | null>(null);
   protected readonly discardCardIds = signal<readonly string[]>([]);
@@ -76,6 +88,7 @@ export class App {
   protected readonly errorMessage = this.localization.errorMessage.bind(this.localization);
   protected readonly cardName = this.localization.cardName.bind(this.localization);
   protected readonly cardDescription = this.localization.cardDescription.bind(this.localization);
+  private readonly definitionName = this.localization.definitionName.bind(this.localization);
   protected readonly cardsCount = this.localization.cardsCount.bind(this.localization);
 
   protected readonly connection = this.lobbyClient.connection;
@@ -87,7 +100,7 @@ export class App {
   protected readonly isHost = this.lobbyClient.isHost;
   protected readonly hasStarted = this.lobbyClient.hasStarted;
   protected readonly recentPublicEvents = computed(() =>
-    (this.game()?.gameLog ?? []).filter((entry) => entry.visibility === 'PUBLIC').slice(-5),
+    (this.game()?.gameLog ?? []).filter((entry) => entry.visibility === 'PUBLIC').slice(-3),
   );
   private presentationGameKey: string | null = null;
   private lastPresentedSequence = 0;
@@ -247,6 +260,46 @@ export class App {
     this.closeSale();
   }
 
+  protected openCharity(game: GameView): void {
+    this.charityCardIds.set([]);
+    this.charityRecipientId.set(
+      game.expandedRuleActions.charityRecipientIds.length === 1
+        ? game.expandedRuleActions.charityRecipientIds[0]!
+        : null,
+    );
+    this.charityOpen.set(true);
+  }
+
+  protected closeCharity(): void {
+    this.charityOpen.set(false);
+    this.charityCardIds.set([]);
+    this.charityRecipientId.set(null);
+  }
+
+  protected toggleCharityCard(game: GameView, cardId: string): void {
+    const selected = this.charityCardIds();
+    if (selected.includes(cardId)) {
+      this.charityCardIds.set(selected.filter((id) => id !== cardId));
+      return;
+    }
+    if (selected.length < game.expandedRuleActions.charityCardCount) {
+      this.charityCardIds.set([...selected, cardId]);
+    }
+  }
+
+  protected confirmCharity(game: GameView): void {
+    const actions = game.expandedRuleActions;
+    if (this.charityCardIds().length !== actions.charityCardCount) return;
+    const recipientId = this.charityRecipientId();
+    if (actions.charityRecipientIds.length > 0 && recipientId === null) return;
+    this.lobbyClient.sendGameCommand({
+      type: 'GIVE_CHARITY',
+      cardIds: this.charityCardIds(),
+      recipientId,
+    });
+    this.closeCharity();
+  }
+
   protected chooseTarget(game: GameView, playerId: string): void {
     const targeting = this.targeting();
     if (targeting === null || !targeting.eligiblePlayerIds.includes(playerId)) return;
@@ -276,9 +329,10 @@ export class App {
     this.combatCardTargeting.set(null);
   }
 
-  protected resolveCharity(game: GameView): void {
+  protected resolveRandomCharity(game: GameView): void {
     if (game.expandedRuleActions.charityCardCount === 0) return;
     this.lobbyClient.sendGameCommand({ type: 'GIVE_RANDOM_CHARITY' });
+    this.closeCharity();
   }
 
   protected decisionCards(game: GameView): readonly GameCardView[] {
@@ -470,17 +524,34 @@ export class App {
 
   protected openCard(card: GameCardView): void {
     this.selectedLogEntry.set(null);
+    this.selectedMonsterPresentation.set(null);
+    this.selectedCard.set(card);
+  }
+
+  protected openMonsterCard(
+    card: GameCardView,
+    currentLevel: number,
+    currentTreasures: number,
+  ): void {
+    this.selectedLogEntry.set(null);
+    this.selectedMonsterPresentation.set({
+      cardId: card.instanceId,
+      currentLevel,
+      currentTreasures,
+    });
     this.selectedCard.set(card);
   }
 
   protected openLogEntry(entry: GameLogEntryView): void {
     if (!this.logEntryCards(entry).length) return;
     this.selectedCard.set(null);
+    this.selectedMonsterPresentation.set(null);
     this.selectedLogEntry.set(entry);
   }
 
   protected closeCardDetails(): void {
     this.selectedCard.set(null);
+    this.selectedMonsterPresentation.set(null);
     this.selectedLogEntry.set(null);
   }
 
@@ -601,6 +672,12 @@ export class App {
               'logToPlayer',
             )} ${target}.`
           : `${player} ${this.t('logCharityDiscarded')} ${entry.count ?? 0}.`;
+      case 'CHARITY_CARDS_REVEALED':
+        return entry.targetPlayerId
+          ? `${player} ${this.t('logCharityCardsGiven')} ${cards} ${this.t(
+              'logToPlayer',
+            )} ${target}.`
+          : `${player} ${this.t('logCharityCardsDiscarded')} ${cards}.`;
       case 'PLAYER_DIED':
         return `${player} ${this.t('logPlayerDied')}`;
       case 'PLAYER_REVIVED':
@@ -670,15 +747,110 @@ export class App {
   }
 
   protected cardTypeForDialog = (card: GameCardView): string => this.cardTypeLabel(card.type);
-  protected effectForDialog = (effect: GameEffectView): string => this.effectLabel(effect);
-  protected slotForDialog = (slot: GameEquipmentSlot): string => this.equipmentSlotLabel(slot);
+  protected readonly selectedCardFacts = (card: GameCardView): readonly string[] => {
+    const presentation = this.selectedMonsterPresentation();
+    return presentation?.cardId === card.instanceId
+      ? this.cardFacts(card, presentation.currentLevel, presentation.currentTreasures)
+      : this.cardFacts(card);
+  };
+
+  protected readonly cardFacts = (
+    card: GameCardView,
+    currentMonsterLevel = card.monster?.level,
+    currentMonsterTreasures = card.monster?.treasureRewards,
+  ): readonly string[] => {
+    const facts: string[] = [];
+    if (card.monster !== undefined) {
+      const baseLevel = card.monster.level;
+      facts.push(
+        currentMonsterLevel !== undefined && currentMonsterLevel !== baseLevel
+          ? `${this.t('level')}: ${baseLevel} · ${this.t('cardCurrentLevel')}: ${currentMonsterLevel}`
+          : `${this.t('level')}: ${baseLevel}`,
+      );
+      facts.push(`${this.t('cardLevelReward')}: ${card.monster.levelRewards}`);
+      const currentTreasures = currentMonsterTreasures ?? card.monster.treasureRewards;
+      facts.push(
+        currentTreasures !== card.monster.treasureRewards
+          ? `${this.t('cardTreasureReward')}: ${card.monster.treasureRewards} → ${currentTreasures}`
+          : `${this.t('cardTreasureReward')}: ${card.monster.treasureRewards}`,
+      );
+      facts.push(
+        `${this.t('cardBadStuff')}: ${
+          card.monster.badStuff.length === 0
+            ? this.t('cardNoRestrictions')
+            : card.monster.badStuff.map((effect) => this.badStuffLabel(effect)).join('; ')
+        }`,
+      );
+    }
+
+    if (card.equipment !== undefined) {
+      facts.push(`${this.t('equipmentSlot')}: ${this.equipmentSlotLabel(card.equipment.slot)}`);
+      if (card.equipment.slot === 'HANDS') {
+        facts.push(`${this.t('cardHands')}: ${card.equipment.hands}`);
+      }
+      facts.push(
+        `${this.t('equipmentBonus')}: ${card.equipment.combatBonus >= 0 ? '+' : ''}${
+          card.equipment.combatBonus
+        }`,
+      );
+      const restrictions = card.equipment.restrictions.map(
+        (restriction) =>
+          `${this.t(
+            restriction.type === 'CLASS' ? 'cardClassRestriction' : 'cardRaceRestriction',
+          )}: ${this.definitionName(restriction.definitionId)}`,
+      );
+      facts.push(
+        `${this.t('cardRestrictions')}: ${
+          restrictions.length === 0 ? this.t('cardNoRestrictions') : restrictions.join(', ')
+        }`,
+      );
+    }
+
+    if (card.deck === 'TREASURE' && card.goldValue !== undefined) {
+      facts.push(`${this.t('cardPrice')}: ${card.goldValue}`);
+    }
+
+    facts.push(...card.effects.map((effect) => this.effectLabel(effect)));
+
+    if (card.play !== undefined) {
+      facts.push(
+        `${this.t('cardTiming')}: ${card.play.timings
+          .map((timing) => this.cardTimingLabel(timing))
+          .join(', ')}`,
+      );
+      facts.push(`${this.t('cardTarget')}: ${this.cardTargetLabel(card.play.target)}`);
+    }
+    return facts;
+  };
+
+  private cardTimingLabel(timing: GameCardPlayTiming): string {
+    const labels = {
+      TURN: 'timingTurn',
+      ACTIVE_COMBAT: 'timingActiveCombat',
+      VICTORY_REACTION: 'timingVictoryReaction',
+      WHEN_DRAWN: 'timingWhenDrawn',
+    } as const;
+    return this.t(labels[timing]);
+  }
+
+  private cardTargetLabel(target: GameCardTarget): string {
+    const labels = {
+      SELF: 'targetSelf',
+      ANY_PLAYER: 'targetAnyPlayer',
+      COMBAT_PLAYERS: 'targetCombatPlayers',
+      COMBAT_PLAYER: 'targetCombatPlayer',
+      MONSTER_ENCOUNTER: 'targetMonsterEncounter',
+      HAND_MONSTER: 'targetHandMonster',
+    } as const;
+    return this.t(labels[target]);
+  }
 
   protected effectLabel(effect: GameEffectView): string {
     switch (effect.type) {
       case 'COMBAT_BONUS':
         return `${this.t('effectCombatBonus')} ${effect.amount >= 0 ? '+' : ''}${effect.amount}`;
       case 'MONSTER_COMBAT_BONUS':
-        return `${this.t('effectMonsterBonus')} +${effect.amount}`;
+        return `${this.t('effectMonsterBonus')} ${effect.amount >= 0 ? '+' : ''}${effect.amount}`;
       case 'MODIFY_MONSTER':
         return `${this.t('effectMonsterStrength')} ${effect.strength >= 0 ? '+' : ''}${
           effect.strength
@@ -694,9 +866,13 @@ export class App {
       case 'DRAW_CARDS':
         return `${this.t('effectDrawCards')} ${effect.count} · ${this.deckLabel(effect.deck)}`;
       case 'DISCARD_RANDOM_CARDS':
-        return `${this.t('effectDiscardRandom')} ${effect.count}`;
+        return `${this.t('effectDiscardRandom')} ${effect.count} · ${this.t(
+          effect.zone === 'HAND' ? 'yourHand' : 'equipment',
+        )}`;
       case 'DISCARD_CHOSEN_CARDS':
-        return `${this.t('effectDiscardChosen')} ${effect.count}`;
+        return `${this.t('effectDiscardChosen')} ${effect.count} · ${this.t(
+          effect.zone === 'HAND' ? 'yourHand' : 'equipment',
+        )}`;
       case 'DISCARD_ROLE':
         return `${this.t('effectDiscardRole')} ${this.cardTypeLabel(effect.role)}`;
       case 'DEATH':

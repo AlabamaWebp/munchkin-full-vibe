@@ -145,6 +145,10 @@ export class GameService {
           command.targetPlayerId.trim().length === 0)) ||
       (command.type === 'TRADE_ITEM' &&
         (typeof command.recipientId !== 'string' ||
+          command.recipientId.trim().length === 0)) ||
+      (command.type === 'GIVE_CHARITY' &&
+        command.recipientId !== null &&
+        (typeof command.recipientId !== 'string' ||
           command.recipientId.trim().length === 0))
     ) {
       return {
