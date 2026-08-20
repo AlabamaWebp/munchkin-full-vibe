@@ -258,6 +258,25 @@ Implement:
 
 ---
 
+## Milestone 12.1 — Game process visibility
+
+Status: complete.
+
+Implemented:
+
+- a non-blocking shared area for newly revealed and publicly played cards;
+- interactive, phase-aware game-history card details with multi-card navigation;
+- responsive public character sheets with explicit equipment and role slots;
+- two-sided combat presentation with authoritative power breakdowns and persistent
+  combat cards;
+- server-projected expected actors and unavailable-card reasons;
+- explicit target selection and confirmation for targeted or combat-card actions;
+- short, reduced-motion-aware result feedback and mobile dialog/bottom-sheet UI;
+- privacy, projection, Angular interaction, equipment-layout, and responsive UI
+  coverage.
+
+---
+
 ## Milestone 13 — LAN production
 
 Implement:

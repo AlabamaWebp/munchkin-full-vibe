@@ -57,6 +57,13 @@ export type GameCommand =
       readonly recipientId: PlayerId | null;
     })
   | (PlayerCommand & {
+      readonly type: "GIVE_RANDOM_CHARITY";
+    })
+  | (PlayerCommand & {
+      readonly type: "RESOLVE_CARD_DISCARD";
+      readonly cardIds: readonly CardInstanceId[];
+    })
+  | (PlayerCommand & {
       readonly type: "RESOLVE_COMBAT";
     })
   | (PlayerCommand & {

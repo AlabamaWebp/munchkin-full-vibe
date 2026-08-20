@@ -9,6 +9,7 @@ const card: GameCardView = {
   description: 'A surprisingly organized threat from beneath the sofa.',
   type: 'MONSTER',
   deck: 'DOOR',
+  effects: [],
   monster: { level: 1, levelRewards: 1, treasureRewards: 1, badStuff: [] },
 };
 

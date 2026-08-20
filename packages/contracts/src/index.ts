@@ -109,6 +109,7 @@ export interface GameCardView {
   readonly description: string;
   readonly type: GameCardType;
   readonly deck: GameDeckType;
+  readonly effects: readonly GameEffectView[];
   readonly equipment?: {
     readonly slot: GameEquipmentSlot;
     readonly hands?: 1 | 2;
@@ -137,7 +138,7 @@ export type GameEffectView =
       readonly count: number;
     }
   | {
-      readonly type: "DISCARD_RANDOM_CARDS";
+      readonly type: "DISCARD_RANDOM_CARDS" | "DISCARD_CHOSEN_CARDS";
       readonly count: number;
       readonly zone: "HAND" | "EQUIPMENT";
     }
@@ -147,7 +148,7 @@ export type GameEffectView =
 export type GameBadStuffEffectView =
   | { readonly type: "LOSE_LEVEL"; readonly amount: number }
   | {
-      readonly type: "DISCARD_RANDOM_CARDS";
+      readonly type: "DISCARD_RANDOM_CARDS" | "DISCARD_CHOSEN_CARDS";
       readonly count: number;
       readonly zone: "HAND" | "EQUIPMENT";
     }
@@ -198,6 +199,83 @@ export type CombatHistoryView =
       readonly side: "PLAYERS" | "MONSTER";
     };
 
+export type GameLogEventType =
+  | "PLAYER_ADDED"
+  | "GAME_STARTED"
+  | "CARDS_DEALT"
+  | "TURN_STARTED"
+  | "DOOR_KICKED"
+  | "CARD_DRAWN"
+  | "CARD_ADDED_TO_HAND"
+  | "CARDS_DISCARDED"
+  | "CARDS_DISCARDED_SUMMARY"
+  | "CARD_DISCARD_REQUIRED"
+  | "CURSE_RESOLVED"
+  | "COMBAT_STARTED"
+  | "COMBAT_UPDATED"
+  | "COMBAT_WON"
+  | "RUN_AWAY_ATTEMPTED"
+  | "BAD_STUFF_APPLIED"
+  | "HELP_REQUESTED"
+  | "HELP_ACCEPTED"
+  | "LEVEL_GAINED"
+  | "LEVEL_LOST"
+  | "TREASURE_GAINED"
+  | "ROOM_LOOTED"
+  | "CARD_PLAYED"
+  | "ITEM_EQUIPPED"
+  | "ITEM_UNEQUIPPED"
+  | "ROLE_PLAYED"
+  | "ITEMS_SOLD"
+  | "ITEM_TRADED"
+  | "CHARITY_RESOLVED"
+  | "PLAYER_DIED"
+  | "PLAYER_REVIVED"
+  | "TURN_ENDED"
+  | "GAME_FINISHED";
+
+export interface GameLogEntryView {
+  readonly sequence: number;
+  readonly turnNumber: number;
+  readonly phase: GamePhase;
+  readonly type: GameLogEventType;
+  readonly visibility: "PUBLIC" | "PRIVATE";
+  readonly playerId?: string;
+  readonly targetPlayerId?: string;
+  readonly card?: GameCardView;
+  readonly cards?: readonly GameCardView[];
+  readonly count?: number;
+  readonly amount?: number;
+  readonly value?: number;
+  readonly newLevel?: number;
+  readonly playerPower?: number;
+  readonly monsterPower?: number;
+  readonly roll?: number;
+  readonly escaped?: boolean;
+  readonly side?: "PLAYERS" | "MONSTER";
+  readonly role?: "CLASS" | "RACE";
+  readonly zone?: "HAND" | "EQUIPMENT";
+}
+
+export type GameCardUnavailableReason =
+  | "GAME_FINISHED"
+  | "PENDING_DECISION"
+  | "WAITING_FOR_TURN"
+  | "COMBAT_ACTIVE"
+  | "NO_ACTIVE_COMBAT"
+  | "WRONG_PHASE"
+  | "SLOT_OCCUPIED"
+  | "NOT_ENOUGH_FREE_HANDS"
+  | "CLASS_REQUIRED"
+  | "RACE_REQUIRED"
+  | "NO_AVAILABLE_ACTION";
+
+export type ExpectedGameActionView =
+  | { readonly type: "DISCARD_CARDS"; readonly playerId: string }
+  | { readonly type: "RESPOND_TO_HELP"; readonly playerId: string }
+  | { readonly type: "COMBAT_DECISION"; readonly playerId: string }
+  | { readonly type: "TAKE_TURN_ACTION"; readonly playerId: string };
+
 export interface GameView {
   readonly gameId: string;
   readonly viewerPlayerId: string;
@@ -226,6 +304,16 @@ export interface GameView {
     readonly escaped: boolean;
     readonly badStuffApplied: boolean;
   } | null;
+  readonly pendingDecision: {
+    readonly type: "DISCARD_CARDS";
+    readonly playerId: string;
+    readonly zone: "HAND" | "EQUIPMENT";
+    readonly count: number;
+    readonly sourceCard: GameCardView;
+    readonly selectableCardIds: readonly string[];
+  } | null;
+  readonly gameLog: readonly GameLogEntryView[];
+  readonly expectedAction: ExpectedGameActionView;
   readonly deckCounts: { readonly door: number; readonly treasure: number };
   readonly availableActions: readonly AvailableGameAction[];
   readonly availableEquipmentActions: {
@@ -245,6 +333,10 @@ export interface GameView {
     readonly charityCardCount: number;
     readonly charityRecipientIds: readonly string[];
   };
+  readonly unavailableCardReasons: readonly {
+    readonly cardId: string;
+    readonly reason: GameCardUnavailableReason;
+  }[];
 }
 
 export type GameClientCommand =
@@ -270,6 +362,10 @@ export type GameClientCommand =
     }
   | { readonly type: "SELL_ITEMS"; readonly cardIds: readonly string[] }
   | {
+      readonly type: "RESOLVE_CARD_DISCARD";
+      readonly cardIds: readonly string[];
+    }
+  | {
       readonly type: "TRADE_ITEM";
       readonly cardId: string;
       readonly recipientId: string;
@@ -278,7 +374,8 @@ export type GameClientCommand =
       readonly type: "GIVE_CHARITY";
       readonly cardIds: readonly string[];
       readonly recipientId: string | null;
-    };
+    }
+  | { readonly type: "GIVE_RANDOM_CHARITY" };
 export interface GameCommandPayload {
   readonly roomCode: string;
   readonly command: GameClientCommand;

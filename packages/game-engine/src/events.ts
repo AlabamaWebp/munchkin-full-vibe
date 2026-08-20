@@ -58,6 +58,20 @@ export type GameEvent =
       readonly cardIds: readonly CardInstanceId[];
     })
   | (PublicEvent & {
+      readonly type: "CARDS_DISCARDED_SUMMARY";
+      readonly playerId: PlayerId;
+      readonly count: number;
+      readonly zone: "HAND" | "EQUIPMENT";
+    })
+  | (PublicEvent & {
+      readonly type: "CARD_DISCARD_REQUIRED";
+      readonly playerId: PlayerId;
+      readonly count: number;
+      readonly zone: "HAND" | "EQUIPMENT";
+      readonly sourceCardId: CardInstanceId;
+      readonly sourceDefinitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
       readonly type: "CURSE_RESOLVED";
       readonly playerId: PlayerId;
       readonly cardId: CardInstanceId;
@@ -107,6 +121,12 @@ export type GameEvent =
     })
   | (PublicEvent & {
       readonly type: "LEVEL_GAINED";
+      readonly playerId: PlayerId;
+      readonly amount: number;
+      readonly newLevel: number;
+    })
+  | (PublicEvent & {
+      readonly type: "LEVEL_LOST";
       readonly playerId: PlayerId;
       readonly amount: number;
       readonly newLevel: number;

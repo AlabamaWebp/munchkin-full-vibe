@@ -79,7 +79,7 @@ const definitions: readonly CardDefinition[] = [
 
 function state(): GameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: parseGameId("multiplayer-combat"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -125,6 +125,9 @@ function state(): GameState {
         { type: "COMBAT_STARTED", playerId: heroId, monsterDefinitionId },
       ],
     },
+    lastRunAwayResult: null,
+    pendingDecision: null,
+    eventLog: [],
     turnNumber: 1,
     winnerId: null,
   };
@@ -224,6 +227,31 @@ describe("multiplayer combat", () => {
       monsterBonus.state.combat?.history.map((entry) => entry.type),
     ).toEqual(["COMBAT_STARTED", "CARD_PLAYED", "CARD_PLAYED"]);
     expect(monsterBonus.state.treasureDiscard).toEqual([bonus, modifier]);
+  });
+
+  it("lets a temporary combat bonus strengthen the monster side", () => {
+    const result = executeCommand(
+      state(),
+      {
+        type: "PLAY_CARD",
+        actorId: outsiderId,
+        cardId: bonus.instanceId,
+        target: { type: "COMBAT", side: "MONSTER" },
+      },
+      { random },
+    );
+    expect(result).toMatchObject({
+      success: true,
+      state: { combat: { monsterBonus: 3 } },
+    });
+    if (result.success) {
+      expect(result.events.at(-1)).toMatchObject({
+        type: "COMBAT_UPDATED",
+        playerPower: 3,
+        monsterPower: 11,
+      });
+      expect(result.state.treasureDiscard).toEqual([bonus]);
+    }
   });
 
   it("rejects a card played on the wrong combat side atomically", () => {

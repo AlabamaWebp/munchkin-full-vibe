@@ -36,7 +36,7 @@ const definitionInputs: readonly DefinitionInput[] = [
       level: 3,
       levelRewards: 1,
       treasureRewards: 1,
-      badStuff: [{ type: "DISCARD_RANDOM_CARDS", zone: "HAND", count: 1 }],
+      badStuff: [{ type: "DISCARD_CHOSEN_CARDS", zone: "HAND", count: 1 }],
     },
   },
   {
@@ -64,7 +64,7 @@ const definitionInputs: readonly DefinitionInput[] = [
       level: 10,
       levelRewards: 1,
       treasureRewards: 3,
-      badStuff: [{ type: "DISCARD_RANDOM_CARDS", zone: "EQUIPMENT", count: 1 }],
+      badStuff: [{ type: "DISCARD_CHOSEN_CARDS", zone: "EQUIPMENT", count: 1 }],
     },
   },
   {
@@ -92,10 +92,10 @@ const definitionInputs: readonly DefinitionInput[] = [
   {
     id: "curse-memory-moths",
     name: "Curse! Memory Moths",
-    description: "Discard one random card from your hand.",
+    description: "Choose and discard one card from your hand.",
     type: CardType.CURSE,
     deck: DeckType.DOOR,
-    effects: [{ type: "DISCARD_RANDOM_CARDS", zone: "HAND", count: 1 }],
+    effects: [{ type: "DISCARD_CHOSEN_CARDS", zone: "HAND", count: 1 }],
   },
   {
     id: "curse-double-backtrack",

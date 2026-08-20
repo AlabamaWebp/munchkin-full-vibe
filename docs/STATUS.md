@@ -3,10 +3,45 @@
 Current milestone:
 
 ```text
-Milestone 12 — Game completion (complete)
+Milestone 12.1 — Game process visibility (complete)
 ```
 
 ## Implemented
+
+- targeted combat-help requests that name the selected player and can only be
+  accepted by that player;
+- temporary combat bonuses playable for either the adventurer or Monster side,
+  with authoritative side-specific power updates and confirmation in the UI;
+- own-turn-only item transfer, preventing Treasure equipment from appearing
+  actionable to a player who is waiting for somebody else's turn;
+- distinct card palettes for Monsters, Curses, equipment, temporary bonuses,
+  Monster modifiers, Classes, Races, and other cards while retaining the Door
+  and Treasure deck accents;
+- seven-second temporary result notifications and viewer-aware waiting statuses
+  that name the player currently choosing, fighting, or ending their turn;
+
+- reusable standalone card-face, card-details, focus-management, and equipment-slot
+  components shared by the hand, public-event area, game history, combat, and
+  character sheet;
+- a non-blocking central stack for newly revealed or publicly played cards, based
+  on the existing authoritative game log and persisted per-viewer sequence
+  acknowledgement so refresh/reconnect does not replay already seen notices;
+- interactive game-history entries that open all viewer-visible related cards,
+  localized effects, source/target, turn, phase, and actual server-confirmed result;
+- responsive public character dialogs/bottom sheets with level, combat and
+  equipment power, private hand count only, life/connection/combat roles, empty
+  Head/Body/Feet/left-hand/right-hand/Class/Race slots, and a two-handed layout;
+- a two-sided combat board with authoritative player, equipment, temporary,
+  helper, Monster-base, and Monster-modifier breakdowns, plus clickable combat
+  cards retained from the existing public combat history;
+- server-projected expected actors and per-card unavailability reasons, hand-card
+  playability indicators, highlighted valid player targets, and explicit
+  confirmation before targeted or combat-card commands;
+- brief result feedback for level, Treasure, escape, bad-stuff, death/revival, and
+  equipment events, with `prefers-reduced-motion` support;
+- keyboard-accessible dialogs with programmatic initial focus, visible focus,
+  Escape handling, localized RU/EN strings, and verified zero page overflow at
+  360, 390, and 412 px (excluding intentional hand scrolling);
 
 - process-lifetime player sessions with random reconnect credentials stored by
   Angular in `localStorage`;
@@ -90,9 +125,9 @@ Milestone 12 — Game completion (complete)
   combat they are not currently winning;
 - a deterministic six-sided escape roll through the injected `RandomSource`,
   with success on 5–6 and failure on 1–4;
-- typed, data-driven Monster bad stuff for level loss and random hand/equipment
-  discard, including five fictional development-Monster consequences and the
-  level-one lower bound;
+- typed, data-driven Monster bad stuff for level loss and explicitly random or
+  player-chosen hand/equipment discard, including five fictional
+  development-Monster consequences and the level-one lower bound;
 - complete losing-combat cleanup after either outcome: Monster discard,
   temporary-bonus reset, removal of helper and combat history with combat state,
   and transition to `END_TURN`;
@@ -132,18 +167,48 @@ Milestone 12 — Game completion (complete)
 - focused engine, lobby, server, and Angular coverage for winning by combat or
   sale, post-finish command rejection, lifecycle authorization, unfinished-game
   rejection, and victory controls.
+- an ordered, match-long game log accumulated from authoritative domain events,
+  with stable sequence and turn metadata, persistence across full-state
+  synchronization and reconnects, and no client-invented actions;
+- player-specific log projection that exposes all public events and only the
+  current viewer's private draws/deals/discards, including readable card details
+  without leaking another player's hidden cards;
+- an always-available localized Game History button and mobile dialog showing the
+  complete chronological history during play and after victory.
+- a compact synchronized latest-actions panel derived from public authoritative
+  events, including explicit level-loss, pending-discard, and discard-summary
+  outcomes visible to every player without opening the full history;
+- typed player-choice discard effects with a reconnect-safe pending decision,
+  exact server validation, blocked unrelated commands, private selectable card
+  identities, and public waiting/result summaries;
+- a mobile discard-selection panel for the affected player and a synchronized
+  waiting state for everyone else;
+- a multi-item sale dialog covering hand and equipped items, with a running
+  authoritative-input total, complete 1,000-value level preview, unused-remainder
+  preview, and atomic confirmation;
+- server-random charity through the retained localized "Remove random excess
+  cards" action, without trusting the client to select which excess cards leave
+  the hand.
 
 ## Verification
 
-Verified on 2026-08-20:
+The shared application header now includes a localized fullscreen control when
+the browser supports the Fullscreen API. It tracks browser-driven fullscreen
+changes, including exiting with Escape, and remains available in the lobby and
+during play.
 
-- `npm test` — succeeded; 18 test files and 98 tests passed across all workspaces;
+Verified on 2026-08-20 after the current gameplay and UI corrections:
+
+- `npm test` — succeeded; 18 test files and 111 tests passed across all workspaces;
 - `npm run test:e2e --workspace @munchkin-lan/server -- --runInBand` — succeeded;
   2 suites and 3 HTTP/Socket.IO end-to-end tests passed;
 - `npm run lint` — succeeded across all four workspaces with 0 errors;
 - `npm run build` — succeeded for shared packages, Angular, and NestJS;
 - `npm run format:check` — succeeded across the repository.
-- `npm run dev` — both Angular and NestJS started successfully in watch mode.
+- the live development application was inspected in the in-app browser at 360,
+  390, and 412 px, including public events, reconnect/reload acknowledgement,
+  card and character bottom sheets, combat-card confirmation, retained combat
+  cards, keyboard Escape, focus, and horizontal-overflow checks.
 
 ## Intentional scope limits
 

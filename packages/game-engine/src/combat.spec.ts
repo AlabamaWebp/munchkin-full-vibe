@@ -71,7 +71,7 @@ const definitions: readonly CardDefinition[] = [
 
 function combatState(): GameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: parseGameId("combat-test"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -99,6 +99,9 @@ function combatState(): GameState {
       helperId: null,
       history: [{ type: "COMBAT_STARTED", playerId, monsterDefinitionId }],
     },
+    lastRunAwayResult: null,
+    pendingDecision: null,
+    eventLog: [],
     turnNumber: 1,
     winnerId: null,
   };

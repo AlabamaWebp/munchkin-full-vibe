@@ -1,10 +1,11 @@
-import type { CardDefinition, CardInstance } from "./cards.js";
+import type { CardDefinition, CardEffect, CardInstance } from "./cards.js";
 import type {
   CardDefinitionId,
   CardInstanceId,
   GameId,
   PlayerId,
 } from "./identifiers.js";
+import type { GameEvent } from "./events.js";
 
 export const GameStatus = {
   LOBBY: "LOBBY",
@@ -81,8 +82,41 @@ export type CombatHistoryEntry =
       readonly side: "PLAYERS" | "MONSTER";
     };
 
+export interface GameLogEntry {
+  readonly sequence: number;
+  readonly turnNumber: number;
+  readonly phase: GamePhase;
+  readonly event: GameEvent;
+}
+
+export type PendingEffectCompletion =
+  | {
+      readonly type: "CURSE";
+      readonly card: CardInstance;
+      readonly targetPlayerId: PlayerId;
+      readonly phaseAfterResolution: "POST_DOOR" | null;
+    }
+  | {
+      readonly type: "RUN_AWAY";
+      readonly playerId: PlayerId;
+      readonly monster: CardInstance;
+      readonly roll: number;
+      readonly badStuffApplied: boolean;
+    };
+
+export interface PendingCardDiscardDecision {
+  readonly type: "DISCARD_CARDS";
+  readonly playerId: PlayerId;
+  readonly zone: "HAND" | "EQUIPMENT";
+  readonly count: number;
+  readonly sourceCardId: CardInstanceId;
+  readonly sourceDefinitionId: CardDefinitionId;
+  readonly remainingEffects: readonly CardEffect[];
+  readonly completion: PendingEffectCompletion;
+}
+
 export interface GameState {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly id: GameId;
   readonly status: GameStatus;
   readonly phase: GamePhase;
@@ -95,6 +129,8 @@ export interface GameState {
   readonly treasureDiscard: readonly CardInstance[];
   readonly combat: CombatState | null;
   readonly lastRunAwayResult: RunAwayResultState | null;
+  readonly pendingDecision: PendingCardDiscardDecision | null;
+  readonly eventLog: readonly GameLogEntry[];
   readonly turnNumber: number;
   readonly winnerId: PlayerId | null;
 }

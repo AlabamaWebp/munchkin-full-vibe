@@ -18,6 +18,7 @@ import {
   GamePhase,
   GameStatus,
   type GameState,
+  type PendingEffectCompletion,
   type PlayerState,
 } from "./game-state.js";
 import type { PlayerId } from "./identifiers.js";
@@ -62,6 +63,7 @@ export type CommandErrorCode =
   | "INVALID_CARD_SELECTION"
   | "INSUFFICIENT_SALE_VALUE"
   | "HAND_LIMIT_EXCEEDED"
+  | "PENDING_DECISION"
   | "NOT_ACTIVE_PLAYER"
   | "NOT_ENOUGH_PLAYERS"
   | "PLAYER_LIMIT_REACHED";
@@ -248,6 +250,13 @@ function discardRandomCards(
               playerId,
               cardIds: discarded.map((card) => card.instanceId),
             },
+            {
+              type: "CARDS_DISCARDED_SUMMARY",
+              visibility: "PUBLIC",
+              playerId,
+              count: discarded.length,
+              zone: effect.zone,
+            },
           ],
   };
 }
@@ -257,11 +266,13 @@ function applyEffects(
   playerId: PlayerId,
   effects: readonly CardEffect[],
   random: RandomSource,
+  sourceCard: CardInstance,
+  completion: PendingEffectCompletion,
 ): EffectResult {
   let nextState = state;
   const events: GameEvent[] = [];
 
-  for (const effect of effects) {
+  for (const [index, effect] of effects.entries()) {
     switch (effect.type) {
       case "COMBAT_BONUS":
         nextState = updatePlayer(nextState, playerId, (player) => ({
@@ -275,12 +286,32 @@ function applyEffects(
           level: player.level + effect.amount,
         }));
         break;
-      case "LOSE_LEVEL":
+      case "LOSE_LEVEL": {
+        const previousLevel = nextState.players.find(
+          (player) => player.id === playerId,
+        )?.level;
         nextState = updatePlayer(nextState, playerId, (player) => ({
           ...player,
           level: Math.max(1, player.level - effect.amount),
         }));
+        const newLevel = nextState.players.find(
+          (player) => player.id === playerId,
+        )?.level;
+        if (
+          previousLevel !== undefined &&
+          newLevel !== undefined &&
+          previousLevel !== newLevel
+        ) {
+          events.push({
+            type: "LEVEL_LOST",
+            visibility: "PUBLIC",
+            playerId,
+            amount: previousLevel - newLevel,
+            newLevel,
+          });
+        }
         break;
+      }
       case "DRAW_CARDS": {
         const result = drawEffectCards(
           nextState,
@@ -297,6 +328,40 @@ function applyEffects(
         nextState = result.state;
         events.push(...result.events);
         break;
+      }
+      case "DISCARD_CHOSEN_CARDS": {
+        const player = nextState.players.find(
+          (candidate) => candidate.id === playerId,
+        );
+        const available =
+          effect.zone === "HAND"
+            ? player?.hand.length
+            : player?.equipment.length;
+        const count = Math.min(effect.count, available ?? 0);
+        if (count === 0) break;
+        nextState = {
+          ...nextState,
+          pendingDecision: {
+            type: "DISCARD_CARDS",
+            playerId,
+            zone: effect.zone,
+            count,
+            sourceCardId: sourceCard.instanceId,
+            sourceDefinitionId: sourceCard.definitionId,
+            remainingEffects: effects.slice(index + 1),
+            completion,
+          },
+        };
+        events.push({
+          type: "CARD_DISCARD_REQUIRED",
+          visibility: "PUBLIC",
+          playerId,
+          count,
+          zone: effect.zone,
+          sourceCardId: sourceCard.instanceId,
+          sourceDefinitionId: sourceCard.definitionId,
+        });
+        return { state: nextState, events };
       }
       case "DISCARD_ROLE": {
         const player = nextState.players.find(
@@ -344,6 +409,87 @@ function applyEffects(
   }
 
   return { state: nextState, events };
+}
+
+function completeEffectResolution(
+  state: GameState,
+  completion: PendingEffectCompletion,
+): EffectResult {
+  if (completion.type === "CURSE") {
+    let nextState = addToDiscard(state, [completion.card]);
+    if (completion.phaseAfterResolution !== null) {
+      nextState = { ...nextState, phase: GamePhase.POST_DOOR };
+    }
+    return {
+      state: nextState,
+      events: [
+        {
+          type: "CURSE_RESOLVED",
+          visibility: "PUBLIC",
+          playerId: completion.targetPlayerId,
+          cardId: completion.card.instanceId,
+          definitionId: completion.card.definitionId,
+        },
+      ],
+    };
+  }
+
+  let nextState = updatePlayer(state, completion.playerId, (player) => ({
+    ...player,
+    temporaryCombatBonus: 0,
+  }));
+  nextState = addToDiscard(nextState, [completion.monster]);
+  nextState = {
+    ...nextState,
+    phase: GamePhase.END_TURN,
+    combat: null,
+    lastRunAwayResult: {
+      playerId: completion.playerId,
+      monsterCardId: completion.monster.instanceId,
+      monsterDefinitionId: completion.monster.definitionId,
+      roll: completion.roll,
+      escaped: false,
+      badStuffApplied: completion.badStuffApplied,
+    },
+  };
+  return {
+    state: nextState,
+    events: completion.badStuffApplied
+      ? [
+          {
+            type: "BAD_STUFF_APPLIED",
+            visibility: "PUBLIC",
+            playerId: completion.playerId,
+            monsterCardId: completion.monster.instanceId,
+            monsterDefinitionId: completion.monster.definitionId,
+          },
+        ]
+      : [],
+  };
+}
+
+function applyEffectsAndComplete(
+  state: GameState,
+  playerId: PlayerId,
+  effects: readonly CardEffect[],
+  random: RandomSource,
+  sourceCard: CardInstance,
+  completion: PendingEffectCompletion,
+): EffectResult {
+  const applied = applyEffects(
+    state,
+    playerId,
+    effects,
+    random,
+    sourceCard,
+    completion,
+  );
+  if (applied.state.pendingDecision !== null) return applied;
+  const completed = completeEffectResolution(applied.state, completion);
+  return {
+    state: completed.state,
+    events: [...applied.events, ...completed.events],
+  };
 }
 
 function addPlayer(
@@ -544,26 +690,20 @@ function kickDoor(
   }
 
   if (definition.type === CardType.CURSE) {
-    const effectResult = applyEffects(
+    const effectResult = applyEffectsAndComplete(
       nextState,
       actorId,
       definition.effects,
       random,
-    );
-    nextState = addToDiscard(effectResult.state, [card]);
-    nextState = { ...nextState, phase: GamePhase.POST_DOOR };
-
-    return succeed(nextState, [
-      doorEvent,
-      ...effectResult.events,
+      card,
       {
-        type: "CURSE_RESOLVED",
-        visibility: "PUBLIC",
-        playerId: actorId,
-        cardId: card.instanceId,
-        definitionId: card.definitionId,
+        type: "CURSE",
+        card,
+        targetPlayerId: actorId,
+        phaseAfterResolution: "POST_DOOR",
       },
-    ]);
+    );
+    return succeed(effectResult.state, [doorEvent, ...effectResult.events]);
   }
 
   nextState = updatePlayer(nextState, actorId, (player) => ({
@@ -938,11 +1078,14 @@ function tradeItem(
   cardId: import("./identifiers.js").CardInstanceId,
   recipientId: PlayerId,
 ): CommandResult {
-  if (state.combat !== null || state.status !== GameStatus.IN_PROGRESS)
+  if (
+    state.status !== GameStatus.IN_PROGRESS ||
+    !canChangeEquipment(state, actorId)
+  )
     return fail(
       state,
       "INVALID_PHASE",
-      "Items cannot be traded during combat.",
+      "Items can only be traded during your turn outside combat.",
     );
   if (
     actorId === recipientId ||
@@ -1058,6 +1201,38 @@ function giveCharity(
   ]);
 }
 
+function giveRandomCharity(
+  state: GameState,
+  actorId: PlayerId,
+  random: RandomSource,
+): CommandResult {
+  const actor = state.players.find((player) => player.id === actorId);
+  if (actor === undefined) {
+    return fail(state, "ACTOR_NOT_FOUND", "The charity player is missing.");
+  }
+  const excess = Math.max(0, actor.hand.length - HAND_LIMIT);
+  const pool = [...actor.hand];
+  const selected: CardInstance[] = [];
+  while (selected.length < excess && pool.length > 0) {
+    const index = random.nextInt(pool.length);
+    const [card] = pool.splice(index, 1);
+    if (card !== undefined) selected.push(card);
+  }
+  const minimumLevel = Math.min(...state.players.map((player) => player.level));
+  const recipient =
+    actor.level === minimumLevel
+      ? null
+      : (state.players.find(
+          (player) => player.id !== actorId && player.level === minimumLevel,
+        )?.id ?? null);
+  return giveCharity(
+    state,
+    actorId,
+    selected.map((card) => card.instanceId),
+    recipient,
+  );
+}
+
 function unequipItem(
   state: GameState,
   actorId: PlayerId,
@@ -1134,20 +1309,26 @@ function playCard(
         "INVALID_TARGET",
         "The Curse target is not in this game.",
       );
-    let nextState = updatePlayer(state, actorId, (player) => ({
+    const nextState = updatePlayer(state, actorId, (player) => ({
       ...player,
       hand: player.hand.filter(
         (candidate) => candidate.instanceId !== card.instanceId,
       ),
     }));
-    const applied = applyEffects(
+    const applied = applyEffectsAndComplete(
       nextState,
       targetId,
       definition.effects,
       random,
+      card,
+      {
+        type: "CURSE",
+        card,
+        targetPlayerId: targetId,
+        phaseAfterResolution: null,
+      },
     );
-    nextState = addToDiscard(applied.state, [card]);
-    return succeed(nextState, [
+    return succeed(applied.state, [
       {
         type: "CARD_PLAYED",
         visibility: "PUBLIC",
@@ -1156,13 +1337,6 @@ function playCard(
         target: command.target,
       },
       ...applied.events,
-      {
-        type: "CURSE_RESOLVED",
-        visibility: "PUBLIC",
-        playerId: targetId,
-        cardId: card.instanceId,
-        definitionId: card.definitionId,
-      },
     ]);
   }
   if (state.combat === null || state.phase !== GamePhase.DOOR_RESOLUTION) {
@@ -1175,11 +1349,13 @@ function playCard(
   if (command.target?.type !== "COMBAT") {
     return fail(state, "INVALID_TARGET", "The card must target the combat.");
   }
-  const isPlayerBonus =
+  const isTemporaryBonus =
     definition.type === CardType.TEMPORARY_BONUS &&
-    command.target.side === "PLAYERS" &&
     definition.effects.length > 0 &&
     definition.effects.every((effect) => effect.type === "COMBAT_BONUS");
+  const isPlayerBonus = isTemporaryBonus && command.target.side === "PLAYERS";
+  const isMonsterTemporaryBonus =
+    isTemporaryBonus && command.target.side === "MONSTER";
   const isMonsterModifier =
     definition.type === CardType.MONSTER_MODIFIER &&
     command.target.side === "MONSTER" &&
@@ -1187,7 +1363,7 @@ function playCard(
     definition.effects.every(
       (effect) => effect.type === "MONSTER_COMBAT_BONUS",
     );
-  if (!isPlayerBonus && !isMonsterModifier) {
+  if (!isPlayerBonus && !isMonsterTemporaryBonus && !isMonsterModifier) {
     return fail(
       state,
       "CARD_NOT_PLAYABLE",
@@ -1214,7 +1390,9 @@ function playCard(
   } else {
     const bonus = definition.effects.reduce(
       (total, effect) =>
-        effect.type === "MONSTER_COMBAT_BONUS" ? total + effect.amount : total,
+        effect.type === "COMBAT_BONUS" || effect.type === "MONSTER_COMBAT_BONUS"
+          ? total + effect.amount
+          : total,
       0,
     );
     nextState = {
@@ -1479,21 +1657,35 @@ function runAway(
 
   const roll = random.nextInt(RUN_AWAY_DIE_SIDES) + 1;
   const escaped = roll >= RUN_AWAY_SUCCESS_MINIMUM;
-  let nextState = state;
-  let effectEvents: readonly GameEvent[] = [];
+  const attempted: GameEvent = {
+    type: "RUN_AWAY_ATTEMPTED",
+    visibility: "PUBLIC",
+    playerId: actorId,
+    monsterCardId: combat.monster.instanceId,
+    monsterDefinitionId: combat.monster.definitionId,
+    roll,
+    escaped,
+  };
 
   if (!escaped) {
-    const result = applyEffects(
-      nextState,
+    const result = applyEffectsAndComplete(
+      state,
       actorId,
       definition.monster.badStuff,
       random,
+      combat.monster,
+      {
+        type: "RUN_AWAY",
+        playerId: actorId,
+        monster: combat.monster,
+        roll,
+        badStuffApplied: definition.monster.badStuff.length > 0,
+      },
     );
-    nextState = result.state;
-    effectEvents = result.events;
+    return succeed(result.state, [attempted, ...result.events]);
   }
 
-  nextState = updatePlayer(nextState, actorId, (player) => ({
+  let nextState = updatePlayer(state, actorId, (player) => ({
     ...player,
     temporaryCombatBonus: 0,
   }));
@@ -1507,34 +1699,87 @@ function runAway(
       monsterCardId: combat.monster.instanceId,
       monsterDefinitionId: combat.monster.definitionId,
       roll,
-      escaped,
-      badStuffApplied: !escaped && definition.monster.badStuff.length > 0,
+      escaped: true,
+      badStuffApplied: false,
     },
   };
+  return succeed(nextState, [attempted]);
+}
 
-  return succeed(nextState, [
+function resolveCardDiscard(
+  state: GameState,
+  actorId: PlayerId,
+  cardIds: readonly import("./identifiers.js").CardInstanceId[],
+  random: RandomSource,
+): CommandResult {
+  const decision = state.pendingDecision;
+  if (decision === null || decision.playerId !== actorId) {
+    return fail(
+      state,
+      "PENDING_DECISION",
+      "There is no card-discard decision for this player.",
+    );
+  }
+  const player = state.players.find((candidate) => candidate.id === actorId)!;
+  const source = decision.zone === "HAND" ? player.hand : player.equipment;
+  if (
+    cardIds.length !== decision.count ||
+    new Set(cardIds).size !== cardIds.length ||
+    cardIds.some((id) => !source.some((card) => card.instanceId === id))
+  ) {
+    return fail(
+      state,
+      "INVALID_CARD_SELECTION",
+      `Select exactly ${decision.count} available card(s).`,
+    );
+  }
+  const selected = source.filter((card) => cardIds.includes(card.instanceId));
+  const selectedIds = new Set(cardIds);
+  let nextState = updatePlayer(state, actorId, (current) =>
+    decision.zone === "HAND"
+      ? {
+          ...current,
+          hand: current.hand.filter(
+            (card) => !selectedIds.has(card.instanceId),
+          ),
+        }
+      : {
+          ...current,
+          equipment: current.equipment.filter(
+            (card) => !selectedIds.has(card.instanceId),
+          ),
+        },
+  );
+  nextState = addToDiscard(nextState, selected);
+  nextState = { ...nextState, pendingDecision: null };
+  const events: GameEvent[] = [
     {
-      type: "RUN_AWAY_ATTEMPTED",
+      type: "CARDS_DISCARDED",
+      visibility: "PRIVATE",
+      recipientPlayerId: actorId,
+      playerId: actorId,
+      cardIds,
+    },
+    {
+      type: "CARDS_DISCARDED_SUMMARY",
       visibility: "PUBLIC",
       playerId: actorId,
-      monsterCardId: combat.monster.instanceId,
-      monsterDefinitionId: combat.monster.definitionId,
-      roll,
-      escaped,
+      count: cardIds.length,
+      zone: decision.zone,
     },
-    ...effectEvents,
-    ...(!escaped && definition.monster.badStuff.length > 0
-      ? [
-          {
-            type: "BAD_STUFF_APPLIED" as const,
-            visibility: "PUBLIC" as const,
-            playerId: actorId,
-            monsterCardId: combat.monster.instanceId,
-            monsterDefinitionId: combat.monster.definitionId,
-          },
-        ]
-      : []),
-  ]);
+  ];
+  const remaining = applyEffectsAndComplete(
+    nextState,
+    actorId,
+    decision.remainingEffects,
+    random,
+    {
+      instanceId: decision.sourceCardId,
+      definitionId: decision.sourceDefinitionId,
+    },
+    decision.completion,
+  );
+  return succeed(remaining.state, [...events, ...remaining.events]);
 }
 
 function executePlayerCommand(
@@ -1559,6 +1804,23 @@ function executePlayerCommand(
       state,
       "COMMAND_NOT_AVAILABLE",
       "No gameplay commands are available after the game has finished.",
+    );
+  }
+
+  if (command.type === "RESOLVE_CARD_DISCARD") {
+    return resolveCardDiscard(
+      state,
+      command.actorId,
+      command.cardIds,
+      context.random,
+    );
+  }
+
+  if (state.pendingDecision !== null) {
+    return fail(
+      state,
+      "PENDING_DECISION",
+      "The pending card decision must be resolved first.",
     );
   }
 
@@ -1609,6 +1871,8 @@ function executePlayerCommand(
         command.cardIds,
         command.recipientId,
       );
+    case "GIVE_RANDOM_CHARITY":
+      return giveRandomCharity(state, command.actorId, context.random);
     case "REQUEST_HELP":
       return requestHelp(state, command.actorId, command.helperId);
     case "RESOLVE_COMBAT":
@@ -1623,40 +1887,64 @@ export function executeCommand(
   command: GameCommand,
   context: CommandContext,
 ): CommandResult {
+  let result: CommandResult;
   if (command.type === "ADD_PLAYER") {
-    return addPlayer(state, command);
+    result = addPlayer(state, command);
+  } else {
+    result = executePlayerCommand(state, command, context);
   }
 
-  const result = executePlayerCommand(state, command, context);
-  if (!result.success || result.state.status !== GameStatus.IN_PROGRESS) {
-    return result;
+  if (result.success && result.state.status === GameStatus.IN_PROGRESS) {
+    const winner = result.state.players.find((player) => {
+      const previousLevel =
+        state.players.find((previous) => previous.id === player.id)?.level ?? 0;
+      return previousLevel < WINNING_LEVEL && player.level >= WINNING_LEVEL;
+    });
+    if (winner !== undefined) {
+      result = succeed(
+        {
+          ...result.state,
+          status: GameStatus.FINISHED,
+          phase: GamePhase.FINISHED,
+          activePlayerId: winner.id,
+          combat: null,
+          lastRunAwayResult: null,
+          pendingDecision: null,
+          winnerId: winner.id,
+        },
+        [
+          ...result.events,
+          {
+            type: "GAME_FINISHED",
+            visibility: "PUBLIC",
+            winnerId: winner.id,
+            winningLevel: WINNING_LEVEL,
+          },
+        ],
+      );
+    }
   }
 
-  const winner = result.state.players.find((player) => {
-    const previousLevel =
-      state.players.find((previous) => previous.id === player.id)?.level ?? 0;
-    return previousLevel < WINNING_LEVEL && player.level >= WINNING_LEVEL;
+  if (!result.success || result.events.length === 0) return result;
+
+  let turnNumber =
+    state.status === GameStatus.LOBBY &&
+    result.state.status !== GameStatus.LOBBY
+      ? result.state.turnNumber
+      : state.turnNumber;
+  const firstSequence = state.eventLog.length + 1;
+  const entries = result.events.map((event, index) => {
+    if (event.type === "TURN_STARTED") turnNumber = event.turnNumber;
+    const phase =
+      event.type === "TURN_STARTED" ? GamePhase.TURN_START : result.state.phase;
+    return { sequence: firstSequence + index, turnNumber, phase, event };
   });
-  if (winner === undefined) return result;
 
-  return succeed(
-    {
+  return {
+    ...result,
+    state: {
       ...result.state,
-      status: GameStatus.FINISHED,
-      phase: GamePhase.FINISHED,
-      activePlayerId: winner.id,
-      combat: null,
-      lastRunAwayResult: null,
-      winnerId: winner.id,
+      eventLog: [...state.eventLog, ...entries],
     },
-    [
-      ...result.events,
-      {
-        type: "GAME_FINISHED",
-        visibility: "PUBLIC",
-        winnerId: winner.id,
-        winningLevel: WINNING_LEVEL,
-      },
-    ],
-  );
+  };
 }

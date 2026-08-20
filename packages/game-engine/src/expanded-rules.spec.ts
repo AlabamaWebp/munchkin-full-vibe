@@ -116,7 +116,7 @@ function player(
 
 function state(players: readonly PlayerState[]): GameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: parseGameId("expanded"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.TURN_START,
@@ -129,6 +129,8 @@ function state(players: readonly PlayerState[]): GameState {
     treasureDiscard: [],
     combat: null,
     lastRunAwayResult: null,
+    pendingDecision: null,
+    eventLog: [],
     turnNumber: 1,
     winnerId: null,
   };
@@ -255,6 +257,28 @@ describe("expanded rules", () => {
         { random },
       ).success,
     ).toBe(false);
+
+    const outOfTurnItem = card("item-4", item.id);
+    const outOfTurnState = state([
+      player(adaId, 1, []),
+      player(bobId, 1, [outOfTurnItem]),
+    ]);
+    expect(
+      executeCommand(
+        outOfTurnState,
+        {
+          type: "TRADE_ITEM",
+          actorId: bobId,
+          cardId: outOfTurnItem.instanceId,
+          recipientId: adaId,
+        },
+        { random },
+      ),
+    ).toMatchObject({
+      success: false,
+      state: outOfTurnState,
+      error: { code: "INVALID_PHASE" },
+    });
   });
 
   it("gives exact excess charity to a lowest-level player", () => {
@@ -279,6 +303,26 @@ describe("expanded rules", () => {
     if (given.success) {
       expect(given.state.players[0]?.hand).toHaveLength(HAND_LIMIT);
       expect(given.state.players[1]?.hand).toHaveLength(2);
+    }
+  });
+
+  it("lets the engine choose random excess charity cards", () => {
+    const cards = Array.from({ length: HAND_LIMIT + 2 }, (_, index) =>
+      card(`random-charity-${index}`, cheap.id),
+    );
+    const initial = {
+      ...state([player(adaId, 3, cards), player(bobId, 1, [])]),
+      phase: GamePhase.END_TURN,
+    };
+    const given = executeCommand(
+      initial,
+      { type: "GIVE_RANDOM_CHARITY", actorId: adaId },
+      { random },
+    );
+    expect(given.success).toBe(true);
+    if (given.success) {
+      expect(given.state.players[0]?.hand).toHaveLength(HAND_LIMIT);
+      expect(given.state.players[1]?.hand).toEqual(cards.slice(0, 2));
     }
   });
 

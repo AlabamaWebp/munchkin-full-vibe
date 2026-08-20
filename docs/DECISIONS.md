@@ -295,3 +295,66 @@ Victory remains independent of transport and cannot be claimed by a client.
 Keeping the lobby roster and process-lifetime sessions preserves reconnect
 identity across both rematches and returns without introducing persistence or a
 second room lifecycle.
+
+---
+
+## ADR-023 — Engine-event-backed, player-specific game history
+
+Every successful domain command appends its emitted events to an ordered log in
+the serializable authoritative `GameState`. Entries carry a stable sequence and
+turn number. NestJS projects public entries to everyone and private entries only
+to their declared recipient, enriching visible card references for presentation.
+Angular renders this projection and never constructs authoritative history from
+locally submitted actions.
+
+Reason:
+
+Keeping the complete history with the in-memory game makes it available after
+refresh or reconnect and preserves the existing full-state synchronization model.
+Reusing event visibility prevents the history UI from exposing another player's
+hand while avoiding a separate event store or database.
+
+---
+
+## ADR-024 — Serializable pending card decisions
+
+Card effects explicitly distinguish engine-random discards from discards chosen
+by the affected player. A chosen discard stores a typed `pendingDecision` in
+`GameState`, including the eligible zone, exact count, source card, remaining
+effects, and typed completion context. All unrelated gameplay commands are
+rejected until the addressed player resolves it.
+
+The server projects selectable card identities only to the addressed player.
+Other players receive the public source, required count, waiting state, and a
+public discard summary, while identities from a private hand remain private.
+
+Reason:
+
+Keeping the interruption and continuation in serializable authoritative state
+makes multi-step effects deterministic across full-state synchronization and
+reconnection. Typed continuations preserve the data-driven rule model without
+putting functions or a generic scripting runtime into game state.
+
+---
+
+## ADR-025 — Authoritative presentation metadata reuses the event log and GameView
+
+Visible card projections include their typed effects. Match-log entries record
+the authoritative phase alongside sequence and turn metadata, and each
+player-specific `GameView` identifies the player expected to act plus reason
+codes for unavailable owned-card actions. Angular may arrange these provided
+totals and effects for presentation, but does not derive game legality or combat
+outcomes.
+
+The central public-card area is a transient view of public entries from the same
+authoritative game log rather than a second event model. A client stores only the
+highest displayed public-event sequence for the current game and viewer so an
+already seen notice is not replayed after refresh; the authoritative entry remains
+available in the player-specific game history.
+
+Reason:
+
+Reusing `GameView`, its audience-filtered log, and public combat history keeps one
+privacy boundary and one source of truth while allowing the mobile UI to explain
+cards and actions without copying engine rules. The local acknowledgement affects
+only transient presentation and cannot hide or alter authoritative history.

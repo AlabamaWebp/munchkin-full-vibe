@@ -152,7 +152,9 @@ export class GameService {
       };
     }
     if (
-      (command.type === 'SELL_ITEMS' || command.type === 'GIVE_CHARITY') &&
+      (command.type === 'SELL_ITEMS' ||
+        command.type === 'GIVE_CHARITY' ||
+        command.type === 'RESOLVE_CARD_DISCARD') &&
       (!Array.isArray(command.cardIds) ||
         command.cardIds.some(
           (id) => typeof id !== 'string' || id.trim().length === 0,
@@ -217,24 +219,32 @@ export class GameService {
                     actorId,
                     cardIds: command.cardIds.map(parseCardInstanceId),
                   }
-                : command.type === 'TRADE_ITEM'
+                : command.type === 'RESOLVE_CARD_DISCARD'
                   ? {
                       type: command.type,
                       actorId,
-                      cardId: parseCardInstanceId(command.cardId),
-                      recipientId: parsePlayerId(command.recipientId),
+                      cardIds: command.cardIds.map(parseCardInstanceId),
                     }
-                  : command.type === 'GIVE_CHARITY'
+                  : command.type === 'TRADE_ITEM'
                     ? {
                         type: command.type,
                         actorId,
-                        cardIds: command.cardIds.map(parseCardInstanceId),
-                        recipientId:
-                          command.recipientId === null
-                            ? null
-                            : parsePlayerId(command.recipientId),
+                        cardId: parseCardInstanceId(command.cardId),
+                        recipientId: parsePlayerId(command.recipientId),
                       }
-                    : { type: command.type, actorId };
+                    : command.type === 'GIVE_CHARITY'
+                      ? {
+                          type: command.type,
+                          actorId,
+                          cardIds: command.cardIds.map(parseCardInstanceId),
+                          recipientId:
+                            command.recipientId === null
+                              ? null
+                              : parsePlayerId(command.recipientId),
+                        }
+                      : command.type === 'GIVE_RANDOM_CHARITY'
+                        ? { type: command.type, actorId }
+                        : { type: command.type, actorId };
     const result = executeCommand(state, domainCommand, {
       random: createSeededRandomSource(randomInt(0x1_0000_0000)),
     });

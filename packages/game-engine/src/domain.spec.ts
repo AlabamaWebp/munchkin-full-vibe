@@ -26,7 +26,7 @@ const definition: CardDefinition = {
 };
 
 const state: GameState = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   id: gameId,
   status: GameStatus.LOBBY,
   phase: GamePhase.LOBBY,
@@ -47,6 +47,9 @@ const state: GameState = {
   doorDiscard: [],
   treasureDiscard: [],
   combat: null,
+  lastRunAwayResult: null,
+  pendingDecision: null,
+  eventLog: [],
   turnNumber: 0,
   winnerId: null,
 };

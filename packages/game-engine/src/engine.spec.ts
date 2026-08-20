@@ -401,12 +401,67 @@ describe("turn commands", () => {
     expect(result.events.map((event) => event.type)).toEqual([
       "DOOR_KICKED",
       "CARDS_DISCARDED",
+      "CARDS_DISCARDED_SUMMARY",
       "CURSE_RESOLVED",
     ]);
     expect(result.events[1]).toMatchObject({
       visibility: "PRIVATE",
       recipientPlayerId: parsePlayerId("ada"),
     });
+  });
+
+  it("pauses a curse while its target chooses cards and resumes after an exact selection", () => {
+    const curse = definition("choosing-curse", CardType.CURSE, DeckType.DOOR, [
+      { type: "DISCARD_CHOSEN_CARDS", zone: "HAND", count: 2 },
+      { type: "LOSE_LEVEL", amount: 1 },
+    ]);
+    const state = startedSinglePlayerGame(curse);
+    const chosen = state.players[0]!.hand.slice(0, 2);
+    const kicked = requireSuccess(
+      executeCommand(
+        state,
+        { type: "KICK_DOOR", actorId: parsePlayerId("ada") },
+        { random: keepOrderRandom },
+      ),
+    );
+
+    expect(kicked.phase).toBe(GamePhase.DOOR_RESOLUTION);
+    expect(kicked.pendingDecision).toMatchObject({
+      type: "DISCARD_CARDS",
+      playerId: parsePlayerId("ada"),
+      count: 2,
+      zone: "HAND",
+    });
+    expect(
+      executeCommand(
+        kicked,
+        { type: "END_TURN", actorId: parsePlayerId("ada") },
+        { random: keepOrderRandom },
+      ),
+    ).toMatchObject({ success: false, error: { code: "PENDING_DECISION" } });
+
+    const resolved = executeCommand(
+      kicked,
+      {
+        type: "RESOLVE_CARD_DISCARD",
+        actorId: parsePlayerId("ada"),
+        cardIds: chosen.map((card) => card.instanceId),
+      },
+      { random: keepOrderRandom },
+    );
+    const final = requireSuccess(resolved);
+    expect(final.pendingDecision).toBeNull();
+    expect(final.phase).toBe(GamePhase.POST_DOOR);
+    expect(final.players[0]).toMatchObject({
+      level: 1,
+      hand: expect.any(Array),
+    });
+    expect(final.players[0]?.hand).toHaveLength(6);
+    expect(resolved.events.map((event) => event.type)).toEqual([
+      "CARDS_DISCARDED",
+      "CARDS_DISCARDED_SUMMARY",
+      "CURSE_RESOLVED",
+    ]);
   });
 
   it("loots one facedown Door card and keeps its identity private", () => {
@@ -488,6 +543,19 @@ describe("turn commands", () => {
       "TURN_ENDED",
       "TURN_STARTED",
     ]);
+    expect(ended.eventLog.slice(-2)).toMatchObject([
+      {
+        turnNumber: 1,
+        phase: GamePhase.TURN_START,
+        event: { type: "TURN_ENDED" },
+      },
+      {
+        turnNumber: 2,
+        phase: GamePhase.TURN_START,
+        event: { type: "TURN_STARTED" },
+      },
+    ]);
+    expect(ended.eventLog.at(-1)?.sequence).toBe(ended.eventLog.length);
   });
 
   it("validates card ownership for unavailable card-play commands", () => {
@@ -510,5 +578,6 @@ describe("turn commands", () => {
       state,
       error: { code: "CARD_NOT_IN_HAND" },
     });
+    expect(result.state.eventLog).toBe(state.eventLog);
   });
 });

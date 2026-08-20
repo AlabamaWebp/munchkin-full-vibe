@@ -65,6 +65,11 @@ export type CardEffect =
       readonly zone: "HAND" | "EQUIPMENT";
     }
   | {
+      readonly type: "DISCARD_CHOSEN_CARDS";
+      readonly count: number;
+      readonly zone: "HAND" | "EQUIPMENT";
+    }
+  | {
       readonly type: "DISCARD_ROLE";
       readonly role: "CLASS" | "RACE";
     }
@@ -76,7 +81,11 @@ export type BadStuffEffect = Extract<
   CardEffect,
   {
     readonly type:
-      "LOSE_LEVEL" | "DISCARD_RANDOM_CARDS" | "DISCARD_ROLE" | "DEATH";
+      | "LOSE_LEVEL"
+      | "DISCARD_RANDOM_CARDS"
+      | "DISCARD_CHOSEN_CARDS"
+      | "DISCARD_ROLE"
+      | "DEATH";
   }
 >;
 

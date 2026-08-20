@@ -70,7 +70,7 @@ function sequenceRandom(...values: number[]): RandomSource {
 
 function losingState(): GameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: parseGameId("run-away-test"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -109,6 +109,8 @@ function losingState(): GameState {
       ],
     },
     lastRunAwayResult: null,
+    pendingDecision: null,
+    eventLog: [],
     turnNumber: 1,
     winnerId: null,
   };
@@ -174,7 +176,9 @@ describe("losing combat", () => {
     });
     expect(result.events.map((event) => event.type)).toEqual([
       "RUN_AWAY_ATTEMPTED",
+      "LEVEL_LOST",
       "CARDS_DISCARDED",
+      "CARDS_DISCARDED_SUMMARY",
       "BAD_STUFF_APPLIED",
     ]);
   });

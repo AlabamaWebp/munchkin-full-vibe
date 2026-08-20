@@ -146,9 +146,9 @@ Implement before advanced rule systems:
   replaced during that combat;
 - the helper contributes their level and equipped combat bonuses to the player
   side; combat power remains derived entirely by the engine;
-- all players may play a `TEMPORARY_BONUS` card for the player side during an
-  active combat, including combats in which they are neither the active player
-  nor the accepted helper;
+- all players may play a `TEMPORARY_BONUS` card for either the player side or
+  the Monster side during an active combat, including combats in which they are
+  neither the active player nor the accepted helper;
 - all players may play a typed `MONSTER_MODIFIER` card for the Monster side;
   Monster modifiers use explicit `MONSTER_COMBAT_BONUS` effects and never rely
   on card names;
@@ -169,8 +169,11 @@ Implement before advanced rule systems:
 - a result of 5 or 6 succeeds, while 1–4 fails;
 - a successful escape applies no bad stuff;
 - a failed escape applies the Monster's typed, data-driven bad-stuff effects to
-  the active player; development effects may lose levels or discard random cards
-  from the hand or equipment;
+  the active player; each discard effect explicitly declares whether cards are
+  selected randomly by the engine or chosen by the affected player;
+- a player-choice discard creates a serializable pending decision, blocks other
+  gameplay commands, and resumes the interrupted effect sequence after the
+  affected player submits exactly the required cards;
 - losing levels can never reduce a player below level one;
 - the accepted helper does not make a separate escape roll and does not receive
   bad stuff under the current simplified rules;
@@ -209,11 +212,13 @@ Add after the core loop works end-to-end:
 - equipment has a data-driven gold value. During their own non-combat turn, a
   player may sell owned items worth at least 1,000 gold total and gains one level
   per complete 1,000 gold; clients never submit the level gain;
-- outside combat, any player may give owned equipment to another player. The
-  recipient receives it into their private hand and equips it separately;
-- the end-turn hand limit is five cards. Every excess card must be given to a
-  lowest-level player. If the active player is tied for lowest level, the excess
-  is discarded instead;
+- during their own non-combat turn, a player may give owned equipment to another
+  player. The recipient receives it into their private hand and equips it
+  separately;
+- the end-turn hand limit is five cards. The active player resolves charity with
+  one action; the engine randomly selects every excess card and gives them to a
+  lowest-level player. If the active player is tied for lowest level, the random
+  excess cards are discarded instead;
 - death keeps the player's level but discards their hand, equipment, Class, and
   Race. The player remains dead until their next turn, then returns and draws up
   to four available Door and four available Treasure cards.
@@ -374,6 +379,8 @@ CARDS_DEALT
 TURN_STARTED
 DOOR_KICKED
 CARD_DRAWN
+CARD_DISCARD_REQUIRED
+CARDS_DISCARDED_SUMMARY
 CURSE_RESOLVED
 COMBAT_STARTED
 CARD_PLAYED
@@ -382,15 +389,18 @@ COMBAT_WON
 RUN_AWAY_ATTEMPTED
 TREASURE_GAINED
 LEVEL_GAINED
+LEVEL_LOST
 TURN_ENDED
 GAME_FINISHED
 ```
 
-Public and private information must be separated when events are later exposed to clients.
+Public and private information must be separated when events are exposed to
+clients. Everyone may see that a player must discard or has discarded a number
+of cards, but identities from a private hand remain visible only to their owner.
 
 ## Game log
 
-The UI should eventually show a readable event log such as:
+The UI shows a readable, complete event log such as:
 
 ```text
 16:42 Dmitry kicked the door.
@@ -401,4 +411,11 @@ The UI should eventually show a readable event log such as:
 16:44 Dmitry gained 1 level.
 ```
 
-The log should be derived from trustworthy server/game-engine events rather than client assumptions.
+The game screen also shows a compact synchronized list of the latest public
+events so the result of an action is visible without opening the complete log.
+
+The log is accumulated in authoritative game state from trustworthy game-engine
+events rather than client assumptions. It survives reconnection for the lifetime
+of the match. Public entries are identical for every player, while private entries
+are projected only to their recipient and must never reveal another player's
+hidden cards.

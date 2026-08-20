@@ -25,6 +25,26 @@
         EN
       </button>
     </div>
+    @if (fullscreenSupported) {
+      <button
+        class="fullscreen-button"
+        type="button"
+        [attr.aria-label]="t(isFullscreen() ? 'exitFullscreen' : 'enterFullscreen')"
+        [attr.title]="t(isFullscreen() ? 'exitFullscreen' : 'enterFullscreen')"
+        [attr.aria-pressed]="isFullscreen()"
+        (click)="toggleFullscreen()"
+      >
+        @if (isFullscreen()) {
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+          </svg>
+        } @else {
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+          </svg>
+        }
+      </button>
+    }
     <span class="connection" [class.online]="connection() === 'CONNECTED'">
       <span aria-hidden="true"></span>
       {{ connection() === 'CONNECTED' ? t('online') : t('reconnecting') }}
@@ -36,20 +56,244 @@
       <div class="turn-banner">
         <div>
           <p class="eyebrow">{{ t('turn') }} {{ currentGame.turnNumber }}</p>
-          <h2 id="turn-title">{{ phaseLabel(currentGame.phase) }}</h2>
+          <h2 id="turn-title">{{ turnStatusLabel(currentGame) }}</h2>
+          @if (currentGame.status !== 'FINISHED') {
+            <p class="expected-action">
+              {{ t('currentTurn') }}:
+              {{ lookupPlayerName(currentGame, currentGame.activePlayerId) }} ·
+              {{ expectedActionLabel(currentGame) }}
+            </p>
+          }
         </div>
-        <div class="deck-counts" [attr.aria-label]="t('deckSizes')">
-          <span
-            >{{ t('door') }} <b>{{ currentGame.deckCounts.door }}</b></span
+        <div class="turn-actions">
+          <div class="deck-counts" [attr.aria-label]="t('deckSizes')">
+            <span
+              >{{ t('door') }} <b>{{ currentGame.deckCounts.door }}</b></span
+            >
+            <span
+              >{{ t('treasure') }} <b>{{ currentGame.deckCounts.treasure }}</b></span
+            >
+          </div>
+          <button
+            class="history-button"
+            type="button"
+            [attr.aria-expanded]="historyOpen()"
+            aria-controls="game-history-dialog"
+            (click)="historyOpen.set(true)"
           >
-          <span
-            >{{ t('treasure') }} <b>{{ currentGame.deckCounts.treasure }}</b></span
-          >
+            {{ t('gameHistory') }}
+            <span>{{ currentGame.gameLog.length }}</span>
+          </button>
         </div>
       </div>
 
       @if (error(); as currentError) {
         <p class="game-error" role="alert">{{ errorMessage(currentError) }}</p>
+      }
+
+      @if (historyOpen()) {
+        <div class="history-backdrop">
+          <section
+            id="game-history-dialog"
+            class="history-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="game-history-title"
+          >
+            <header>
+              <div>
+                <p class="eyebrow">{{ t('gameHistoryDescription') }}</p>
+                <h2 id="game-history-title">{{ t('gameHistory') }}</h2>
+              </div>
+              <button
+                class="history-close"
+                type="button"
+                [attr.aria-label]="t('closeGameHistory')"
+                (click)="historyOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            @if (currentGame.gameLog.length === 0) {
+              <p class="history-empty">{{ t('emptyGameHistory') }}</p>
+            } @else {
+              <ol class="game-history-list">
+                @for (entry of currentGame.gameLog; track entry.sequence) {
+                  <li [class.has-details]="logEntryCards(entry).length > 0">
+                    <span class="history-meta">
+                      @if (entry.turnNumber > 0) {
+                        {{ t('historyEntryMeta') }} {{ entry.turnNumber }} ·
+                      }
+                      #{{ entry.sequence }}
+                    </span>
+                    @if (logEntryCards(entry).length > 0) {
+                      <button type="button" (click)="openLogEntry(entry)">
+                        <span>{{ gameLogEntryLabel(currentGame, entry) }}</span>
+                        <small>{{ t('openEventDetails') }} ›</small>
+                      </button>
+                    } @else {
+                      <p>{{ gameLogEntryLabel(currentGame, entry) }}</p>
+                    }
+                  </li>
+                }
+              </ol>
+            }
+          </section>
+        </div>
+      }
+
+      @if (publicCardEvents().length > 0) {
+        <section class="public-event-zone" aria-live="polite" [attr.aria-label]="t('publicEvents')">
+          <div class="event-zone-heading">
+            <div>
+              <p class="eyebrow">{{ t('publicEvents') }}</p>
+              <strong>{{ t('publicEventsHint') }}</strong>
+            </div>
+          </div>
+          <div class="event-card-stack">
+            @for (entry of publicCardEvents(); track entry.sequence) {
+              <article>
+                @if (logEntryCards(entry)[0]; as card) {
+                  <app-game-card
+                    [card]="card"
+                    [name]="cardName(card)"
+                    [kicker]="cardTypeLabel(card.type)"
+                    [badge]="lookupPlayerName(currentGame, entry.playerId ?? '')"
+                    [ariaLabel]="t('openEventDetails') + ': ' + cardName(card)"
+                    [compact]="true"
+                    (opened)="openLogEntry(entry)"
+                  />
+                }
+                <p>{{ gameLogEntryLabel(currentGame, entry) }}</p>
+                <button
+                  type="button"
+                  class="event-dismiss"
+                  [attr.aria-label]="t('dismissEvent')"
+                  (click)="dismissPublicEvent(entry.sequence)"
+                >
+                  ×
+                </button>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @if (feedbackEvents().length > 0) {
+        <div class="result-feedback" aria-live="polite">
+          @for (entry of feedbackEvents(); track entry.sequence) {
+            <span>✓ {{ gameLogEntryLabel(currentGame, entry) }}</span>
+          }
+        </div>
+      }
+
+      @if (recentPublicEvents().length > 0) {
+        <details class="recent-events">
+          <summary>{{ t('recentEvents') }}</summary>
+          <ol>
+            @for (entry of recentPublicEvents(); track entry.sequence) {
+              <li>
+                @if (logEntryCards(entry).length > 0) {
+                  <button type="button" (click)="openLogEntry(entry)">
+                    {{ gameLogEntryLabel(currentGame, entry) }}
+                  </button>
+                } @else {
+                  {{ gameLogEntryLabel(currentGame, entry) }}
+                }
+              </li>
+            }
+          </ol>
+        </details>
+      }
+
+      @if (currentGame.pendingDecision; as decision) {
+        <section class="decision-panel" aria-live="assertive">
+          <p class="eyebrow">{{ t('decisionRequired') }}</p>
+          <h3>{{ cardName(decision.sourceCard) }}</h3>
+          @if (decision.playerId === currentGame.viewerPlayerId) {
+            <p>{{ t('chooseCardsToDiscard') }}: {{ decision.count }}</p>
+            <div class="selection-list">
+              @for (card of decisionCards(currentGame); track card.instanceId) {
+                <button
+                  type="button"
+                  [class.selected]="discardCardIds().includes(card.instanceId)"
+                  [attr.aria-pressed]="discardCardIds().includes(card.instanceId)"
+                  (click)="toggleDiscardCard(card.instanceId)"
+                >
+                  <strong>{{ cardName(card) }}</strong>
+                  <span>{{ cardTypeLabel(card.type) }}</span>
+                </button>
+              }
+            </div>
+            <p>{{ t('selectedCards') }}: {{ discardCardIds().length }} / {{ decision.count }}</p>
+            <button
+              class="primary"
+              type="button"
+              [disabled]="pending() || discardCardIds().length !== decision.count"
+              (click)="confirmDiscard(currentGame)"
+            >
+              {{ t('confirmDiscard') }}
+            </button>
+          } @else {
+            <p>
+              {{ lookupPlayerName(currentGame, decision.playerId) }}
+              {{ t('playerChoosingCards') }}
+            </p>
+          }
+        </section>
+      }
+
+      @if (saleOpen()) {
+        <div class="history-backdrop">
+          <section class="history-dialog sale-dialog" role="dialog" aria-modal="true">
+            <header>
+              <div>
+                <p class="eyebrow">{{ t('saleDescription') }}</p>
+                <h2>{{ t('sellItems') }}</h2>
+              </div>
+              <button
+                class="history-close"
+                type="button"
+                [attr.aria-label]="t('closeSale')"
+                (click)="closeSale()"
+              >
+                ×
+              </button>
+            </header>
+            <div class="selection-list sale-list">
+              @for (card of saleCards(currentGame); track card.instanceId) {
+                <button
+                  type="button"
+                  [class.selected]="saleCardIds().includes(card.instanceId)"
+                  [attr.aria-pressed]="saleCardIds().includes(card.instanceId)"
+                  (click)="toggleSaleCard(card.instanceId)"
+                >
+                  <strong>{{ cardName(card) }}</strong>
+                  <span>{{ t('value') }} {{ card.equipment?.value ?? 0 }}</span>
+                </button>
+              }
+            </div>
+            <div class="sale-summary">
+              <span
+                >{{ t('saleTotal') }}: <b>{{ saleTotal(currentGame) }}</b></span
+              >
+              <span
+                >{{ t('saleLevels') }}: <b>{{ saleLevels(currentGame) }}</b></span
+              >
+              <span
+                >{{ t('saleRemainder') }}: <b>{{ saleTotal(currentGame) % 1000 }}</b></span
+              >
+            </div>
+            <button
+              class="primary"
+              type="button"
+              [disabled]="pending() || saleTotal(currentGame) < 1000"
+              (click)="confirmSale(currentGame)"
+            >
+              {{ t('confirmSale') }}
+            </button>
+          </section>
+        </div>
       }
 
       @if (currentGame.status === 'FINISHED' && currentGame.winnerId; as winnerId) {
@@ -76,11 +320,39 @@
       }
 
       @if (currentGame.status !== 'FINISHED') {
+        @if (targeting(); as target) {
+          <section class="targeting-banner" aria-live="assertive">
+            <div>
+              <strong>{{ t('chooseTarget') }}: {{ cardName(target.card) }}</strong>
+              <span>{{ t('validTargetsHighlighted') }}</span>
+            </div>
+            <button type="button" (click)="cancelTargeting()">{{ t('cancel') }}</button>
+          </section>
+        }
         <section class="opponents" [attr.aria-label]="t('players')">
           @for (player of currentGame.players; track player.playerId) {
-            <article
+            <button
+              type="button"
+              class="player-card"
               [class.active-player]="player.playerId === currentGame.activePlayerId"
               [class.self-player]="player.playerId === currentGame.viewerPlayerId"
+              [class.valid-target]="targeting()?.eligiblePlayerIds?.includes(player.playerId)"
+              [class.invalid-target]="
+                targeting() !== null && !targeting()?.eligiblePlayerIds?.includes(player.playerId)
+              "
+              [disabled]="
+                targeting() !== null && !targeting()?.eligiblePlayerIds?.includes(player.playerId)
+              "
+              [attr.aria-label]="
+                targeting()?.eligiblePlayerIds?.includes(player.playerId)
+                  ? t('selectTarget') + ': ' + player.name
+                  : t('openCharacter') + ': ' + player.name
+              "
+              (click)="
+                targeting()
+                  ? chooseTarget(currentGame, player.playerId)
+                  : selectedPlayerId.set(player.playerId)
+              "
             >
               <span class="avatar" aria-hidden="true">{{
                 player.name.charAt(0).toUpperCase()
@@ -92,73 +364,140 @@
                 >
               </div>
               @if (player.playerId === currentGame.activePlayerId) {
-                <span class="turn-dot" [title]="t('currentTurn')"></span>
+                <span class="turn-dot" [title]="t('currentTurn')" aria-hidden="true"></span>
               }
-            </article>
+              @if (currentGame.combat?.helperId === player.playerId) {
+                <span class="player-role-icon" [title]="t('helperJoined')" aria-hidden="true"
+                  >+</span
+                >
+              }
+            </button>
           }
         </section>
 
         <section class="table-area" [attr.aria-label]="t('gameTable')">
           @if (currentGame.combat; as combat) {
-            <p class="eyebrow">{{ t('monsterEncounter') }}</p>
-            <article class="monster-card">
-              <span>{{ t('level') }} {{ combat.monster.monster?.level }}</span>
-              <h3>{{ cardName(combat.monster) }}</h3>
-              <p>{{ cardDescription(combat.monster) }}</p>
-              <div class="combat-score">
-                <strong>{{ t('yourPower') }} {{ combat.playerPower }}</strong>
-                <span aria-hidden="true">×</span>
-                <strong>{{ t('monsterPower') }} {{ combat.monsterPower }}</strong>
+            <div class="combat-heading">
+              <div>
+                <p class="eyebrow">{{ t('monsterEncounter') }}</p>
+                <strong>{{ expectedActionLabel(currentGame) }}</strong>
               </div>
-              <small>
-                {{ t('combatRewards') }}: +{{ combat.monster.monster?.levelRewards }}
-                {{ t('levels') }}, {{ combat.monster.monster?.treasureRewards }}
-                {{ t('treasures') }}
-              </small>
-              @if (combat.monster.monster?.badStuff; as badStuff) {
-                <div class="combat-participants">
-                  <strong>{{ t('badStuff') }}</strong>
-                  @for (effect of badStuff; track $index) {
-                    <span>{{ badStuffLabel(effect) }}</span>
+              <div class="combat-score" [attr.aria-label]="t('combatTotals')">
+                <strong>{{ combat.playerPower }}</strong
+                ><span>{{ t('versus') }}</span
+                ><strong>{{ combat.monsterPower }}</strong>
+              </div>
+            </div>
+            <div class="combat-board">
+              <section class="combat-side player-side">
+                <h3>⚔ {{ t('playerSide') }}</h3>
+                @for (player of currentGame.players; track player.playerId) {
+                  @if (player.playerId === combat.playerId) {
+                    <div class="power-breakdown">
+                      <span>{{ player.name }}</span>
+                      <span
+                        >{{ t('level') }} <b>{{ player.level }}</b></span
+                      >
+                      <span
+                        >{{ t('equipmentBonus') }} <b>+{{ player.equipmentCombatBonus }}</b></span
+                      >
+                      <span
+                        >{{ t('temporaryBonus') }} <b>+{{ player.temporaryCombatBonus }}</b></span
+                      >
+                    </div>
+                  }
+                  @if (player.playerId === combat.helperId) {
+                    <div class="power-breakdown helper-breakdown">
+                      <span>{{ t('helperJoined') }}: {{ player.name }}</span>
+                      <span
+                        >{{ t('helperContribution') }} <b>+{{ combat.helperContribution }}</b></span
+                      >
+                    </div>
+                  }
+                }
+                <strong class="side-total">{{ t('total') }} {{ combat.playerPower }}</strong>
+                <div class="combat-cards">
+                  @for (entry of combat.history; track $index) {
+                    @if (entry.type === 'CARD_PLAYED' && entry.side === 'PLAYERS') {
+                      <app-game-card
+                        [card]="entry.card"
+                        [name]="cardName(entry.card)"
+                        [kicker]="lookupPlayerName(currentGame, entry.playerId)"
+                        [badge]="'+' + combatCardBonus(entry.card)"
+                        [ariaLabel]="t('openCardDetails') + ': ' + cardName(entry.card)"
+                        [compact]="true"
+                        (opened)="openCard(entry.card)"
+                      />
+                    }
                   }
                 </div>
-              }
-              <div class="combat-participants">
-                @if (combat.helperId) {
-                  <span>
-                    {{ t('helperJoined') }}:
-                    <strong>{{ lookupPlayerName(currentGame, combat.helperId) }}</strong>
-                    (+{{ combat.helperContribution }})
-                  </span>
-                } @else if (combat.requestedHelperId) {
-                  <span>
-                    {{ t('helpRequested') }}:
-                    <strong>{{ lookupPlayerName(currentGame, combat.requestedHelperId) }}</strong>
-                  </span>
-                }
-                @if (combat.monsterBonus > 0) {
-                  <span>{{ t('monsterBonus') }} +{{ combat.monsterBonus }}</span>
-                }
-              </div>
-              @if (currentGame.requestableHelperIds.length > 0) {
-                <div class="help-actions">
-                  @for (helperId of currentGame.requestableHelperIds; track helperId) {
-                    <button type="button" [disabled]="pending()" (click)="requestHelp(helperId)">
-                      {{ t('requestHelp') }}: {{ lookupPlayerName(currentGame, helperId) }}
-                    </button>
+              </section>
+              <section class="combat-side monster-side">
+                <h3>☠ {{ t('monsterSide') }}</h3>
+                <app-game-card
+                  [card]="combat.monster"
+                  [name]="cardName(combat.monster)"
+                  [kicker]="cardTypeLabel(combat.monster.type)"
+                  [badge]="t('level') + ' ' + (combat.monster.monster?.level ?? 0)"
+                  [ariaLabel]="t('openCardDetails') + ': ' + cardName(combat.monster)"
+                  [compact]="true"
+                  (opened)="openCard(combat.monster)"
+                />
+                <div class="power-breakdown">
+                  <span
+                    >{{ t('monsterBase') }} <b>{{ combat.monster.monster?.level ?? 0 }}</b></span
+                  >
+                  <span
+                    >{{ t('monsterModifiers') }} <b>+{{ combat.monsterBonus }}</b></span
+                  >
+                </div>
+                <strong class="side-total">{{ t('total') }} {{ combat.monsterPower }}</strong>
+                <div class="combat-cards">
+                  @for (entry of combat.history; track $index) {
+                    @if (entry.type === 'CARD_PLAYED' && entry.side === 'MONSTER') {
+                      <app-game-card
+                        [card]="entry.card"
+                        [name]="cardName(entry.card)"
+                        [kicker]="lookupPlayerName(currentGame, entry.playerId)"
+                        [badge]="'+' + combatCardBonus(entry.card)"
+                        [ariaLabel]="t('openCardDetails') + ': ' + cardName(entry.card)"
+                        [compact]="true"
+                        (opened)="openCard(entry.card)"
+                      />
+                    }
                   }
                 </div>
-              }
-            </article>
-            <section class="combat-history" [attr.aria-label]="t('combatHistory')">
-              <strong>{{ t('combatHistory') }}</strong>
+              </section>
+            </div>
+            @if (combat.monster.monster?.badStuff; as badStuff) {
+              <details class="bad-stuff-details">
+                <summary>{{ t('badStuff') }}</summary>
+                @for (effect of badStuff; track $index) {
+                  <span>{{ badStuffLabel(effect) }}</span>
+                }
+              </details>
+            }
+            @if (currentGame.requestableHelperIds.length > 0) {
+              <div class="help-actions">
+                @for (helperId of currentGame.requestableHelperIds; track helperId) {
+                  <button type="button" [disabled]="pending()" (click)="requestHelp(helperId)">
+                    {{ t('requestHelp') }}: {{ lookupPlayerName(currentGame, helperId) }}
+                  </button>
+                }
+              </div>
+            }
+            <details class="combat-history">
+              <summary>{{ t('combatHistory') }}</summary>
               <ol>
                 @for (entry of combat.history; track $index) {
                   <li>
                     @switch (entry.type) {
                       @case ('COMBAT_STARTED') {
                         {{ lookupPlayerName(currentGame, entry.playerId) }}
-                        {{ t('historyCombatStarted') }} {{ cardName(entry.monster) }}
+                        {{ t('historyCombatStarted') }}
+                        <button type="button" (click)="openCard(entry.monster)">
+                          {{ cardName(entry.monster) }}
+                        </button>
                       }
                       @case ('HELP_REQUESTED') {
                         {{ lookupPlayerName(currentGame, entry.playerId) }}
@@ -179,13 +518,17 @@
                               : 'historyPlayedForMonster'
                           )
                         }}:
-                        {{ cardName(entry.card) }}
+                        <button type="button" (click)="openCard(entry.card)">
+                          {{ cardName(entry.card) }} ({{
+                            combatCardBonus(entry.card) >= 0 ? '+' : ''
+                          }}{{ combatCardBonus(entry.card) }})
+                        </button>
                       }
                     }
                   </li>
                 }
               </ol>
-            </section>
+            </details>
           } @else if (currentGame.lastRunAwayResult; as result) {
             <div class="table-message run-away-result" aria-live="polite">
               <strong>
@@ -203,13 +546,18 @@
             </div>
           } @else {
             <div class="table-message">
-              <strong>{{ t('anotherPlayerActs') }}</strong
+              <strong>{{ turnStatusLabel(currentGame) }}</strong
               ><span>{{ t('handPrivate') }}</span>
             </div>
           }
         </section>
 
-        <section class="character-panel" aria-labelledby="character-title">
+        <button
+          type="button"
+          class="character-panel"
+          aria-labelledby="character-title"
+          (click)="selectedPlayerId.set(currentGame.viewerPlayerId)"
+        >
           <div class="character-heading">
             <div>
               <p class="eyebrow">{{ t('yourAdventurer') }}</p>
@@ -227,45 +575,11 @@
               }
             </div>
           </div>
-          <div class="equipment-slot">
-            <strong>{{ t('roles') }}</strong>
-            <span
-              >{{ t('cardClass') }}:
-              {{
-                currentGame.self.classCard ? cardName(currentGame.self.classCard) : t('none')
-              }}</span
-            >
-            <span
-              >{{ t('cardRace') }}:
-              {{
-                currentGame.self.raceCard ? cardName(currentGame.self.raceCard) : t('none')
-              }}</span
-            >
-            @if (currentGame.self.isDead) {
-              <span>{{ t('dead') }}</span>
-            }
-          </div>
-          <div class="equipment-slot">
-            <strong>{{ t('equipment') }}</strong>
-            @if (currentGame.self.equipment.length === 0) {
-              <span>{{ t('nothingEquipped') }}</span>
-            } @else {
-              @for (card of currentGame.self.equipment; track card.instanceId) {
-                <button
-                  type="button"
-                  class="equipped-card"
-                  [class.selected]="selectedCard()?.instanceId === card.instanceId"
-                  (click)="selectedCard.set(card)"
-                >
-                  {{ cardName(card) }} +{{ card.equipment?.combatBonus }}
-                </button>
-              }
-            }
-          </div>
-          <small class="equipment-summary">
-            {{ t('equipmentBonus') }} +{{ currentGame.self.equipmentCombatBonus }}
-          </small>
-        </section>
+          <small class="equipment-summary"
+            >{{ t('equipmentBonus') }} +{{ currentGame.self.equipmentCombatBonus }} ·
+            {{ t('openCharacter') }}</small
+          >
+        </button>
 
         <section class="hand-section" aria-labelledby="hand-title">
           <div class="section-heading">
@@ -274,129 +588,238 @@
           </div>
           <div class="hand" tabindex="0">
             @for (card of currentGame.self.hand; track card.instanceId) {
-              <button
-                class="hand-card"
-                type="button"
-                [class.selected]="selectedCard()?.instanceId === card.instanceId"
-                (click)="selectedCard.set(card)"
-              >
-                <small>{{ deckLabel(card.deck) }}</small
-                ><strong>{{ cardName(card) }}</strong
-                ><span>{{ cardTypeLabel(card.type) }}</span>
-              </button>
+              <app-game-card
+                [card]="card"
+                [name]="cardName(card)"
+                [kicker]="deckLabel(card.deck)"
+                [badge]="
+                  isCardPlayable(currentGame, card) ? t('playableNow') : cardTypeLabel(card.type)
+                "
+                [ariaLabel]="cardAriaLabel(currentGame, card)"
+                [playable]="isCardPlayable(currentGame, card)"
+                [unavailable]="!isCardPlayable(currentGame, card)"
+                (opened)="openCard(card)"
+              />
             }
           </div>
         </section>
 
         @if (selectedCard(); as card) {
-          <aside class="card-details" aria-live="polite">
-            <div class="card-details-copy">
-              <small>{{ cardTypeLabel(card.type) }}</small
-              ><strong>{{ cardName(card) }}</strong>
-              <p>{{ cardDescription(card) }}</p>
-              @if (card.equipment; as equipment) {
-                <p>
-                  {{ equipmentSlotLabel(equipment.slot) }} · {{ t('equipmentBonus') }} +{{
-                    equipment.combatBonus
-                  }}
-                  · {{ t('value') }} {{ equipment.value }}
-                </p>
+          <app-card-details-dialog
+            [cards]="[card]"
+            [title]="cardName(card)"
+            [eyebrow]="cardTypeLabel(card.type)"
+            [result]="cardUnavailableReason(currentGame, card)"
+            [closeLabel]="t('closeCardDetails')"
+            [effectsLabel]="t('cardEffects')"
+            [bonusLabel]="t('equipmentBonus')"
+            [valueLabel]="t('value')"
+            [slotLabel]="t('equipmentSlot')"
+            [relatedCardsLabel]="t('relatedCards')"
+            [cardName]="cardName"
+            [cardDescription]="cardDescription"
+            [typeLabel]="cardTypeForDialog"
+            [effectLabel]="effectForDialog"
+            [equipmentSlotLabel]="slotForDialog"
+            (closed)="closeCardDetails()"
+          >
+            <div class="dialog-actions">
+              @if (canEquip(currentGame, card)) {
+                <button type="button" [disabled]="pending()" (click)="equip(card)">
+                  {{ t('equip') }}
+                </button>
               }
-              <div class="card-details-actions">
-                @if (canEquip(currentGame, card)) {
-                  <button type="button" [disabled]="pending()" (click)="equip(card)">
-                    {{ t('equip') }}
-                  </button>
-                }
-                @if (canUnequip(currentGame, card)) {
-                  <button type="button" [disabled]="pending()" (click)="unequip(card)">
-                    {{ t('unequip') }}
-                  </button>
-                }
-                @if (
-                  expandedActionIncludes(currentGame.expandedRuleActions.playableRoleCardIds, card)
-                ) {
-                  <button type="button" [disabled]="pending()" (click)="playRole(card)">
-                    {{ t('playRole') }}
-                  </button>
-                }
-                @if (
-                  expandedActionIncludes(currentGame.expandedRuleActions.playableCurseCardIds, card)
-                ) {
-                  @for (player of currentGame.players; track player.playerId) {
-                    <button
-                      type="button"
-                      [disabled]="pending()"
-                      (click)="playCurse(card, player.playerId)"
-                    >
-                      {{ t('curseTo') }} {{ player.name }}
-                    </button>
-                  }
-                }
-                @if (
-                  expandedActionIncludes(
-                    currentGame.expandedRuleActions.sellableItemCardIds,
-                    card
-                  ) && (card.equipment?.value ?? 0) >= 1000
-                ) {
-                  <button type="button" [disabled]="pending()" (click)="sell(card)">
-                    {{ t('sell') }}
-                  </button>
-                }
-                @if (
-                  expandedActionIncludes(currentGame.expandedRuleActions.tradeableItemCardIds, card)
-                ) {
-                  @for (player of currentGame.players; track player.playerId) {
-                    @if (player.playerId !== currentGame.viewerPlayerId) {
-                      <button
-                        type="button"
-                        [disabled]="pending()"
-                        (click)="trade(card, player.playerId)"
-                      >
-                        {{ t('tradeTo') }} {{ player.name }}
-                      </button>
-                    }
-                  }
-                }
-                @if (canPlayCombatCard(currentGame, card, 'PLAYERS')) {
+              @if (canUnequip(currentGame, card)) {
+                <button type="button" [disabled]="pending()" (click)="unequip(card)">
+                  {{ t('unequip') }}
+                </button>
+              }
+              @if (
+                expandedActionIncludes(currentGame.expandedRuleActions.playableRoleCardIds, card)
+              ) {
+                <button type="button" [disabled]="pending()" (click)="playRole(card)">
+                  {{ t('playRole') }}
+                </button>
+              }
+              @if (
+                expandedActionIncludes(currentGame.expandedRuleActions.playableCurseCardIds, card)
+              ) {
+                <button
+                  type="button"
+                  [disabled]="pending()"
+                  (click)="beginTargeting(currentGame, card, 'CURSE')"
+                >
+                  {{ t('chooseCurseTarget') }}
+                </button>
+              }
+              @if (
+                expandedActionIncludes(currentGame.expandedRuleActions.tradeableItemCardIds, card)
+              ) {
+                @if (currentGame.players.length > 1) {
                   <button
                     type="button"
                     [disabled]="pending()"
-                    (click)="playCombatCard(card, 'PLAYERS')"
+                    (click)="beginTargeting(currentGame, card, 'TRADE')"
                   >
-                    {{ t('playForPlayers') }}
+                    {{ t('chooseTradeTarget') }}
                   </button>
                 }
-                @if (canPlayCombatCard(currentGame, card, 'MONSTER')) {
-                  <button
-                    type="button"
-                    [disabled]="pending()"
-                    (click)="playCombatCard(card, 'MONSTER')"
-                  >
-                    {{ t('playForMonster') }}
-                  </button>
+              }
+              @if (canPlayCombatCard(currentGame, card, 'PLAYERS')) {
+                <button
+                  type="button"
+                  [disabled]="pending()"
+                  (click)="playCombatCard(card, 'PLAYERS')"
+                >
+                  {{ t('playForPlayers') }}
+                </button>
+              }
+              @if (canPlayCombatCard(currentGame, card, 'MONSTER')) {
+                <button
+                  type="button"
+                  [disabled]="pending()"
+                  (click)="playCombatCard(card, 'MONSTER')"
+                >
+                  {{ t('playForMonster') }}
+                </button>
+              }
+            </div>
+          </app-card-details-dialog>
+        }
+
+        @if (selectedLogEntry(); as entry) {
+          <app-card-details-dialog
+            [cards]="logEntryCards(entry)"
+            [title]="t('eventDetails')"
+            [eyebrow]="t('eventNumber') + ' #' + entry.sequence"
+            [meta]="logEntryMeta(currentGame, entry)"
+            [result]="gameLogEntryLabel(currentGame, entry)"
+            [closeLabel]="t('closeCardDetails')"
+            [effectsLabel]="t('cardEffects')"
+            [bonusLabel]="t('equipmentBonus')"
+            [valueLabel]="t('value')"
+            [slotLabel]="t('equipmentSlot')"
+            [relatedCardsLabel]="t('relatedCards')"
+            [cardName]="cardName"
+            [cardDescription]="cardDescription"
+            [typeLabel]="cardTypeForDialog"
+            [effectLabel]="effectForDialog"
+            [equipmentSlotLabel]="slotForDialog"
+            (closed)="closeCardDetails()"
+          />
+        }
+
+        @if (selectedPlayer(currentGame); as player) {
+          <div class="history-backdrop character-backdrop">
+            <section
+              class="history-dialog character-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="player-dialog-title"
+            >
+              <header>
+                <div>
+                  <p class="eyebrow">{{ t('character') }}</p>
+                  <h2 id="player-dialog-title">{{ player.name }}</h2>
+                </div>
+                <button
+                  type="button"
+                  class="history-close"
+                  appAutoFocus
+                  [attr.aria-label]="t('closeCharacter')"
+                  (click)="selectedPlayerId.set(null)"
+                >
+                  ×
+                </button>
+              </header>
+              <div class="character-stats">
+                <span
+                  >{{ t('level') }} <b>{{ player.level }}</b></span
+                >
+                <span
+                  >{{ t('combatPower') }} <b>{{ player.combatPower }}</b></span
+                >
+                <span
+                  >{{ t('equipmentBonus') }} <b>+{{ player.equipmentCombatBonus }}</b></span
+                >
+                <span
+                  >{{ t('cardsInHand') }} <b>{{ player.handCount }}</b></span
+                >
+              </div>
+              <div class="character-statuses">
+                <span>{{ player.isDead ? '☠ ' + t('deadShort') : '♥ ' + t('alive') }}</span>
+                <span>{{
+                  isPlayerConnected(player.playerId) ? '● ' + t('connected') : '○ ' + t('offline')
+                }}</span>
+                @if (player.playerId === currentGame.activePlayerId) {
+                  <span>▶ {{ t('activePlayer') }}</span>
+                }
+                @if (player.playerId === currentGame.combat?.playerId) {
+                  <span>⚔ {{ t('inCombat') }}</span>
+                }
+                @if (player.playerId === currentGame.combat?.helperId) {
+                  <span>+ {{ t('helperJoined') }}</span>
                 }
               </div>
-            </div>
-            <button
-              class="close-details"
-              type="button"
-              [attr.aria-label]="t('closeCardDetails')"
-              (click)="selectedCard.set(null)"
+              <app-equipment-layout
+                [player]="player"
+                [labels]="equipmentLabels()"
+                [cardName]="cardName"
+                (cardOpened)="openCard($event)"
+              />
+              @if (player.playerId !== currentGame.viewerPlayerId) {
+                <p class="information-only">{{ t('informationOnly') }}</p>
+              }
+            </section>
+          </div>
+        }
+
+        @if (confirmation(); as confirm) {
+          <div class="history-backdrop confirmation-backdrop">
+            <section
+              class="history-dialog confirmation-dialog"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-title"
             >
-              ×
-            </button>
-          </aside>
+              <header>
+                <div>
+                  <p class="eyebrow">{{ t('confirmAction') }}</p>
+                  <h2 id="confirm-title">{{ cardName(confirm.card) }}</h2>
+                </div>
+              </header>
+              <p>
+                {{ t('target') }}: <strong>{{ confirm.targetLabel }}</strong>
+              </p>
+              <div class="confirmation-actions">
+                <button type="button" (click)="confirmation.set(null)">{{ t('cancel') }}</button>
+                <button
+                  type="button"
+                  class="primary"
+                  appAutoFocus
+                  [disabled]="pending()"
+                  (click)="confirmTargetAction()"
+                >
+                  {{ t('confirm') }}
+                </button>
+              </div>
+            </section>
+          </div>
         }
 
         <nav class="action-bar" [attr.aria-label]="t('availableActions')">
+          @if (currentGame.expandedRuleActions.sellableItemCardIds.length > 0) {
+            <button type="button" [disabled]="pending()" (click)="openSale()">
+              {{ t('sellItems') }}
+            </button>
+          }
           @if (currentGame.expandedRuleActions.charityCardCount > 0) {
             <button type="button" [disabled]="pending()" (click)="resolveCharity(currentGame)">
               {{ t('charity') }} ({{ currentGame.expandedRuleActions.charityCardCount }})
             </button>
           }
           @if (currentGame.availableActions.length === 0) {
-            <span>{{ currentGame.combat ? t('combatInProgress') : t('waitingForTurn') }}</span>
+            <span>{{ turnStatusLabel(currentGame) }}</span>
           } @else {
             @for (action of currentGame.availableActions; track action) {
               <button

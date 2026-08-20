@@ -137,6 +137,7 @@ export function canChangeEquipment(
 ): boolean {
   return (
     state.activePlayerId === playerId &&
+    state.pendingDecision === null &&
     state.combat === null &&
     (state.phase === GamePhase.TURN_START ||
       state.phase === GamePhase.POST_DOOR ||

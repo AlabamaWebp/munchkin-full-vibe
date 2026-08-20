@@ -44,9 +44,68 @@ describe('createGameView', () => {
       adaView.players.find((player) => player.playerId === graceId),
     ).toEqual(expect.objectContaining({ handCount: 8 }));
     expect(adaView.players[1]).not.toHaveProperty('hand');
+    expect(
+      adaView.gameLog.filter((entry) => entry.type === 'CARDS_DEALT'),
+    ).toEqual([expect.objectContaining({ playerId: adaId, count: 8 })]);
+    expect(adaView.gameLog.every((entry) => entry.phase !== undefined)).toBe(
+      true,
+    );
     const serializedAdaView = JSON.stringify(adaView);
     for (const hiddenCard of graceState?.hand ?? []) {
       expect(serializedAdaView).not.toContain(hiddenCard.instanceId);
+    }
+  });
+
+  it('projects a public card event to every viewer without exposing either private hand', () => {
+    const adaId = parsePlayerId('public-ada');
+    const graceId = parsePlayerId('public-grace');
+    const random = createSeededRandomSource(142);
+    let state = createGame({ id: parseGameId('SHOW') });
+    for (const [actorId, name] of [
+      [adaId, 'Ada'],
+      [graceId, 'Grace'],
+    ] as const) {
+      const added = executeCommand(
+        state,
+        { type: 'ADD_PLAYER', actorId, name },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: adaId },
+      { random },
+    );
+    if (!started.success || started.state.activePlayerId === null)
+      throw new Error('Expected a started game.');
+    const revealedCard = started.state.doorDeck[0];
+    if (revealedCard === undefined) throw new Error('Expected a Door card.');
+    const kicked = executeCommand(
+      started.state,
+      { type: 'KICK_DOOR', actorId: started.state.activePlayerId },
+      { random },
+    );
+    if (!kicked.success) throw new Error(kicked.error.message);
+
+    for (const viewerId of [adaId, graceId]) {
+      const view = createGameView(kicked.state, viewerId);
+      const publicEntry = view.gameLog.find(
+        (entry) => entry.type === 'DOOR_KICKED',
+      );
+      expect(publicEntry?.card?.instanceId).toBe(revealedCard.instanceId);
+      expect(publicEntry?.card?.effects).toBeDefined();
+
+      const other = kicked.state.players.find(
+        (player) => player.id !== viewerId,
+      );
+      const serialized = JSON.stringify(view);
+      for (const hiddenCard of other?.hand ?? []) {
+        if (hiddenCard.instanceId !== revealedCard.instanceId) {
+          expect(serialized).not.toContain(hiddenCard.instanceId);
+        }
+      }
     }
   });
 
@@ -70,6 +129,78 @@ describe('createGameView', () => {
     expect(createGameView(started.state, playerId).availableActions).toEqual([
       'KICK_DOOR',
     ]);
+  });
+
+  it('projects a pending discard choice only to the addressed player', () => {
+    const adaId = parsePlayerId('pending-ada');
+    const bobId = parsePlayerId('pending-bob');
+    const random = createSeededRandomSource(71);
+    let state = createGame({ id: parseGameId('WAIT') });
+    for (const [actorId, name] of [
+      [adaId, 'Ada'],
+      [bobId, 'Bob'],
+    ] as const) {
+      const added = executeCommand(
+        state,
+        { type: 'ADD_PLAYER', actorId, name },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: adaId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const sourceCard = started.state.doorDeck.find((card) =>
+      started.state.cardDefinitions.some(
+        (definition) =>
+          definition.id === card.definitionId &&
+          definition.type === CardType.CURSE,
+      ),
+    );
+    if (sourceCard === undefined) throw new Error('Missing development Curse.');
+    state = {
+      ...started.state,
+      phase: 'DOOR_RESOLUTION',
+      doorDeck: started.state.doorDeck.filter(
+        (card) => card.instanceId !== sourceCard.instanceId,
+      ),
+      pendingDecision: {
+        type: 'DISCARD_CARDS',
+        playerId: adaId,
+        zone: 'HAND',
+        count: 1,
+        sourceCardId: sourceCard.instanceId,
+        sourceDefinitionId: sourceCard.definitionId,
+        remainingEffects: [],
+        completion: {
+          type: 'CURSE',
+          card: sourceCard,
+          targetPlayerId: adaId,
+          phaseAfterResolution: 'POST_DOOR',
+        },
+      },
+    };
+
+    const adaView = createGameView(state, adaId);
+    const bobView = createGameView(state, bobId);
+    expect(adaView.pendingDecision?.selectableCardIds).toEqual(
+      state.players[0]?.hand.map((card) => card.instanceId),
+    );
+    expect(bobView.pendingDecision).toMatchObject({
+      playerId: adaId,
+      count: 1,
+      selectableCardIds: [],
+    });
+    expect(adaView.availableActions).toEqual([]);
+    expect(bobView.availableActions).toEqual([]);
+    expect(bobView.expectedAction).toEqual({
+      type: 'DISCARD_CARDS',
+      playerId: adaId,
+    });
   });
 
   it('projects server-derived equipment actions and combat power', () => {
@@ -135,6 +266,61 @@ describe('createGameView', () => {
       after.self.level + after.self.equipmentCombatBonus,
     );
     expect(after.self.equipment[0]?.equipment).toBeDefined();
+    expect(after.self.equipment[0]?.effects.length).toBeGreaterThan(0);
+  });
+
+  it('does not project item transfer actions outside the viewer turn', () => {
+    const adaId = parsePlayerId('trade-ada');
+    const graceId = parsePlayerId('trade-grace');
+    const random = createSeededRandomSource(31);
+    let state = createGame({ id: parseGameId('GIVE') });
+    for (const [actorId, name] of [
+      [adaId, 'Ada'],
+      [graceId, 'Grace'],
+    ] as const) {
+      const added = executeCommand(
+        state,
+        { type: 'ADD_PLAYER', actorId, name },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: adaId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const inactiveId = started.state.players.find(
+      (player) => player.id !== started.state.activePlayerId,
+    )?.id;
+    const item = [
+      ...started.state.players.flatMap((player) => player.hand),
+      ...started.state.treasureDeck,
+    ].find((card) =>
+      started.state.cardDefinitions.some(
+        (definition) =>
+          definition.id === card.definitionId &&
+          definition.type === CardType.EQUIPMENT,
+      ),
+    );
+    if (inactiveId === undefined || item === undefined)
+      throw new Error('Missing inactive player or development equipment.');
+    state = {
+      ...started.state,
+      phase: 'END_TURN',
+      players: started.state.players.map((player) =>
+        player.id === inactiveId ? { ...player, hand: [item] } : player,
+      ),
+    };
+
+    const view = createGameView(state, inactiveId);
+    expect(view.expandedRuleActions.tradeableItemCardIds).toEqual([]);
+    expect(view.unavailableCardReasons).toContainEqual({
+      cardId: item.instanceId,
+      reason: 'WAITING_FOR_TURN',
+    });
   });
 
   it('projects combat powers and only the active player combat cards', () => {
@@ -197,6 +383,12 @@ describe('createGameView', () => {
     expect(view.playableCombatCards.playersSideCardIds).toEqual([
       bonus.instanceId,
     ]);
+    expect(view.playableCombatCards.monsterSideCardIds).toEqual([
+      bonus.instanceId,
+    ]);
+    expect(view.unavailableCardReasons).not.toContainEqual(
+      expect.objectContaining({ cardId: bonus.instanceId }),
+    );
     expect(view.combat).toMatchObject({
       playerId,
       playerPower: view.self.combatPower,
@@ -294,7 +486,7 @@ describe('createGameView', () => {
     expect(helperView.availableActions).toEqual(['ACCEPT_HELP']);
     expect(helperView.playableCombatCards).toEqual({
       playersSideCardIds: [bonus.instanceId],
-      monsterSideCardIds: [modifier.instanceId],
+      monsterSideCardIds: [bonus.instanceId, modifier.instanceId],
     });
     expect(helperView.combat?.history).toHaveLength(2);
 
