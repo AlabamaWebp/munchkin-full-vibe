@@ -2,6 +2,7 @@ import type { CardDefinition, CardEffect, CardInstance } from "./cards.js";
 import type {
   CardDefinitionId,
   CardInstanceId,
+  EncounterId,
   GameId,
   PlayerId,
 } from "./identifiers.js";
@@ -42,15 +43,48 @@ export interface PlayerState {
 
 export interface CombatState {
   readonly playerId: PlayerId;
-  readonly monster: CardInstance;
-  readonly monsterBonus: number;
+  readonly revision: number;
+  readonly monsters: readonly CombatMonsterState[];
+  readonly nextEncounterSequence: number;
+  readonly nextReactionWindowSequence: number;
+  readonly reactionWindow: CombatReactionWindow | null;
   readonly requestedHelperId: PlayerId | null;
   readonly helperId: PlayerId | null;
   readonly history: readonly CombatHistoryEntry[];
+  readonly runAway: RunAwaySequenceState | null;
 }
 
-export interface RunAwayResultState {
+export interface CombatReactionWindow {
+  readonly windowId: number;
+  readonly declaredAtRevision: number;
+  readonly claimantId: PlayerId;
+  readonly confirmedPlayerIds: readonly PlayerId[];
+}
+
+export interface CombatMonsterPlayedCard {
+  readonly card: CardInstance;
   readonly playerId: PlayerId;
+  readonly strengthModifier: number;
+  readonly treasureModifier: number;
+  readonly purpose: "MODIFIER" | "ADD_MONSTER" | "CLONE_MONSTER";
+}
+
+export interface CombatMonsterState {
+  readonly encounterId: EncounterId;
+  readonly monster: CardInstance;
+  readonly sourceCard: CardInstance;
+  readonly clonedFromEncounterId: EncounterId | null;
+  readonly baseStrength: number;
+  readonly baseLevelRewards: number;
+  readonly baseTreasureRewards: number;
+  readonly badStuff: readonly import("./cards.js").BadStuffEffect[];
+  readonly strengthModifier: number;
+  readonly treasureModifier: number;
+  readonly playedCards: readonly CombatMonsterPlayedCard[];
+}
+
+export interface RunAwayAttemptState {
+  readonly encounterId: EncounterId;
   readonly monsterCardId: CardInstanceId;
   readonly monsterDefinitionId: CardDefinitionId;
   readonly roll: number;
@@ -58,10 +92,21 @@ export interface RunAwayResultState {
   readonly badStuffApplied: boolean;
 }
 
+export interface RunAwaySequenceState {
+  readonly nextMonsterIndex: number;
+  readonly attempts: readonly RunAwayAttemptState[];
+}
+
+export interface RunAwayResultState {
+  readonly playerId: PlayerId;
+  readonly attempts: readonly RunAwayAttemptState[];
+}
+
 export type CombatHistoryEntry =
   | {
       readonly type: "COMBAT_STARTED";
       readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
       readonly monsterDefinitionId: CardDefinitionId;
     }
   | {
@@ -80,6 +125,25 @@ export type CombatHistoryEntry =
       readonly cardId: CardInstanceId;
       readonly definitionId: CardDefinitionId;
       readonly side: "PLAYERS" | "MONSTER";
+      readonly encounterId?: EncounterId;
+      readonly targetPlayerId?: PlayerId;
+    }
+  | {
+      readonly type: "MONSTER_ADDED";
+      readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
+      readonly monsterDefinitionId: CardDefinitionId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+    }
+  | {
+      readonly type: "MONSTER_CLONED";
+      readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
+      readonly sourceEncounterId: EncounterId;
+      readonly monsterDefinitionId: CardDefinitionId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
     };
 
 export interface GameLogEntry {
@@ -99,9 +163,7 @@ export type PendingEffectCompletion =
   | {
       readonly type: "RUN_AWAY";
       readonly playerId: PlayerId;
-      readonly monster: CardInstance;
-      readonly roll: number;
-      readonly badStuffApplied: boolean;
+      readonly encounterId: EncounterId;
     };
 
 export interface PendingCardDiscardDecision {
@@ -116,7 +178,7 @@ export interface PendingCardDiscardDecision {
 }
 
 export interface GameState {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly id: GameId;
   readonly status: GameStatus;
   readonly phase: GamePhase;

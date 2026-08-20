@@ -52,9 +52,11 @@ DOOR_RESOLUTION
     v
 POST_DOOR
     |
-    +--> later: LOOK_FOR_TROUBLE
+    +--> LOOK_FOR_TROUBLE when a Monster is available in hand
     |
     +--> LOOT_ROOM when allowed
+    |
+    +--> END_TURN when the hand limit allows it
     |
     v
 END_TURN
@@ -76,13 +78,37 @@ The basic engine uses the following concrete development rules:
 - a Curse resolves its typed effects, is discarded, and proceeds to `POST_DOOR`;
 - any other Door card is revealed, added to the active player's hand, and proceeds
   to `POST_DOOR`;
-- after a non-combat Door resolution, the player may loot one facedown Door card
-  or skip looting and end the turn;
+- after a non-combat Door resolution, the player may play exactly one Monster
+  from their own hand with `LOOK_FOR_TROUBLE`, loot one facedown Door card, or
+  skip both and end the turn when the hand limit allows it;
+- a Monster played with `LOOK_FOR_TROUBLE` leaves the private hand, becomes
+  public, and starts the same normal combat as a Monster revealed by kicking the
+  Door;
 - ending the turn advances cyclically through join order, increments the turn
   number, and returns to `TURN_START`.
 
 The card identities in an initial deal or facedown room loot are private. The
 revealed kicked-Door card is public.
+
+## Deck lifecycle and draws
+
+Door and Treasure draws use the same server-authoritative lifecycle, while the
+two deck types remain completely separate:
+
+- a draw first consumes the remaining cards from the current draw pile in their
+  existing order;
+- if the requested draw crosses the end of that pile, the engine shuffles only
+  the corresponding discard pile through the injected `RandomSource` and
+  continues the draw;
+- recycling the discard produces a public `DECK_RESHUFFLED` event that identifies
+  only the Door or Treasure deck and never reveals card identities;
+- the engine rejects the action atomically only when the matching draw pile and
+  discard pile together contain fewer cards than the complete requested draw;
+- this lifecycle applies to kicking the Door, looting the room, typed card-draw
+  effects, combat Treasure rewards, and both four-card revival draws;
+- revival requires exactly four Door and four Treasure cards. If either combined
+  deck and discard cannot provide all four, ending the preceding turn fails
+  atomically and the player remains dead until the action can be completed.
 
 ## Core V1 feature set
 
@@ -121,7 +147,8 @@ Implement before advanced rule systems:
 
 ## Milestone 8 combat rules
 
-- kicking a Door that contains a Monster starts combat for the active player;
+- kicking a Door that contains a Monster or playing one owned hand Monster with
+  `LOOK_FOR_TROUBLE` starts combat for the active player;
 - player power is the player's level plus equipment bonuses plus temporary
   combat bonuses calculated by the engine;
 - monster power is the monster's data-driven level;
@@ -131,9 +158,10 @@ Implement before advanced rule systems:
 - the player wins only when player power is strictly greater than monster power;
   a tie is not a victory;
 - a defeated monster is moved to the Door discard pile, its data-driven level
-  reward is applied, and its full Treasure reward is drawn privately;
-- combat rewards are atomic: combat is not resolved if the Treasure deck cannot
-  provide every promised card;
+  reward is applied, and its full Treasure reward is drawn privately, recycling
+  the Treasure discard when required;
+- combat rewards are atomic: combat is not resolved if the Treasure draw pile
+  and discard together cannot provide every promised card;
 - temporary combat power is cleared after victory, and the game proceeds to
   `END_TURN`;
 - losing combat, running away, and bad stuff remain part of Milestone 10.
@@ -146,12 +174,12 @@ Implement before advanced rule systems:
   replaced during that combat;
 - the helper contributes their level and equipped combat bonuses to the player
   side; combat power remains derived entirely by the engine;
-- all players may play a `TEMPORARY_BONUS` card for either the player side or
-  the Monster side during an active combat, including combats in which they are
-  neither the active player nor the accepted helper;
-- all players may play a typed `MONSTER_MODIFIER` card for the Monster side;
-  Monster modifiers use explicit `MONSTER_COMBAT_BONUS` effects and never rely
-  on card names;
+- all players may play a `TEMPORARY_BONUS` card for the player side or for one
+  explicitly addressed Monster encounter during an active combat, including
+  combats in which they are neither the active player nor the accepted helper;
+- all players may play a typed `MONSTER_MODIFIER` card for one Monster encounter;
+  Monster modifiers use typed effects, require a stable encounter target, and
+  never rely on card names;
 - a combat card must target the side permitted by its typed definition; cards
   played on the wrong side are rejected atomically;
 - the active player receives all level and Treasure rewards under the current
@@ -164,24 +192,104 @@ Implement before advanced rule systems:
 ## Milestone 10 losing-combat rules
 
 - only the active player may run away, and only while their combined player-side
-  power does not exceed the Monster power;
-- running away rolls one six-sided die through the injected `RandomSource`;
+  power does not exceed total Monster-side power;
+- running away rolls one six-sided die through the injected `RandomSource` for
+  each Monster encounter, in combat order;
 - a result of 5 or 6 succeeds, while 1–4 fails;
-- a successful escape applies no bad stuff;
-- a failed escape applies the Monster's typed, data-driven bad-stuff effects to
-  the active player; each discard effect explicitly declares whether cards are
-  selected randomly by the engine or chosen by the affected player;
+- a successful escape from one Monster applies no bad stuff for that encounter;
+- a failed escape applies that Monster's typed, data-driven bad-stuff effects to
+  the active player before attempting the next encounter; each discard effect
+  explicitly declares whether cards are selected randomly by the engine or
+  chosen by the affected player;
 - a player-choice discard creates a serializable pending decision, blocks other
   gameplay commands, and resumes the interrupted effect sequence after the
   affected player submits exactly the required cards;
 - losing levels can never reduce a player below level one;
 - the accepted helper does not make a separate escape roll and does not receive
   bad stuff under the current simplified rules;
-- after either escape result, the Monster is discarded, the active player's
-  temporary combat bonus is cleared, help and combat history are removed with
-  the combat state, and the game proceeds to `END_TURN`;
-- the public escape roll and result remain in the game state until the turn ends,
-  so every player and a reconnecting client can see the outcome.
+- after all escape attempts, every physical Monster and attached modifier is
+  discarded, the active player's temporary combat bonus is cleared, help and
+  combat history are removed with the combat state, and the game proceeds to
+  `END_TURN`;
+- all public escape rolls and results remain in the game state until the turn
+  ends, so every player and a reconnecting client can see the outcome.
+
+## Multi-Monster combat extension
+
+- an active combat contains one or more ordered Monster encounters;
+- every encounter receives a stable `encounterId` that remains unchanged for
+  the lifetime of that combat and is the only valid target for a Monster-side
+  modifier;
+- each encounter stores a snapshot of its Monster's base strength, level reward,
+  Treasure reward, bad stuff, its own strength and Treasure modifiers, and its
+  publicly played physical cards;
+- total Monster-side power is the sum of every encounter's current strength;
+  each current strength is bounded below by one;
+- an original typed `ADD_MONSTER_TO_COMBAT` effect requires its player to select
+  a Monster from the same private hand. The effect card and selected Monster both
+  leave that hand, the Monster receives a new encounter id, and both cards remain
+  public with the combat until cleanup;
+- a typed `CLONE_COMBAT_MONSTER` effect targets one encounter and creates a new
+  encounter as an independent snapshot of the selected Monster, including all
+  strength and Treasure changes already applied at that moment. Later changes to
+  either encounter do not affect the other;
+- typed `MODIFY_MONSTER` effects target exactly one encounter and may change both
+  strength and Treasure reward. The development booster grants +5 strength and
+  +2 Treasures; the development weakening applies -5 strength and -1 Treasure;
+- a Monster's current Treasure reward is bounded below by zero;
+- winning uses the sum of all current Monster Treasure rewards and all base level
+  rewards. Reward availability is validated atomically before any combat change;
+- victory discards every unique physical Monster, add/clone card, and attached
+  Monster modifier participating in the combat, then grants the summed rewards;
+- running away performs one ordered, independent die roll per Monster encounter.
+  A failed roll immediately resolves that encounter's bad stuff before the next
+  roll;
+- if bad stuff requires a player choice, the current encounter, completed
+  attempts, next encounter index, remaining effects, and pending decision stay in
+  serializable state. After the addressed player answers—even after reconnect—the
+  engine resumes with the next Monster rather than restarting the sequence;
+- after all attempts, every physical combat Monster and modifier is discarded,
+  temporary player combat power is cleared, the full ordered attempt summary is
+  retained until turn end, and play moves to `END_TURN`;
+- no multi-Monster behavior depends on a card name; card types, typed effects,
+  encounter targets, and target validation are authoritative.
+
+## Combat victory reaction window
+
+- a winning combat is never completed by a direct client resolution command;
+- while the player side is strictly stronger, the active combat player may send
+  `DECLARE_COMBAT_VICTORY` for the current server-projected combat revision;
+- in a one-player match that declaration rechecks the powers and resolves the
+  combat immediately;
+- in a multiplayer match it creates a serializable reaction window in
+  `CombatState`. The claimant is confirmed automatically, and every other match
+  participant must send `PASS_COMBAT_REACTION` for that exact window before the
+  combat may end;
+- connection status does not alter the participant list or confirmations. A
+  disconnected player remains awaited and sees the same window after reconnect;
+- a player who confirmed that they will not intervene cannot play a reaction in
+  that window. If combat changes, earlier confirmations are reset and that player
+  may react again; the claimant remains confirmed while their claim remains valid;
+- the final confirmation atomically rechecks current player-side and Monster-side
+  power before granting any level or Treasure reward;
+- a valid intervention increments the combat revision. If the player side still
+  leads, a new reaction-window id is created with only the claimant confirmed. If
+  the lead is lost, the victory claim is cancelled and no reaction window remains;
+- after a cancelled claim, restoring the player-side lead does not resume the old
+  window. The active player must declare victory again for the new combat revision;
+- reaction-window and combat-revision ids are server-authored. Duplicate or stale
+  passes, declarations, and card reactions are rejected without changing state;
+- while the window is active, the only allowed commands are the exact-window pass
+  and typed combat reactions. Help, escape, equipment, economy, turn, ordinary
+  Curse, and other gameplay commands are blocked;
+- allowed typed reactions are: a combat Curse targeting the active combat player
+  or accepted helper; adding a selected owned hand Monster; cloning a selected
+  encounter; strengthening or weakening a selected encounter; and a temporary
+  bonus typed for either the player side or one selected Monster;
+- `COMBAT_CURSE` is a distinct data-driven card type. Its typed combat modifier is
+  temporary and is cleared from the active player or helper with combat cleanup;
+- player-side and Monster-side temporary bonuses are distinguished by their typed
+  effects. A card cannot be played on a side its definition does not permit.
 
 ## Expanded V1.1 feature set
 
@@ -220,8 +328,9 @@ Add after the core loop works end-to-end:
   lowest-level player. If the active player is tied for lowest level, the random
   excess cards are discarded instead;
 - death keeps the player's level but discards their hand, equipment, Class, and
-  Race. The player remains dead until their next turn, then returns and draws up
-  to four available Door and four available Treasure cards.
+  Race. The player remains dead until their next turn, then returns after an
+  atomic draw of exactly four Door and four Treasure cards using the normal deck
+  recycling lifecycle.
 
 ## Development player count
 
@@ -243,37 +352,34 @@ One-player mode is for testing UI, networking and engine flows.
 
 ## Development card set
 
-Use original fictional cards.
+The development catalog uses only original fictional names and text. It contains
+20 unique Door definitions and 22 unique Treasure definitions, producing 56 Door
+and 66 Treasure physical cards. This is sufficient for the initial eight-card
+deal to six players and leaves enough variety for a normal match.
 
-Suggested initial test content:
+Door content includes eight Monsters across levels 1–18 with typed bad stuff,
+six ordinary Curses, one combat Curse, two Classes, two Races, and a typed card
+that adds a selected hand Monster to combat. Treasure content includes ten items
+covering every equipment slot, player- and Monster-side one-shot bonuses,
+strength/reward Monster modifiers, a weakening card, and Monster cloning.
 
-### Monsters
+Catalog completeness rules:
 
-- Rat — low level;
-- Goblin — low level;
-- Orc — medium level;
-- Troll — high level;
-- Dragon — very high level.
+- production definitions must not use `OTHER` as behaviorless filler;
+- `effects: []` is valid only for a Monster, equipment, Class, or Race whose
+  complete behavior is represented by its typed fields;
+- every definition has a stable unique `id` and `artKey`;
+- every Treasure has an explicit non-negative `goldValue`, including one-shot
+  cards and modifiers;
+- every equipment definition declares its slot, occupied hands (`0`, `1`, or
+  `2`), combat bonus, and an explicit typed restrictions list (which may be
+  empty); only Hands equipment may occupy one or two hands;
+- every action card whose use is not inherent in its type declares typed
+  permitted timing and target metadata;
+- English source text and Russian localization must exist for every definition.
 
-### Equipment
-
-- Wooden Sword;
-- Helmet;
-- Boots;
-- Armor;
-- Great Sword.
-
-### Temporary bonuses
-
-- Small Potion;
-- Large Potion;
-- Lucky Charm.
-
-### Curses
-
-- Lose 1 Level;
-- Discard Helmet;
-- Lose an Item.
+These presentation and legality metadata are projected unchanged in each visible
+`GameCardView`; the client does not infer them from a name or description.
 
 Exact numbers are implementation details and may be adjusted for testing.
 
@@ -346,6 +452,11 @@ Losing combat should eventually support:
 The winning level is 10. Reaching level 10 through any authoritative level gain
 (including combat rewards or selling items) immediately finishes the game.
 
+The combat reaction window delays only the resolution of a won combat. It does
+not change the winning-level rule: when the eventually granted combat level reward
+reaches level 10, the game still finishes immediately in that same authoritative
+resolution.
+
 Only the game engine may decide that a player has won.
 
 The finished game state identifies the winner, clears active combat, and rejects
@@ -378,6 +489,8 @@ GAME_STARTED
 CARDS_DEALT
 TURN_STARTED
 DOOR_KICKED
+DECK_RESHUFFLED
+LOOKED_FOR_TROUBLE
 CARD_DRAWN
 CARD_DISCARD_REQUIRED
 CARDS_DISCARDED_SUMMARY
@@ -385,6 +498,10 @@ CURSE_RESOLVED
 COMBAT_STARTED
 CARD_PLAYED
 COMBAT_UPDATED
+COMBAT_VICTORY_DECLARED
+COMBAT_REACTION_PASSED
+COMBAT_REACTIONS_RESET
+COMBAT_VICTORY_CANCELLED
 COMBAT_WON
 RUN_AWAY_ATTEMPTED
 TREASURE_GAINED

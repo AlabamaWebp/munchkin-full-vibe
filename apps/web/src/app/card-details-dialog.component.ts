@@ -45,15 +45,19 @@ import { AutoFocusDirective } from './auto-focus.directive';
             <small>{{ typeLabel()(card) }}</small>
             <h3>{{ cardName()(card) }}</h3>
             <p>{{ cardDescription()(card) }}</p>
+            @if (card.goldValue !== undefined) {
+              <dl>
+                <div>
+                  <dt>{{ valueLabel() }}</dt>
+                  <dd>{{ card.goldValue }}</dd>
+                </div>
+              </dl>
+            }
             @if (card.equipment; as equipment) {
               <dl>
                 <div>
                   <dt>{{ bonusLabel() }}</dt>
                   <dd>+{{ equipment.combatBonus }}</dd>
-                </div>
-                <div>
-                  <dt>{{ valueLabel() }}</dt>
-                  <dd>{{ equipment.value }}</dd>
                 </div>
                 <div>
                   <dt>{{ slotLabel() }}</dt>

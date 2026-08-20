@@ -4,6 +4,7 @@ import {
   createSeededRandomSource,
   executeCommand,
   parseGameId,
+  parseEncounterId,
   parsePlayerId,
   type GameState,
 } from '@munchkin-lan/game-engine';
@@ -129,6 +130,75 @@ describe('createGameView', () => {
     expect(createGameView(started.state, playerId).availableActions).toEqual([
       'KICK_DOOR',
     ]);
+  });
+
+  it('projects the exact hand Monsters available for LOOK_FOR_TROUBLE and its public event', () => {
+    const playerId = parsePlayerId('trouble-solo');
+    const random = createSeededRandomSource(17);
+    let state = createGame({ id: parseGameId('LOOK') });
+    const added = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId: playerId, name: 'Solo' },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const started = executeCommand(
+      added.state,
+      { type: 'START_GAME', actorId: playerId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const monster = [
+      ...started.state.players[0]!.hand,
+      ...started.state.doorDeck,
+    ].find((card) =>
+      started.state.cardDefinitions.some(
+        (definition) =>
+          definition.id === card.definitionId &&
+          definition.type === CardType.MONSTER,
+      ),
+    );
+    if (monster === undefined) throw new Error('Missing development Monster.');
+    state = {
+      ...started.state,
+      phase: 'POST_DOOR',
+      combat: null,
+      doorDeck: started.state.doorDeck.filter(
+        (card) => card.instanceId !== monster.instanceId,
+      ),
+      players: started.state.players.map((player) => ({
+        ...player,
+        hand: [monster],
+      })),
+    };
+
+    const before = createGameView(state, playerId);
+    expect(before.lookForTroubleCardIds).toEqual([monster.instanceId]);
+    expect(before.availableActions).toContain('LOOK_FOR_TROUBLE');
+    expect(before.unavailableCardReasons).not.toContainEqual(
+      expect.objectContaining({ cardId: monster.instanceId }),
+    );
+
+    const result = executeCommand(
+      state,
+      {
+        type: 'LOOK_FOR_TROUBLE',
+        actorId: playerId,
+        cardId: monster.instanceId,
+      },
+      { random },
+    );
+    if (!result.success) throw new Error(result.error.message);
+    const after = createGameView(result.state, playerId);
+    expect(after.lookForTroubleCardIds).toEqual([]);
+    expect(after.combat?.monsters[0]?.monster.instanceId).toBe(
+      monster.instanceId,
+    );
+    expect(after.gameLog.at(-2)).toMatchObject({
+      type: 'LOOKED_FOR_TROUBLE',
+      visibility: 'PUBLIC',
+      card: { instanceId: monster.instanceId },
+    });
   });
 
   it('projects a pending discard choice only to the addressed player', () => {
@@ -266,7 +336,12 @@ describe('createGameView', () => {
       after.self.level + after.self.equipmentCombatBonus,
     );
     expect(after.self.equipment[0]?.equipment).toBeDefined();
-    expect(after.self.equipment[0]?.effects.length).toBeGreaterThan(0);
+    expect(after.self.equipment[0]?.equipment?.combatBonus).toBeGreaterThan(0);
+    expect(after.self.equipment[0]?.artKey).toBeTruthy();
+    expect(after.self.equipment[0]?.goldValue).toEqual(expect.any(Number));
+    expect(after.self.equipment[0]?.equipment?.restrictions).toBeInstanceOf(
+      Array,
+    );
   });
 
   it('does not project item transfer actions outside the viewer turn', () => {
@@ -355,19 +430,42 @@ describe('createGameView', () => {
     const bonus = findCard(CardType.TEMPORARY_BONUS);
     if (monster === undefined || bonus === undefined)
       throw new Error('Missing development combat cards.');
+    const monsterStats = started.state.cardDefinitions.find(
+      (definition) => definition.id === monster.definitionId,
+    )!.monster!;
+    const encounterId = parseEncounterId('encounter-1');
     state = {
       ...started.state,
       phase: 'DOOR_RESOLUTION',
       combat: {
         playerId,
-        monster,
-        monsterBonus: 0,
+        revision: 1,
+        monsters: [
+          {
+            encounterId,
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: null,
+            baseStrength: monsterStats.level,
+            baseLevelRewards: monsterStats.levelRewards,
+            baseTreasureRewards: monsterStats.treasureRewards,
+            badStuff: monsterStats.badStuff,
+            strengthModifier: 0,
+            treasureModifier: 0,
+            playedCards: [],
+          },
+        ],
+        nextEncounterSequence: 2,
+        nextReactionWindowSequence: 1,
+        reactionWindow: null,
         requestedHelperId: null,
         helperId: null,
+        runAway: null,
         history: [
           {
             type: 'COMBAT_STARTED',
             playerId,
+            encounterId,
             monsterDefinitionId: monster.definitionId,
           },
         ],
@@ -383,16 +481,14 @@ describe('createGameView', () => {
     expect(view.playableCombatCards.playersSideCardIds).toEqual([
       bonus.instanceId,
     ]);
-    expect(view.playableCombatCards.monsterSideCardIds).toEqual([
-      bonus.instanceId,
-    ]);
+    expect(view.playableCombatCards.monsterSideCardIds).toEqual([]);
     expect(view.unavailableCardReasons).not.toContainEqual(
       expect.objectContaining({ cardId: bonus.instanceId }),
     );
     expect(view.combat).toMatchObject({
       playerId,
       playerPower: view.self.combatPower,
-      monsterPower: view.combat?.monster.monster?.level,
+      monsterPower: view.combat?.monsters[0]?.currentStrength,
     });
 
     const escaped = executeCommand(
@@ -406,9 +502,9 @@ describe('createGameView', () => {
       availableActions: ['END_TURN'],
       lastRunAwayResult: {
         playerId,
-        roll: 5,
-        escaped: true,
-        badStuffApplied: false,
+        attempts: [
+          { encounterId, roll: 5, escaped: true, badStuffApplied: false },
+        ],
       },
     });
   });
@@ -455,26 +551,55 @@ describe('createGameView', () => {
     const monster = findCard(CardType.MONSTER);
     const bonus = findCard(CardType.TEMPORARY_BONUS);
     const modifier = findCard(CardType.MONSTER_MODIFIER);
-    if (monster === undefined || bonus === undefined || modifier === undefined)
+    const combatCurse = findCard(CardType.COMBAT_CURSE);
+    if (
+      monster === undefined ||
+      bonus === undefined ||
+      modifier === undefined ||
+      combatCurse === undefined
+    )
       throw new Error('Missing development multiplayer combat cards.');
+    const monsterStats = started.state.cardDefinitions.find(
+      (definition) => definition.id === monster.definitionId,
+    )!.monster!;
+    const encounterId = parseEncounterId('encounter-1');
     state = {
       ...started.state,
       phase: 'DOOR_RESOLUTION',
       players: started.state.players.map((player) =>
         player.id === helperId
-          ? { ...player, hand: [bonus, modifier] }
+          ? { ...player, hand: [bonus, modifier, combatCurse] }
           : player,
       ),
       combat: {
         playerId: activeId,
-        monster,
-        monsterBonus: 0,
+        revision: 1,
+        monsters: [
+          {
+            encounterId,
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: null,
+            baseStrength: monsterStats.level,
+            baseLevelRewards: monsterStats.levelRewards,
+            baseTreasureRewards: monsterStats.treasureRewards,
+            badStuff: monsterStats.badStuff,
+            strengthModifier: 0,
+            treasureModifier: 0,
+            playedCards: [],
+          },
+        ],
+        nextEncounterSequence: 2,
+        nextReactionWindowSequence: 1,
+        reactionWindow: null,
         requestedHelperId: helperId,
         helperId: null,
+        runAway: null,
         history: [
           {
             type: 'COMBAT_STARTED',
             playerId: activeId,
+            encounterId,
             monsterDefinitionId: monster.definitionId,
           },
           { type: 'HELP_REQUESTED', playerId: activeId, helperId },
@@ -486,12 +611,206 @@ describe('createGameView', () => {
     expect(helperView.availableActions).toEqual(['ACCEPT_HELP']);
     expect(helperView.playableCombatCards).toEqual({
       playersSideCardIds: [bonus.instanceId],
-      monsterSideCardIds: [bonus.instanceId, modifier.instanceId],
+      monsterSideCardIds: [modifier.instanceId],
+      monsterTargetActions: [
+        { cardId: modifier.instanceId, encounterIds: [encounterId] },
+      ],
+      addMonsterActions: [],
+      playerTargetActions: [],
     });
     expect(helperView.combat?.history).toHaveLength(2);
 
     const activeView = createGameView(state, activeId);
     expect(activeView.requestableHelperIds).toEqual([helperId]);
     expect(activeView.combat).toMatchObject({ requestedHelperId: helperId });
+
+    const reactionState: GameState = {
+      ...state,
+      combat: {
+        ...state.combat!,
+        reactionWindow: {
+          windowId: 1,
+          declaredAtRevision: state.combat!.revision,
+          claimantId: activeId,
+          confirmedPlayerIds: [activeId],
+        },
+        nextReactionWindowSequence: 2,
+      },
+    };
+    const reactionView = createGameView(reactionState, helperId);
+    expect(reactionView.expectedAction).toEqual({
+      type: 'COMBAT_REACTIONS',
+      playerId: activeId,
+      waitingPlayerIds: [helperId],
+    });
+    expect(reactionView.availableActions).toEqual(['PASS_COMBAT_REACTION']);
+    expect(reactionView.combat?.reactionWindow).toEqual({
+      windowId: 1,
+      claimantId: activeId,
+      confirmedPlayerIds: [activeId],
+      waitingPlayerIds: [helperId],
+    });
+    expect(reactionView.playableCombatCards.playerTargetActions).toEqual([
+      { cardId: combatCurse.instanceId, playerIds: [activeId] },
+    ]);
+    expect(createGameView(reactionState, activeId).availableActions).toEqual(
+      [],
+    );
+  });
+
+  it('projects added, modified, and cloned Monster encounters independently', () => {
+    const playerId = parsePlayerId('multi-viewer');
+    const random = createSeededRandomSource(91);
+    let state = createGame({ id: parseGameId('MOBS') });
+    const addedPlayer = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId: playerId, name: 'Viewer' },
+      { random },
+    );
+    if (!addedPlayer.success) throw new Error(addedPlayer.error.message);
+    const started = executeCommand(
+      addedPlayer.state,
+      { type: 'START_GAME', actorId: playerId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const allCards = [
+      ...started.state.players[0]!.hand,
+      ...started.state.doorDeck,
+      ...started.state.treasureDeck,
+    ];
+    const cardsOfType = (type: CardType) =>
+      allCards.filter((card) =>
+        started.state.cardDefinitions.some(
+          (definition) =>
+            definition.id === card.definitionId && definition.type === type,
+        ),
+      );
+    const [firstMonster, secondMonster] = cardsOfType(CardType.MONSTER);
+    const addCard = cardsOfType(CardType.ADD_MONSTER)[0];
+    const cloneCard = cardsOfType(CardType.CLONE_MONSTER)[0];
+    const modifier = cardsOfType(CardType.MONSTER_MODIFIER)[0];
+    if (
+      firstMonster === undefined ||
+      secondMonster === undefined ||
+      addCard === undefined ||
+      cloneCard === undefined ||
+      modifier === undefined
+    )
+      throw new Error('Missing development multi-Monster cards.');
+    const stats = started.state.cardDefinitions.find(
+      (definition) => definition.id === firstMonster.definitionId,
+    )!.monster!;
+    const firstEncounterId = parseEncounterId('encounter-1');
+    state = {
+      ...started.state,
+      phase: 'DOOR_RESOLUTION',
+      players: started.state.players.map((player) => ({
+        ...player,
+        hand: [secondMonster, addCard, cloneCard, modifier],
+      })),
+      combat: {
+        playerId,
+        revision: 1,
+        monsters: [
+          {
+            encounterId: firstEncounterId,
+            monster: firstMonster,
+            sourceCard: firstMonster,
+            clonedFromEncounterId: null,
+            baseStrength: stats.level,
+            baseLevelRewards: stats.levelRewards,
+            baseTreasureRewards: stats.treasureRewards,
+            badStuff: stats.badStuff,
+            strengthModifier: 0,
+            treasureModifier: 0,
+            playedCards: [],
+          },
+        ],
+        nextEncounterSequence: 2,
+        nextReactionWindowSequence: 1,
+        reactionWindow: null,
+        requestedHelperId: null,
+        helperId: null,
+        runAway: null,
+        history: [
+          {
+            type: 'COMBAT_STARTED',
+            playerId,
+            encounterId: firstEncounterId,
+            monsterDefinitionId: firstMonster.definitionId,
+          },
+        ],
+      },
+    };
+
+    const added = executeCommand(
+      state,
+      {
+        type: 'PLAY_CARD',
+        actorId: playerId,
+        cardId: addCard.instanceId,
+        target: { type: 'HAND_MONSTER', cardId: secondMonster.instanceId },
+      },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const secondEncounterId = added.state.combat!.monsters[1]!.encounterId;
+    const modified = executeCommand(
+      added.state,
+      {
+        type: 'PLAY_CARD',
+        actorId: playerId,
+        cardId: modifier.instanceId,
+        target: {
+          type: 'COMBAT',
+          side: 'MONSTER',
+          encounterId: secondEncounterId,
+        },
+      },
+      { random },
+    );
+    if (!modified.success) throw new Error(modified.error.message);
+    const cloned = executeCommand(
+      modified.state,
+      {
+        type: 'PLAY_CARD',
+        actorId: playerId,
+        cardId: cloneCard.instanceId,
+        target: {
+          type: 'COMBAT',
+          side: 'MONSTER',
+          encounterId: secondEncounterId,
+        },
+      },
+      { random },
+    );
+    if (!cloned.success) throw new Error(cloned.error.message);
+
+    const view = createGameView(cloned.state, playerId);
+    expect(view.combat?.monsters).toHaveLength(3);
+    expect(view.combat?.monsters[1]).toMatchObject({
+      encounterId: secondEncounterId,
+      playedCards: [
+        { card: { instanceId: addCard.instanceId } },
+        { card: { instanceId: modifier.instanceId } },
+      ],
+    });
+    expect(view.combat?.monsters[2]).toMatchObject({
+      clonedFromEncounterId: secondEncounterId,
+      sourceCard: { instanceId: cloneCard.instanceId },
+      strengthModifier: view.combat?.monsters[1]?.strengthModifier,
+      treasureModifier: view.combat?.monsters[1]?.treasureModifier,
+    });
+    expect(view.combat?.history.map((entry) => entry.type)).toEqual([
+      'COMBAT_STARTED',
+      'MONSTER_ADDED',
+      'CARD_PLAYED',
+      'MONSTER_CLONED',
+    ]);
+    expect(view.gameLog.slice(-2).map((entry) => entry.type)).toEqual([
+      'MONSTER_CLONED',
+      'COMBAT_UPDATED',
+    ]);
   });
 });

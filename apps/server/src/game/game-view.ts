@@ -10,11 +10,15 @@ import {
   calculateCombatPower,
   calculateCombatSidePower,
   calculateMonsterPower,
+  calculateMonsterStrength,
+  calculateMonsterTreasures,
+  canLookForTrouble,
   CardType,
   equipmentConflict,
   equipmentCombatBonus,
   equipmentRestriction,
   GamePhase,
+  HAND_LIMIT,
   type CardInstance,
   type GameLogEntry,
   type GameState,
@@ -33,22 +37,35 @@ function cardView(state: GameState, card: CardInstance): GameCardView {
   return {
     instanceId: card.instanceId,
     definitionId: definition.id,
+    artKey: definition.artKey ?? definition.id,
     name: definition.name,
     description: definition.description,
     type: definition.type,
     deck: definition.deck,
+    ...(definition.goldValue === undefined
+      ? {}
+      : { goldValue: definition.goldValue }),
+    ...(definition.play === undefined ? {} : { play: definition.play }),
     effects: definition.effects,
     ...(definition.equipment === undefined
       ? {}
       : {
           equipment: {
             ...definition.equipment,
-            value: definition.equipment.value ?? 0,
-            combatBonus: definition.effects.reduce(
-              (total, effect) =>
-                effect.type === 'COMBAT_BONUS' ? total + effect.amount : total,
-              0,
-            ),
+            hands:
+              definition.equipment.hands ??
+              (definition.equipment.slot === 'HANDS' ? 1 : 0),
+            restrictions: definition.equipment.restrictions ?? [],
+            value: definition.goldValue ?? definition.equipment.value ?? 0,
+            combatBonus:
+              definition.equipment.combatBonus ??
+              definition.effects.reduce(
+                (total, effect) =>
+                  effect.type === 'COMBAT_BONUS'
+                    ? total + effect.amount
+                    : total,
+                0,
+              ),
           },
         }),
     ...(definition.monster === undefined
@@ -69,7 +86,13 @@ function cardById(state: GameState, cardId: string): GameCardView | null {
       ...(player.classCard === null ? [] : [player.classCard]),
       ...(player.raceCard === null ? [] : [player.raceCard]),
     ]),
-    ...(state.combat === null ? [] : [state.combat.monster]),
+    ...(state.combat === null
+      ? []
+      : state.combat.monsters.flatMap((monster) => [
+          monster.monster,
+          monster.sourceCard,
+          ...monster.playedCards.map((played) => played.card),
+        ])),
     ...(state.pendingDecision?.completion.type === 'CURSE'
       ? [state.pendingDecision.completion.card]
       : []),
@@ -130,6 +153,8 @@ function projectLogEntry(
     case 'PLAYER_DIED':
     case 'PLAYER_REVIVED':
       return { ...base, playerId: event.playerId };
+    case 'DECK_RESHUFFLED':
+      return { ...base, deck: event.deck };
     case 'DOOR_KICKED':
     case 'CARD_ADDED_TO_HAND':
     case 'CURSE_RESOLVED':
@@ -175,6 +200,34 @@ function projectLogEntry(
         ...base,
         playerId: event.playerId,
         card: requiredLogCard(state, event.monsterCardId),
+        encounterId: event.encounterId,
+      };
+    case 'LOOKED_FOR_TROUBLE':
+      return {
+        ...base,
+        playerId: event.playerId,
+        card: requiredLogCard(state, event.monsterCardId),
+      };
+    case 'MONSTER_ADDED':
+      return {
+        ...base,
+        playerId: event.playerId,
+        cards: [
+          requiredLogCard(state, event.cardId),
+          requiredLogCard(state, event.monsterCardId),
+        ],
+        encounterId: event.encounterId,
+      };
+    case 'MONSTER_CLONED':
+      return {
+        ...base,
+        playerId: event.playerId,
+        cards: [
+          requiredLogCard(state, event.cardId),
+          requiredLogCard(state, event.monsterCardId),
+        ],
+        encounterId: event.encounterId,
+        sourceEncounterId: event.sourceEncounterId,
       };
     case 'COMBAT_UPDATED':
       return {
@@ -183,6 +236,16 @@ function projectLogEntry(
         playerPower: event.playerPower,
         monsterPower: event.monsterPower,
       };
+    case 'COMBAT_VICTORY_DECLARED':
+    case 'COMBAT_REACTION_PASSED':
+    case 'COMBAT_REACTIONS_RESET':
+      return {
+        ...base,
+        playerId: event.playerId,
+        reactionWindowId: event.reactionWindowId,
+      };
+    case 'COMBAT_VICTORY_CANCELLED':
+      return { ...base, playerId: event.playerId };
     case 'RUN_AWAY_ATTEMPTED':
       return {
         ...base,
@@ -190,6 +253,7 @@ function projectLogEntry(
         card: requiredLogCard(state, event.monsterCardId),
         roll: event.roll,
         escaped: event.escaped,
+        encounterId: event.encounterId,
       };
     case 'HELP_REQUESTED':
     case 'HELP_ACCEPTED':
@@ -217,6 +281,9 @@ function projectLogEntry(
           ? { targetPlayerId: event.target.playerId }
           : {}),
         ...(event.target?.type === 'COMBAT' ? { side: event.target.side } : {}),
+        ...(event.target?.type === 'COMBAT' && event.target.side === 'MONSTER'
+          ? { encounterId: event.target.encounterId }
+          : {}),
       };
     case 'ROLE_PLAYED':
       return {
@@ -265,6 +332,16 @@ function expectedAction(state: GameState): GameView['expectedAction'] {
   if (state.pendingDecision !== null) {
     return { type: 'DISCARD_CARDS', playerId: state.pendingDecision.playerId };
   }
+  if (state.combat?.reactionWindow !== null && state.combat !== null) {
+    const confirmed = new Set(state.combat.reactionWindow.confirmedPlayerIds);
+    return {
+      type: 'COMBAT_REACTIONS',
+      playerId: state.combat.reactionWindow.claimantId,
+      waitingPlayerIds: state.players
+        .filter((player) => !confirmed.has(player.id))
+        .map((player) => player.id),
+    };
+  }
   if (
     state.combat?.requestedHelperId !== null &&
     state.combat?.requestedHelperId !== undefined
@@ -296,17 +373,41 @@ function unavailableCardReason(
   if (state.status === 'FINISHED') return 'GAME_FINISHED';
   if (state.pendingDecision !== null) return 'PENDING_DECISION';
 
-  if (definition.type === CardType.CURSE) return null;
+  if (definition.type === CardType.MONSTER) {
+    if (canLookForTrouble(state, viewerPlayerId, card.instanceId)) return null;
+    if (state.combat !== null) return 'COMBAT_ACTIVE';
+    if (state.activePlayerId !== viewerPlayerId) return 'WAITING_FOR_TURN';
+    return 'WRONG_PHASE';
+  }
+
+  if (definition.type === CardType.CURSE)
+    return state.combat?.reactionWindow === null || state.combat === null
+      ? null
+      : 'REACTION_WINDOW_ACTIVE';
+  if (definition.type === CardType.COMBAT_CURSE) {
+    const window = state.combat?.reactionWindow;
+    if (window === null || window === undefined) return 'NO_AVAILABLE_ACTION';
+    return window.confirmedPlayerIds.includes(viewerPlayerId)
+      ? 'REACTION_ALREADY_CONFIRMED'
+      : null;
+  }
   if (
     state.combat !== null &&
     (definition.type === CardType.TEMPORARY_BONUS ||
-      definition.type === CardType.MONSTER_MODIFIER)
+      definition.type === CardType.MONSTER_MODIFIER ||
+      definition.type === CardType.ADD_MONSTER ||
+      definition.type === CardType.CLONE_MONSTER)
   ) {
-    return null;
+    const window = state.combat.reactionWindow;
+    return window !== null && window.confirmedPlayerIds.includes(viewerPlayerId)
+      ? 'REACTION_ALREADY_CONFIRMED'
+      : null;
   }
   if (
     definition.type === CardType.TEMPORARY_BONUS ||
-    definition.type === CardType.MONSTER_MODIFIER
+    definition.type === CardType.MONSTER_MODIFIER ||
+    definition.type === CardType.ADD_MONSTER ||
+    definition.type === CardType.CLONE_MONSTER
   ) {
     return 'NO_ACTIVE_COMBAT';
   }
@@ -341,17 +442,48 @@ function availableActions(
   viewerPlayerId: PlayerId,
 ): GameView['availableActions'] {
   if (state.pendingDecision !== null) return [];
+  const reactionWindow = state.combat?.reactionWindow;
+  if (reactionWindow !== null && reactionWindow !== undefined) {
+    return reactionWindow.confirmedPlayerIds.includes(viewerPlayerId)
+      ? []
+      : ['PASS_COMBAT_REACTION'];
+  }
   if (state.combat?.requestedHelperId === viewerPlayerId)
     return ['ACCEPT_HELP'];
   if (state.activePlayerId !== viewerPlayerId) return [];
   if (state.combat !== null)
     return calculateCombatSidePower(state) > calculateMonsterPower(state)
-      ? ['RESOLVE_COMBAT']
+      ? ['DECLARE_COMBAT_VICTORY']
       : ['RUN_AWAY'];
   if (state.phase === GamePhase.TURN_START) return ['KICK_DOOR'];
-  if (state.phase === GamePhase.POST_DOOR) return ['LOOT_ROOM', 'END_TURN'];
-  if (state.phase === GamePhase.END_TURN) return ['END_TURN'];
+  const player = state.players.find(
+    (candidate) => candidate.id === viewerPlayerId,
+  );
+  if (player === undefined) return [];
+  if (state.phase === GamePhase.POST_DOOR) {
+    const actions: GameView['availableActions'][number][] = [];
+    if (
+      player.hand.some((card) =>
+        canLookForTrouble(state, viewerPlayerId, card.instanceId),
+      )
+    ) {
+      actions.push('LOOK_FOR_TROUBLE');
+    }
+    if (state.doorDeck.length + state.doorDiscard.length > 0) {
+      actions.push('LOOT_ROOM');
+    }
+    if (player.hand.length <= HAND_LIMIT) actions.push('END_TURN');
+    return actions;
+  }
+  if (state.phase === GamePhase.END_TURN)
+    return player.hand.length <= HAND_LIMIT ? ['END_TURN'] : [];
   return [];
+}
+
+function canPlayCombatCard(state: GameState, playerId: PlayerId): boolean {
+  if (state.combat === null || state.pendingDecision !== null) return false;
+  const window = state.combat.reactionWindow;
+  return window === null || !window.confirmedPlayerIds.includes(playerId);
 }
 
 export function createGameView(
@@ -403,21 +535,61 @@ export function createGameView(
         ? null
         : {
             playerId: state.combat.playerId,
-            monster: cardView(state, state.combat.monster),
+            revision: state.combat.revision,
+            monsters: state.combat.monsters.map((monster) => ({
+              encounterId: monster.encounterId,
+              monster: cardView(state, monster.monster),
+              sourceCard: cardView(state, monster.sourceCard),
+              clonedFromEncounterId: monster.clonedFromEncounterId,
+              baseStrength: monster.baseStrength,
+              strengthModifier: monster.strengthModifier,
+              currentStrength: calculateMonsterStrength(monster),
+              baseLevelRewards: monster.baseLevelRewards,
+              baseTreasureRewards: monster.baseTreasureRewards,
+              treasureModifier: monster.treasureModifier,
+              currentTreasures: calculateMonsterTreasures(monster),
+              playedCards: monster.playedCards.map((played) => ({
+                ...played,
+                card: cardView(state, played.card),
+              })),
+            })),
             playerPower: calculateCombatSidePower(state),
             monsterPower: calculateMonsterPower(state),
-            monsterBonus: state.combat.monsterBonus,
             requestedHelperId: state.combat.requestedHelperId,
             helperId: state.combat.helperId,
             helperContribution:
               state.combat.helperId === null
                 ? 0
                 : calculateCombatPower(state, state.combat.helperId),
+            reactionWindow:
+              state.combat.reactionWindow === null
+                ? null
+                : {
+                    windowId: state.combat.reactionWindow.windowId,
+                    claimantId: state.combat.reactionWindow.claimantId,
+                    confirmedPlayerIds:
+                      state.combat.reactionWindow.confirmedPlayerIds,
+                    waitingPlayerIds: state.players
+                      .filter(
+                        (player) =>
+                          !state.combat!.reactionWindow!.confirmedPlayerIds.includes(
+                            player.id,
+                          ),
+                      )
+                      .map((player) => player.id),
+                  },
             history: state.combat.history.map((entry) => {
               if (entry.type === 'COMBAT_STARTED') {
+                const monster = state.combat!.monsters.find(
+                  (candidate) => candidate.encounterId === entry.encounterId,
+                );
+                if (monster === undefined)
+                  throw new TypeError(
+                    `Combat history references missing encounter ${entry.encounterId}.`,
+                  );
                 return {
                   ...entry,
-                  monster: cardView(state, state.combat!.monster),
+                  monster: cardView(state, monster.monster),
                 };
               }
               if (entry.type === 'CARD_PLAYED') {
@@ -425,6 +597,51 @@ export function createGameView(
                   type: entry.type,
                   playerId: entry.playerId,
                   side: entry.side,
+                  card: cardView(state, {
+                    instanceId: entry.cardId,
+                    definitionId: entry.definitionId,
+                  }),
+                  ...(entry.encounterId === undefined
+                    ? {}
+                    : { encounterId: entry.encounterId }),
+                  ...(entry.targetPlayerId === undefined
+                    ? {}
+                    : { targetPlayerId: entry.targetPlayerId }),
+                };
+              }
+              if (entry.type === 'MONSTER_ADDED') {
+                const monster = state.combat!.monsters.find(
+                  (candidate) => candidate.encounterId === entry.encounterId,
+                );
+                if (monster === undefined)
+                  throw new TypeError(
+                    `Combat history references missing encounter ${entry.encounterId}.`,
+                  );
+                return {
+                  type: entry.type,
+                  playerId: entry.playerId,
+                  encounterId: entry.encounterId,
+                  monster: cardView(state, monster.monster),
+                  card: cardView(state, {
+                    instanceId: entry.cardId,
+                    definitionId: entry.definitionId,
+                  }),
+                };
+              }
+              if (entry.type === 'MONSTER_CLONED') {
+                const monster = state.combat!.monsters.find(
+                  (candidate) => candidate.encounterId === entry.encounterId,
+                );
+                if (monster === undefined)
+                  throw new TypeError(
+                    `Combat history references missing encounter ${entry.encounterId}.`,
+                  );
+                return {
+                  type: entry.type,
+                  playerId: entry.playerId,
+                  encounterId: entry.encounterId,
+                  sourceEncounterId: entry.sourceEncounterId,
+                  monster: cardView(state, monster.monster),
                   card: cardView(state, {
                     instanceId: entry.cardId,
                     definitionId: entry.definitionId,
@@ -439,13 +656,16 @@ export function createGameView(
         ? null
         : {
             playerId: state.lastRunAwayResult.playerId,
-            monster: cardView(state, {
-              instanceId: state.lastRunAwayResult.monsterCardId,
-              definitionId: state.lastRunAwayResult.monsterDefinitionId,
-            }),
-            roll: state.lastRunAwayResult.roll,
-            escaped: state.lastRunAwayResult.escaped,
-            badStuffApplied: state.lastRunAwayResult.badStuffApplied,
+            attempts: state.lastRunAwayResult.attempts.map((attempt) => ({
+              encounterId: attempt.encounterId,
+              monster: cardView(state, {
+                instanceId: attempt.monsterCardId,
+                definitionId: attempt.monsterDefinitionId,
+              }),
+              roll: attempt.roll,
+              escaped: attempt.escaped,
+              badStuffApplied: attempt.badStuffApplied,
+            })),
           },
     pendingDecision:
       state.pendingDecision === null
@@ -480,6 +700,11 @@ export function createGameView(
       treasure: state.treasureDeck.length,
     },
     availableActions: availableActions(state, viewerPlayerId),
+    lookForTroubleCardIds: self.hand
+      .filter((card) =>
+        canLookForTrouble(state, viewerPlayerId, card.instanceId),
+      )
+      .map((card) => card.instanceId),
     availableEquipmentActions: {
       equipCardIds: self.hand
         .filter((card) => canEquipItem(state, viewerPlayerId, card.instanceId))
@@ -493,37 +718,114 @@ export function createGameView(
     requestableHelperIds:
       state.pendingDecision === null &&
       state.combat?.playerId === viewerPlayerId &&
-      state.combat.helperId === null
+      state.combat.helperId === null &&
+      state.combat.reactionWindow === null
         ? state.players
             .filter((player) => player.id !== viewerPlayerId)
             .map((player) => player.id)
         : [],
     playableCombatCards: {
-      playersSideCardIds:
-        state.combat === null || state.pendingDecision !== null
-          ? []
-          : self.hand
+      playersSideCardIds: !canPlayCombatCard(state, viewerPlayerId)
+        ? []
+        : self.hand
+            .filter((card) => {
+              const definition = state.cardDefinitions.find(
+                (candidate) => candidate.id === card.definitionId,
+              );
+              return (
+                definition?.type === CardType.TEMPORARY_BONUS &&
+                definition.effects.length > 0 &&
+                definition.effects.every(
+                  (effect) => effect.type === 'COMBAT_BONUS',
+                )
+              );
+            })
+            .map((card) => card.instanceId),
+      monsterSideCardIds: !canPlayCombatCard(state, viewerPlayerId)
+        ? []
+        : self.hand
+            .filter((card) => {
+              const definition = state.cardDefinitions.find(
+                (definition) => definition.id === card.definitionId,
+              );
+              return (
+                (definition?.type === CardType.TEMPORARY_BONUS &&
+                  definition.effects.length > 0 &&
+                  definition.effects.every(
+                    (effect) => effect.type === 'MONSTER_COMBAT_BONUS',
+                  )) ||
+                definition?.type === CardType.MONSTER_MODIFIER ||
+                definition?.type === CardType.CLONE_MONSTER
+              );
+            })
+            .map((card) => card.instanceId),
+      monsterTargetActions: !canPlayCombatCard(state, viewerPlayerId)
+        ? []
+        : self.hand.flatMap((card) => {
+            const definition = state.cardDefinitions.find(
+              (candidate) => candidate.id === card.definitionId,
+            );
+            const targetable =
+              (definition?.type === CardType.TEMPORARY_BONUS &&
+                definition.effects.length > 0 &&
+                definition.effects.every(
+                  (effect) => effect.type === 'MONSTER_COMBAT_BONUS',
+                )) ||
+              definition?.type === CardType.MONSTER_MODIFIER ||
+              definition?.type === CardType.CLONE_MONSTER;
+            return targetable
+              ? [
+                  {
+                    cardId: card.instanceId,
+                    encounterIds: state.combat!.monsters.map(
+                      (monster) => monster.encounterId,
+                    ),
+                  },
+                ]
+              : [];
+          }),
+      addMonsterActions: !canPlayCombatCard(state, viewerPlayerId)
+        ? []
+        : self.hand.flatMap((card) => {
+            const definition = state.cardDefinitions.find(
+              (candidate) => candidate.id === card.definitionId,
+            );
+            if (definition?.type !== CardType.ADD_MONSTER) return [];
+            const monsterCardIds = self.hand
               .filter(
-                (card) =>
+                (candidate) =>
+                  candidate.instanceId !== card.instanceId &&
                   state.cardDefinitions.find(
-                    (definition) => definition.id === card.definitionId,
-                  )?.type === CardType.TEMPORARY_BONUS,
+                    (candidateDefinition) =>
+                      candidateDefinition.id === candidate.definitionId,
+                  )?.type === CardType.MONSTER,
               )
-              .map((card) => card.instanceId),
-      monsterSideCardIds:
-        state.combat === null || state.pendingDecision !== null
+              .map((candidate) => candidate.instanceId);
+            return monsterCardIds.length === 0
+              ? []
+              : [{ cardId: card.instanceId, monsterCardIds }];
+          }),
+      playerTargetActions:
+        !canPlayCombatCard(state, viewerPlayerId) ||
+        state.combat?.reactionWindow === null
           ? []
-          : self.hand
-              .filter((card) => {
-                const type = state.cardDefinitions.find(
-                  (definition) => definition.id === card.definitionId,
-                )?.type;
-                return (
-                  type === CardType.TEMPORARY_BONUS ||
-                  type === CardType.MONSTER_MODIFIER
-                );
-              })
-              .map((card) => card.instanceId),
+          : self.hand.flatMap((card) => {
+              const definition = state.cardDefinitions.find(
+                (candidate) => candidate.id === card.definitionId,
+              );
+              if (definition?.type !== CardType.COMBAT_CURSE) return [];
+              return [
+                {
+                  cardId: card.instanceId,
+                  playerIds: [
+                    state.combat!.playerId,
+                    ...(state.combat!.helperId === null
+                      ? []
+                      : [state.combat!.helperId]),
+                  ],
+                },
+              ];
+            }),
     },
     expandedRuleActions: {
       playableRoleCardIds: canChangeEquipment(state, viewerPlayerId)
@@ -537,7 +839,8 @@ export function createGameView(
             .map((card) => card.instanceId)
         : [],
       playableCurseCardIds:
-        state.pendingDecision === null
+        state.pendingDecision === null &&
+        (state.combat === null || state.combat.reactionWindow === null)
           ? self.hand
               .filter(
                 (card) =>

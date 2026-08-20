@@ -1271,6 +1271,13 @@ button.event-dismiss {
   gap: 0.75rem;
 }
 
+.combat-reaction-window {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid #b8944d;
+}
+
 .combat-heading .eyebrow {
   margin-bottom: 0.25rem;
 }
@@ -1337,6 +1344,15 @@ button.event-dismiss {
 }
 .monster-side .side-total {
   color: #ff9d96;
+}
+
+.monster-combatant {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(255, 157, 150, 0.28);
+  border-radius: 0.85rem;
+  background: rgba(255, 157, 150, 0.06);
 }
 
 .combat-cards {

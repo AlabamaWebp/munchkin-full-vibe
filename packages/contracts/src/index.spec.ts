@@ -36,6 +36,7 @@ describe("shared contracts", () => {
     const card: GameCardView = {
       instanceId: "potion-1",
       definitionId: "potion",
+      artKey: "test.potion",
       name: "Pocket Tonic",
       description: "A brief burst of courage.",
       type: "TEMPORARY_BONUS",
@@ -54,6 +55,7 @@ describe("shared contracts", () => {
     };
 
     expect(entry.card?.effects).toEqual([{ type: "COMBAT_BONUS", amount: 3 }]);
+    expect(entry.card?.artKey).toBe("test.potion");
     expect(entry).not.toHaveProperty("hand");
   });
 });

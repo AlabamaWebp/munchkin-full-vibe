@@ -78,9 +78,16 @@ function gameView(player: GamePlayerView, hand: readonly GameCardView[] = []): G
     expectedAction: { type: 'TAKE_TURN_ACTION', playerId: player.playerId },
     deckCounts: { door: 10, treasure: 10 },
     availableActions: ['KICK_DOOR'],
+    lookForTroubleCardIds: [],
     availableEquipmentActions: { equipCardIds: [], unequipCardIds: [] },
     requestableHelperIds: [],
-    playableCombatCards: { playersSideCardIds: [], monsterSideCardIds: [] },
+    playableCombatCards: {
+      playersSideCardIds: [],
+      monsterSideCardIds: [],
+      monsterTargetActions: [],
+      addMonsterActions: [],
+      playerTargetActions: [],
+    },
     expandedRuleActions: {
       playableRoleCardIds: [],
       playableCurseCardIds: [],
@@ -225,12 +232,20 @@ describe('App', () => {
     const card = {
       instanceId: 'sword-1',
       definitionId: 'sword',
+      artKey: 'test.sword',
       name: 'Sword',
       description: 'A useful sword.',
       type: 'EQUIPMENT' as const,
       deck: 'TREASURE' as const,
+      goldValue: 1000,
       effects: [{ type: 'COMBAT_BONUS' as const, amount: 2 }],
-      equipment: { slot: 'HANDS' as const, hands: 1 as const, combatBonus: 2, value: 1000 },
+      equipment: {
+        slot: 'HANDS' as const,
+        hands: 1 as const,
+        combatBonus: 2,
+        restrictions: [],
+        value: 1000,
+      },
     };
     const player = {
       playerId: 'player-1',
@@ -280,9 +295,16 @@ describe('App', () => {
       deckCounts: { door: 10, treasure: 10 },
       expectedAction: { type: 'TAKE_TURN_ACTION', playerId: 'player-1' },
       availableActions: ['KICK_DOOR'],
+      lookForTroubleCardIds: [],
       availableEquipmentActions: { equipCardIds: ['sword-1'], unequipCardIds: [] },
       requestableHelperIds: [],
-      playableCombatCards: { playersSideCardIds: [], monsterSideCardIds: [] },
+      playableCombatCards: {
+        playersSideCardIds: [],
+        monsterSideCardIds: [],
+        monsterTargetActions: [],
+        addMonsterActions: [],
+        playerTargetActions: [],
+      },
       expandedRuleActions: {
         playableRoleCardIds: [],
         playableCurseCardIds: [],
@@ -348,6 +370,7 @@ describe('App', () => {
     const card: GameCardView = {
       instanceId: 'potion-1',
       definitionId: 'potion',
+      artKey: 'test.potion',
       name: 'Potion',
       description: 'A visible boost.',
       type: 'TEMPORARY_BONUS',
@@ -396,12 +419,19 @@ describe('App', () => {
     const greatSword: GameCardView = {
       instanceId: 'great-sword-1',
       definitionId: 'great-sword',
+      artKey: 'test.great-sword',
       name: 'Great Sword',
       description: 'It needs both hands.',
       type: 'EQUIPMENT',
       deck: 'TREASURE',
       effects: [{ type: 'COMBAT_BONUS', amount: 4 }],
-      equipment: { slot: 'HANDS', hands: 2, combatBonus: 4, value: 800 },
+      equipment: {
+        slot: 'HANDS',
+        hands: 2,
+        combatBonus: 4,
+        restrictions: [],
+        value: 800,
+      },
     };
     const player = playerView({ equipment: [greatSword], equipmentCombatBonus: 4, combatPower: 5 });
     lobbyClient.showGame(gameView(player));
@@ -424,6 +454,7 @@ describe('App', () => {
     const card: GameCardView = {
       instanceId: 'potion-1',
       definitionId: 'potion',
+      artKey: 'test.potion',
       name: 'Potion',
       description: 'A combat-only boost.',
       type: 'TEMPORARY_BONUS',
@@ -452,12 +483,19 @@ describe('App', () => {
     const item: GameCardView = {
       instanceId: 'helmet-1',
       definitionId: 'helmet',
+      artKey: 'test.helmet',
       name: 'Helmet',
       description: 'A sturdy helmet.',
       type: 'EQUIPMENT',
       deck: 'TREASURE',
       effects: [{ type: 'COMBAT_BONUS', amount: 1 }],
-      equipment: { slot: 'HEAD', combatBonus: 1, value: 400 },
+      equipment: {
+        slot: 'HEAD',
+        hands: 0,
+        combatBonus: 1,
+        restrictions: [],
+        value: 400,
+      },
     };
     const active = playerView({ playerId: 'player-1', name: 'Ada' });
     const viewer = playerView({ playerId: 'player-2', name: 'Grace', handCount: 1 });
@@ -501,6 +539,7 @@ describe('App', () => {
     const curse: GameCardView = {
       instanceId: 'curse-1',
       definitionId: 'curse',
+      artKey: 'test.curse',
       name: 'Foggy Boots',
       description: 'A target loses one level.',
       type: 'CURSE',
@@ -544,6 +583,54 @@ describe('App', () => {
       type: 'PLAY_CURSE',
       cardId: 'curse-1',
       targetPlayerId: 'player-2',
+    });
+  });
+
+  it('chooses exactly one hand Monster before sending LOOK_FOR_TROUBLE', async () => {
+    const monster: GameCardView = {
+      instanceId: 'trouble-monster-1',
+      definitionId: 'trouble-monster',
+      artKey: 'test.trouble-monster',
+      name: 'Trouble Monster',
+      description: 'Waiting in the adventurer hand.',
+      type: 'MONSTER',
+      deck: 'DOOR',
+      effects: [],
+      monster: { level: 3, levelRewards: 1, treasureRewards: 1, badStuff: [] },
+    };
+    const self = playerView({ handCount: 1 });
+    lobbyClient.showGame({
+      ...gameView(self, [monster]),
+      phase: 'POST_DOOR',
+      availableActions: ['LOOK_FOR_TROUBLE', 'LOOT_ROOM', 'END_TURN'],
+      lookForTroubleCardIds: [monster.instanceId],
+    });
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const action = Array.from(
+      compiled.querySelectorAll<HTMLButtonElement>('.action-bar button'),
+    ).find((button) => button.textContent?.trim() === 'Искать неприятности');
+
+    action?.click();
+    await fixture.whenStable();
+    expect(compiled.querySelector('[role="dialog"]')?.textContent).toContain(
+      'Выберите ровно одного монстра с руки',
+    );
+    expect(lobbyClient.sendGameCommand).not.toHaveBeenCalled();
+
+    compiled.querySelector<HTMLButtonElement>('.selection-list button')?.click();
+    await fixture.whenStable();
+    const confirm = Array.from(compiled.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Сразиться с выбранным монстром',
+    );
+    expect(confirm?.disabled).toBe(false);
+    confirm?.click();
+
+    expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({
+      type: 'LOOK_FOR_TROUBLE',
+      cardId: monster.instanceId,
     });
   });
 
@@ -594,9 +681,16 @@ describe('App', () => {
       deckCounts: { door: 5, treasure: 5 },
       expectedAction: { type: 'TAKE_TURN_ACTION', playerId: 'player-1' },
       availableActions: [],
+      lookForTroubleCardIds: [],
       availableEquipmentActions: { equipCardIds: [], unequipCardIds: [] },
       requestableHelperIds: [],
-      playableCombatCards: { playersSideCardIds: [], monsterSideCardIds: [] },
+      playableCombatCards: {
+        playersSideCardIds: [],
+        monsterSideCardIds: [],
+        monsterTargetActions: [],
+        addMonsterActions: [],
+        playerTargetActions: [],
+      },
       expandedRuleActions: {
         playableRoleCardIds: [],
         playableCurseCardIds: [],
@@ -627,6 +721,7 @@ describe('App', () => {
     const bonus = {
       instanceId: 'potion-1',
       definitionId: 'potion',
+      artKey: 'test.potion',
       name: 'Potion',
       description: 'A quick boost.',
       type: 'TEMPORARY_BONUS' as const,
@@ -636,6 +731,7 @@ describe('App', () => {
     const monster = {
       instanceId: 'monster-1',
       definitionId: 'monster',
+      artKey: 'test.monster',
       name: 'Monster',
       description: 'A test monster.',
       type: 'MONSTER' as const,
@@ -681,26 +777,69 @@ describe('App', () => {
       self: { ...player, hand: [bonus] },
       combat: {
         playerId: 'player-1',
-        monster,
+        revision: 3,
+        monsters: [
+          {
+            encounterId: 'encounter-1',
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: null,
+            baseStrength: 3,
+            strengthModifier: 0,
+            currentStrength: 3,
+            baseLevelRewards: 1,
+            baseTreasureRewards: 2,
+            treasureModifier: 0,
+            currentTreasures: 2,
+            playedCards: [],
+          },
+          {
+            encounterId: 'encounter-2',
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: 'encounter-1',
+            baseStrength: 3,
+            strengthModifier: 0,
+            currentStrength: 3,
+            baseLevelRewards: 1,
+            baseTreasureRewards: 2,
+            treasureModifier: 0,
+            currentTreasures: 2,
+            playedCards: [],
+          },
+        ],
         playerPower: 4,
-        monsterPower: 3,
-        monsterBonus: 0,
+        monsterPower: 6,
         requestedHelperId: null,
         helperId: null,
         helperContribution: 0,
-        history: [{ type: 'COMBAT_STARTED', playerId: 'player-1', monster }],
+        reactionWindow: null,
+        history: [
+          {
+            type: 'COMBAT_STARTED',
+            playerId: 'player-1',
+            encounterId: 'encounter-1',
+            monster,
+          },
+        ],
       },
       lastRunAwayResult: null,
       pendingDecision: null,
       gameLog: [],
       deckCounts: { door: 10, treasure: 10 },
       expectedAction: { type: 'COMBAT_DECISION', playerId: 'player-1' },
-      availableActions: ['RESOLVE_COMBAT'],
+      availableActions: ['DECLARE_COMBAT_VICTORY'],
+      lookForTroubleCardIds: [],
       availableEquipmentActions: { equipCardIds: [], unequipCardIds: [] },
       requestableHelperIds: ['player-2'],
       playableCombatCards: {
         playersSideCardIds: ['potion-1'],
         monsterSideCardIds: ['potion-1'],
+        monsterTargetActions: [
+          { cardId: 'potion-1', encounterIds: ['encounter-1', 'encounter-2'] },
+        ],
+        addMonsterActions: [],
+        playerTargetActions: [],
       },
       expandedRuleActions: {
         playableRoleCardIds: [],
@@ -718,13 +857,14 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     expect(compiled.querySelector('.player-side')?.textContent).toContain('Итого 4');
-    expect(compiled.querySelector('.monster-side')?.textContent).toContain('Итого 3');
+    expect(compiled.querySelector('.monster-side')?.textContent).toContain('Итого 6');
+    expect(compiled.querySelectorAll('.monster-combatant')).toHaveLength(2);
     expect(compiled.textContent).toContain('История боя');
     const helpButton = Array.from(compiled.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Позвать на помощь: Grace'),
     );
     helpButton?.click();
-    compiled.querySelectorAll<HTMLButtonElement>('app-game-card button')[1]?.click();
+    compiled.querySelector<HTMLButtonElement>('.hand app-game-card button')?.click();
     await fixture.whenStable();
     const playButton = Array.from(compiled.querySelectorAll('button')).find(
       (button) => button.textContent?.trim() === 'Сыграть за приключенцев',
@@ -748,12 +888,122 @@ describe('App', () => {
     expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({
       type: 'PLAY_CARD',
       cardId: 'potion-1',
-      targetSide: 'PLAYERS',
+      target: { type: 'PLAYERS' },
     });
-    expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({ type: 'RESOLVE_COMBAT' });
+    expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({
+      type: 'DECLARE_COMBAT_VICTORY',
+      combatRevision: 3,
+    });
     expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({
       type: 'REQUEST_HELP',
       helperId: 'player-2',
+    });
+  });
+
+  it('shows reconnect-safe reaction status and dispatches the versioned pass', async () => {
+    const monster: GameCardView = {
+      instanceId: 'reaction-monster-1',
+      definitionId: 'reaction-monster',
+      artKey: 'test.reaction-monster',
+      name: 'Reaction Monster',
+      description: 'Waits for every response.',
+      type: 'MONSTER',
+      deck: 'DOOR',
+      effects: [],
+      monster: { level: 3, levelRewards: 1, treasureRewards: 0, badStuff: [] },
+    };
+    const combatCurse: GameCardView = {
+      instanceId: 'combat-curse-1',
+      definitionId: 'combat-curse',
+      artKey: 'test.combat-curse',
+      name: 'Combat Curse',
+      description: 'Reduces a combat participant power.',
+      type: 'COMBAT_CURSE',
+      deck: 'DOOR',
+      effects: [{ type: 'COMBAT_BONUS', amount: -3 }],
+    };
+    const claimant = playerView({
+      playerId: 'player-1',
+      name: 'Ada',
+      level: 6,
+      combatPower: 6,
+    });
+    const viewer = playerView({
+      playerId: 'player-2',
+      name: 'Grace',
+      handCount: 1,
+    });
+    const offline = playerView({ playerId: 'player-3', name: 'Lin' });
+    lobbyClient.showGame({
+      ...gameView(viewer, [combatCurse]),
+      phase: 'DOOR_RESOLUTION',
+      activePlayerId: claimant.playerId,
+      players: [claimant, viewer, offline],
+      combat: {
+        playerId: claimant.playerId,
+        revision: 4,
+        monsters: [
+          {
+            encounterId: 'encounter-1',
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: null,
+            baseStrength: 3,
+            strengthModifier: 0,
+            currentStrength: 3,
+            baseLevelRewards: 1,
+            baseTreasureRewards: 0,
+            treasureModifier: 0,
+            currentTreasures: 0,
+            playedCards: [],
+          },
+        ],
+        playerPower: 6,
+        monsterPower: 3,
+        requestedHelperId: null,
+        helperId: null,
+        helperContribution: 0,
+        reactionWindow: {
+          windowId: 7,
+          claimantId: claimant.playerId,
+          confirmedPlayerIds: [claimant.playerId],
+          waitingPlayerIds: [viewer.playerId, offline.playerId],
+        },
+        history: [],
+      },
+      expectedAction: {
+        type: 'COMBAT_REACTIONS',
+        playerId: claimant.playerId,
+        waitingPlayerIds: [viewer.playerId, offline.playerId],
+      },
+      availableActions: ['PASS_COMBAT_REACTION'],
+      playableCombatCards: {
+        playersSideCardIds: [],
+        monsterSideCardIds: [],
+        monsterTargetActions: [],
+        addMonsterActions: [],
+        playerTargetActions: [{ cardId: combatCurse.instanceId, playerIds: [claimant.playerId] }],
+      },
+    });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const reaction = compiled.querySelector('.combat-reaction-window');
+    expect(reaction?.textContent).toContain('Победа заявлена');
+    expect(reaction?.textContent).toContain('Ada');
+    expect(reaction?.textContent).toContain('Grace');
+    expect(reaction?.textContent).toContain('Lin');
+    expect(reaction?.textContent).toContain('Combat Curse');
+
+    const pass = Array.from(
+      compiled.querySelectorAll<HTMLButtonElement>('.action-bar button'),
+    ).find((button) => button.textContent?.trim() === 'Не вмешиваюсь');
+    pass?.click();
+    expect(lobbyClient.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PASS_COMBAT_REACTION',
+      reactionWindowId: 7,
     });
   });
 
@@ -761,6 +1011,7 @@ describe('App', () => {
     const monster = {
       instanceId: 'monster-1',
       definitionId: 'monster',
+      artKey: 'test.monster',
       name: 'Monster',
       description: 'A test monster.',
       type: 'MONSTER' as const,
@@ -799,19 +1050,31 @@ describe('App', () => {
       combat: null,
       lastRunAwayResult: {
         playerId: 'player-1',
-        monster,
-        roll: 2,
-        escaped: false,
-        badStuffApplied: true,
+        attempts: [
+          {
+            encounterId: 'encounter-1',
+            monster,
+            roll: 2,
+            escaped: false,
+            badStuffApplied: true,
+          },
+        ],
       },
       pendingDecision: null,
       gameLog: [],
       deckCounts: { door: 10, treasure: 10 },
       expectedAction: { type: 'TAKE_TURN_ACTION', playerId: 'player-1' },
       availableActions: ['END_TURN'],
+      lookForTroubleCardIds: [],
       availableEquipmentActions: { equipCardIds: [], unequipCardIds: [] },
       requestableHelperIds: [],
-      playableCombatCards: { playersSideCardIds: [], monsterSideCardIds: [] },
+      playableCombatCards: {
+        playersSideCardIds: [],
+        monsterSideCardIds: [],
+        monsterTargetActions: [],
+        addMonsterActions: [],
+        playerTargetActions: [],
+      },
       expandedRuleActions: {
         playableRoleCardIds: [],
         playableCurseCardIds: [],

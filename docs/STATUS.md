@@ -3,10 +3,93 @@
 Current milestone:
 
 ```text
-Milestone 12.1 — Game process visibility (complete)
+Milestone 12.3 — Complete original card catalog metadata (complete)
 ```
 
 ## Implemented
+
+- replaced all behaviorless production `OTHER` cards with original functional
+  content and expanded the set to 20 unique Door and 22 unique Treasure
+  definitions (56 Door and 66 Treasure physical cards for 3–6 players);
+- added eight varied Monsters, six ordinary and one combat Curse, two Classes,
+  two Races, ten equipment items, one-shot bonuses for both combat sides,
+  Monster strength/reward modifiers, weakening, adding, and cloning;
+- added a stable unique `artKey` to every production definition, explicit
+  `goldValue` to every Treasure, and typed play timing/target metadata for action
+  cards, all passed through player-specific `GameCardView` projections;
+- moved production equipment power and value to explicit typed metadata: slot,
+  occupied hands, combat bonus, gold value, and an explicit Class/Race
+  restrictions list; sales and combat power remain engine-derived;
+- completed original English source copy and Russian localization for every
+  catalog definition without changing the card-face layout;
+- added catalog completeness coverage for definition/art-key uniqueness, minimum
+  definition and copy counts, absence of fillers, empty-effect policy, Treasure
+  values, action policies, equipment fields, and complete RU translations;
+
+- direct `RESOLVE_COMBAT` removal in favor of a versioned
+  `DECLARE_COMBAT_VICTORY` / `PASS_COMBAT_REACTION` protocol, with immediate
+  single-player resolution and atomic final-confirmation power/reward checks;
+- a JSON-serializable, reconnect-safe combat reaction window containing the
+  claimant, combat revision, monotonic window id, confirmed permanent player ids,
+  and derived waiting list; disconnected players remain awaited;
+- exact-window stale/duplicate command rejection, confirmed-player intervention
+  blocking, full confirmation reset after every intervention, and automatic claim
+  cancellation when the player side loses its strict lead;
+- reaction-window command gating plus typed combat Curse, add-Monster, clone,
+  selected-Monster strengthen/weaken, player-side bonus, and selected-Monster-side
+  bonus reactions, without client-submitted power or card-name rules;
+- original Combat Curse! Tangled Bootlaces, Heroic Snack Break, and Ominous Stage
+  Light development cards, including typed side restrictions and RU localization;
+- player-specific reaction projection and a mobile RU/EN panel showing confirmed
+  and awaited players, disconnected waiters, available reaction cards, pass state,
+  and versioned UI commands;
+- focused engine coverage for multiplayer waiting, reconnect-safe serialization,
+  final-pass resolution, solo resolution, command blocking, confirmed-player
+  locking, reset/cancel behavior, every allowed typed reaction, invalid targets,
+  and stale/duplicate races; plus server projection/validation and Angular UI
+  coverage;
+
+- schema version 4 multi-Monster combat with stable branded `encounterId`
+  values, ordered participants, stored base parameters, independent strength and
+  Treasure modifiers, and public per-Monster played-card attachments;
+- total Monster-side power plus atomic summed level/Treasure rewards, including
+  the strength floor of one, Treasure floor of zero, and unique physical-card
+  cleanup for all participating Monsters, add/clone cards, and modifiers;
+- original typed add-Monster and clone-Monster cards: adding consumes a selected
+  owned hand Monster, while cloning creates an independent snapshot containing
+  every modifier and reward change already applied to its target;
+- encounter-addressed typed Monster modifiers, including a +5 strength/+2
+  Treasure booster and a -5 strength/-1 Treasure weakening, with no card-name
+  rules or client-submitted calculations;
+- sequential per-Monster run-away rolls and bad stuff, with serializable progress,
+  ordered public attempt events, reconnect-safe chosen-card pending decisions,
+  and automatic continuation at the next Monster;
+- updated transport contracts, authoritative event/history projection,
+  player-specific `GameView`, RU/EN labels, target selection, multi-Monster combat
+  board, per-Monster modifiers/rewards/bad stuff, and ordered escape results;
+- focused engine coverage for valid and invalid encounter targets, adding,
+  cloning and snapshot independence, reward sums, lower bounds, physical cleanup,
+  multiple Monsters, sequential escape, and reconnect continuation;
+
+- authoritative `LOOK_FOR_TROUBLE` in `POST_DOOR`, requiring exactly one owned
+  Monster from the active player's hand, publishing that Monster, removing it
+  from the private hand, and starting the normal combat lifecycle;
+- server-projected `LOOK_FOR_TROUBLE` availability and exact eligible Monster
+  ids, a localized RU/EN one-Monster selection dialog, public game-history/card
+  presentation, and generic Socket.IO command routing without client-calculated
+  combat state;
+- one atomic Door/Treasure draw mechanism that consumes the current pile first,
+  deterministically shuffles the matching discard through `RandomSource` only
+  when needed, and continues across the pile boundary;
+- cyclic draws applied to kicking the Door, room loot, typed draw effects, combat
+  Treasure rewards, and exact four-Door/four-Treasure revival, with no partial
+  state change when the combined matching pile is too short;
+- a public identity-free `DECK_RESHUFFLED` event, projected into synchronized
+  game history with localized RU/EN text;
+- deterministic engine, projection, transport-validation, and Angular coverage
+  for ordinary draws, boundary recycling, empty discard, independent Door and
+  Treasure recycling, revival atomicity, and valid/invalid
+  `LOOK_FOR_TROUBLE` actions;
 
 - targeted combat-help requests that name the selected player and can only be
   accepted by that player;
@@ -107,8 +190,8 @@ Milestone 12.1 — Game process visibility (complete)
 - combat-card play by every participant through the existing generic command,
   with explicit player/Monster target sides and no client-provided power;
 - typed, data-driven `MONSTER_MODIFIER` cards and
-  `MONSTER_COMBAT_BONUS` effects, including two localized fictional development
-  cards, Monster-side validation, discard handling, and power projection;
+  Monster-modification effects, including localized fictional development
+  cards, encounter-target validation, cleanup, and power projection;
 - serializable public per-combat history for the encounter, help requests and
   acceptance, and cards played on either side, preserved across full-state
   synchronization and reconnects while the combat is active;
@@ -197,18 +280,20 @@ the browser supports the Fullscreen API. It tracks browser-driven fullscreen
 changes, including exiting with Escape, and remains available in the lobby and
 during play.
 
-Verified on 2026-08-20 after the current gameplay and UI corrections:
+Verified on 2026-08-20 after the complete-card-catalog extension:
 
-- `npm test` — succeeded; 18 test files and 111 tests passed across all workspaces;
+- `npm test` — succeeded; 22 test files/suites and 152 tests passed across all
+  workspaces;
 - `npm run test:e2e --workspace @munchkin-lan/server -- --runInBand` — succeeded;
   2 suites and 3 HTTP/Socket.IO end-to-end tests passed;
 - `npm run lint` — succeeded across all four workspaces with 0 errors;
 - `npm run build` — succeeded for shared packages, Angular, and NestJS;
 - `npm run format:check` — succeeded across the repository.
-- the live development application was inspected in the in-app browser at 360,
-  390, and 412 px, including public events, reconnect/reload acknowledgement,
-  card and character bottom sheets, combat-card confirmation, retained combat
-  cards, keyboard Escape, focus, and horizontal-overflow checks.
+
+The earlier Milestone 12.1 live inspection covered 360, 390, and 412 px layouts,
+public events, reconnect/reload acknowledgement, bottom sheets, keyboard Escape,
+focus, and horizontal overflow. The new selection flow is covered by the Angular
+component tests and production build listed above.
 
 ## Intentional scope limits
 
@@ -216,8 +301,8 @@ Verified on 2026-08-20 after the current gameplay and UI corrections:
   restarts, as required for the initial LAN version.
 - Helper reward negotiation is intentionally deferred; all current combat
   rewards go to the active player.
-- Helpers do not yet make separate escape rolls or receive bad stuff; Milestone
-  10 intentionally uses one active-player escape resolution for the combat.
+- Helpers do not make escape rolls or receive bad stuff. The active player makes
+  one sequential escape attempt for each Monster encounter.
 - NestJS does not yet serve the Angular production files; development still uses
   Angular on port 4200 and NestJS on port 3000. The one-origin LAN package remains
   Milestone 13 work.

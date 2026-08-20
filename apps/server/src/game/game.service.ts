@@ -10,6 +10,7 @@ import {
   createSeededRandomSource,
   executeCommand,
   parseCardInstanceId,
+  parseEncounterId,
   parseGameId,
   parsePlayerId,
   type GameCommand,
@@ -121,7 +122,9 @@ export class GameService {
     if (
       (command.type === 'EQUIP_ITEM' ||
         command.type === 'UNEQUIP_ITEM' ||
+        command.type === 'LOOK_FOR_TROUBLE' ||
         command.type === 'PLAY_CARD' ||
+        command.type === 'PLAY_COMBAT_CURSE' ||
         command.type === 'PLAY_ROLE' ||
         command.type === 'PLAY_CURSE' ||
         command.type === 'TRADE_ITEM') &&
@@ -136,7 +139,8 @@ export class GameService {
       };
     }
     if (
-      (command.type === 'PLAY_CURSE' &&
+      ((command.type === 'PLAY_CURSE' ||
+        command.type === 'PLAY_COMBAT_CURSE') &&
         (typeof command.targetPlayerId !== 'string' ||
           command.targetPlayerId.trim().length === 0)) ||
       (command.type === 'TRADE_ITEM' &&
@@ -181,15 +185,83 @@ export class GameService {
         },
       };
     }
+    if (command.type === 'PLAY_CARD') {
+      const target = command.target;
+      const validTarget =
+        target?.type === 'PLAYERS' ||
+        (target?.type === 'MONSTER' &&
+          typeof target.encounterId === 'string' &&
+          target.encounterId.trim().length > 0) ||
+        (target?.type === 'HAND_MONSTER' &&
+          typeof target.monsterCardId === 'string' &&
+          target.monsterCardId.trim().length > 0);
+      if (!validTarget) {
+        return {
+          success: false,
+          error: {
+            code: 'INVALID_TARGET',
+            message: 'A valid typed combat target is required.',
+          },
+        };
+      }
+    }
+    if (
+      command.type === 'DECLARE_COMBAT_VICTORY' &&
+      (!Number.isSafeInteger(command.combatRevision) ||
+        command.combatRevision < 1)
+    ) {
+      return {
+        success: false,
+        error: {
+          code: 'STALE_COMBAT_STATE',
+          message: 'A valid combat revision is required.',
+        },
+      };
+    }
+    if (
+      (command.type === 'PASS_COMBAT_REACTION' &&
+        (!Number.isSafeInteger(command.reactionWindowId) ||
+          command.reactionWindowId < 1)) ||
+      (command.type === 'PLAY_COMBAT_CURSE' &&
+        (!Number.isSafeInteger(command.reactionWindowId) ||
+          command.reactionWindowId < 1)) ||
+      (command.type === 'PLAY_CARD' &&
+        command.reactionWindowId !== undefined &&
+        (!Number.isSafeInteger(command.reactionWindowId) ||
+          command.reactionWindowId < 1))
+    ) {
+      return {
+        success: false,
+        error: {
+          code: 'STALE_COMBAT_REACTION',
+          message: 'A valid combat reaction window is required.',
+        },
+      };
+    }
     const domainCommand: GameCommand =
       command.type === 'PLAY_CARD'
         ? {
             type: command.type,
             actorId,
             cardId: parseCardInstanceId(command.cardId),
-            target: { type: 'COMBAT', side: command.targetSide },
+            target:
+              command.target.type === 'PLAYERS'
+                ? { type: 'COMBAT', side: 'PLAYERS' }
+                : command.target.type === 'MONSTER'
+                  ? {
+                      type: 'COMBAT',
+                      side: 'MONSTER',
+                      encounterId: parseEncounterId(command.target.encounterId),
+                    }
+                  : {
+                      type: 'HAND_MONSTER',
+                      cardId: parseCardInstanceId(command.target.monsterCardId),
+                    },
+            ...(command.reactionWindowId === undefined
+              ? {}
+              : { reactionWindowId: command.reactionWindowId }),
           }
-        : command.type === 'PLAY_CURSE'
+        : command.type === 'PLAY_COMBAT_CURSE'
           ? {
               type: 'PLAY_CARD',
               actorId,
@@ -198,53 +270,82 @@ export class GameService {
                 type: 'PLAYER',
                 playerId: parsePlayerId(command.targetPlayerId),
               },
+              reactionWindowId: command.reactionWindowId,
             }
-          : command.type === 'REQUEST_HELP'
+          : command.type === 'PLAY_CURSE'
             ? {
-                type: command.type,
+                type: 'PLAY_CARD',
                 actorId,
-                helperId: parsePlayerId(command.helperId),
+                cardId: parseCardInstanceId(command.cardId),
+                target: {
+                  type: 'PLAYER',
+                  playerId: parsePlayerId(command.targetPlayerId),
+                },
               }
-            : command.type === 'EQUIP_ITEM' ||
-                command.type === 'UNEQUIP_ITEM' ||
-                command.type === 'PLAY_ROLE'
+            : command.type === 'REQUEST_HELP'
               ? {
                   type: command.type,
                   actorId,
-                  cardId: parseCardInstanceId(command.cardId),
+                  helperId: parsePlayerId(command.helperId),
                 }
-              : command.type === 'SELL_ITEMS'
+              : command.type === 'LOOK_FOR_TROUBLE'
                 ? {
                     type: command.type,
                     actorId,
-                    cardIds: command.cardIds.map(parseCardInstanceId),
+                    cardId: parseCardInstanceId(command.cardId),
                   }
-                : command.type === 'RESOLVE_CARD_DISCARD'
+                : command.type === 'EQUIP_ITEM' ||
+                    command.type === 'UNEQUIP_ITEM' ||
+                    command.type === 'PLAY_ROLE'
                   ? {
                       type: command.type,
                       actorId,
-                      cardIds: command.cardIds.map(parseCardInstanceId),
+                      cardId: parseCardInstanceId(command.cardId),
                     }
-                  : command.type === 'TRADE_ITEM'
+                  : command.type === 'SELL_ITEMS'
                     ? {
                         type: command.type,
                         actorId,
-                        cardId: parseCardInstanceId(command.cardId),
-                        recipientId: parsePlayerId(command.recipientId),
+                        cardIds: command.cardIds.map(parseCardInstanceId),
                       }
-                    : command.type === 'GIVE_CHARITY'
+                    : command.type === 'RESOLVE_CARD_DISCARD'
                       ? {
                           type: command.type,
                           actorId,
                           cardIds: command.cardIds.map(parseCardInstanceId),
-                          recipientId:
-                            command.recipientId === null
-                              ? null
-                              : parsePlayerId(command.recipientId),
                         }
-                      : command.type === 'GIVE_RANDOM_CHARITY'
-                        ? { type: command.type, actorId }
-                        : { type: command.type, actorId };
+                      : command.type === 'TRADE_ITEM'
+                        ? {
+                            type: command.type,
+                            actorId,
+                            cardId: parseCardInstanceId(command.cardId),
+                            recipientId: parsePlayerId(command.recipientId),
+                          }
+                        : command.type === 'GIVE_CHARITY'
+                          ? {
+                              type: command.type,
+                              actorId,
+                              cardIds: command.cardIds.map(parseCardInstanceId),
+                              recipientId:
+                                command.recipientId === null
+                                  ? null
+                                  : parsePlayerId(command.recipientId),
+                            }
+                          : command.type === 'GIVE_RANDOM_CHARITY'
+                            ? { type: command.type, actorId }
+                            : command.type === 'DECLARE_COMBAT_VICTORY'
+                              ? {
+                                  type: command.type,
+                                  actorId,
+                                  combatRevision: command.combatRevision,
+                                }
+                              : command.type === 'PASS_COMBAT_REACTION'
+                                ? {
+                                    type: command.type,
+                                    actorId,
+                                    reactionWindowId: command.reactionWindowId,
+                                  }
+                                : { type: command.type, actorId };
     const result = executeCommand(state, domainCommand, {
       random: createSeededRandomSource(randomInt(0x1_0000_0000)),
     });

@@ -48,7 +48,7 @@ export class App {
   protected readonly publicCardEvents = signal<readonly GameLogEntryView[]>([]);
   protected readonly feedbackEvents = signal<readonly GameLogEntryView[]>([]);
   protected readonly targeting = signal<{
-    readonly kind: 'CURSE' | 'TRADE';
+    readonly kind: 'CURSE' | 'COMBAT_CURSE' | 'TRADE';
     readonly card: GameCardView;
     readonly eligiblePlayerIds: readonly string[];
   } | null>(null);
@@ -57,9 +57,16 @@ export class App {
     readonly card: GameCardView;
     readonly targetLabel: string;
   } | null>(null);
+  protected readonly combatCardTargeting = signal<{
+    readonly card: GameCardView;
+    readonly type: 'MONSTER' | 'HAND_MONSTER';
+    readonly targetIds: readonly string[];
+  } | null>(null);
   protected readonly historyOpen = signal(false);
   protected readonly saleOpen = signal(false);
   protected readonly saleCardIds = signal<readonly string[]>([]);
+  protected readonly lookForTroubleOpen = signal(false);
+  protected readonly lookForTroubleCardId = signal<string | null>(null);
   protected readonly discardCardIds = signal<readonly string[]>([]);
   protected readonly isFullscreen = signal(document.fullscreenElement !== null);
   protected readonly fullscreenSupported =
@@ -104,6 +111,7 @@ export class App {
 
   protected rematch(): void {
     this.closeCardDetails();
+    this.closeLookForTrouble();
     this.selectedPlayerId.set(null);
     this.historyOpen.set(false);
     this.lobbyClient.rematch();
@@ -111,13 +119,54 @@ export class App {
 
   protected returnToLobby(): void {
     this.closeCardDetails();
+    this.closeLookForTrouble();
     this.selectedPlayerId.set(null);
     this.historyOpen.set(false);
     this.lobbyClient.returnToLobby();
   }
 
-  protected sendAction(action: AvailableGameAction): void {
+  protected sendAction(game: GameView, action: AvailableGameAction): void {
+    if (action === 'LOOK_FOR_TROUBLE') {
+      this.openLookForTrouble();
+      return;
+    }
+    if (action === 'DECLARE_COMBAT_VICTORY') {
+      if (game.combat === null) return;
+      this.lobbyClient.sendGameCommand({
+        type: action,
+        combatRevision: game.combat.revision,
+      });
+      return;
+    }
+    if (action === 'PASS_COMBAT_REACTION') {
+      const reactionWindowId = game.combat?.reactionWindow?.windowId;
+      if (reactionWindowId === undefined) return;
+      this.lobbyClient.sendGameCommand({ type: action, reactionWindowId });
+      return;
+    }
     this.lobbyClient.sendGameCommand({ type: action });
+  }
+
+  protected openLookForTrouble(): void {
+    this.lookForTroubleCardId.set(null);
+    this.lookForTroubleOpen.set(true);
+  }
+
+  protected closeLookForTrouble(): void {
+    this.lookForTroubleCardId.set(null);
+    this.lookForTroubleOpen.set(false);
+  }
+
+  protected lookForTroubleCards(game: GameView): readonly GameCardView[] {
+    const available = new Set(game.lookForTroubleCardIds);
+    return game.self.hand.filter((card) => available.has(card.instanceId));
+  }
+
+  protected confirmLookForTrouble(): void {
+    const cardId = this.lookForTroubleCardId();
+    if (cardId === null) return;
+    this.lobbyClient.sendGameCommand({ type: 'LOOK_FOR_TROUBLE', cardId });
+    this.closeLookForTrouble();
   }
 
   protected equip(card: GameCardView): void {
@@ -140,6 +189,19 @@ export class App {
       eligiblePlayerIds: game.players
         .filter((player) => kind === 'CURSE' || player.playerId !== game.viewerPlayerId)
         .map((player) => player.playerId),
+    });
+  }
+
+  protected beginCombatCurseTargeting(game: GameView, card: GameCardView): void {
+    const action = game.playableCombatCards.playerTargetActions.find(
+      (candidate) => candidate.cardId === card.instanceId,
+    );
+    if (action === undefined) return;
+    this.closeCardDetails();
+    this.targeting.set({
+      kind: 'COMBAT_CURSE',
+      card,
+      eligiblePlayerIds: action.playerIds,
     });
   }
 
@@ -170,7 +232,7 @@ export class App {
   protected saleTotal(game: GameView): number {
     const selected = new Set(this.saleCardIds());
     return this.saleCards(game).reduce(
-      (total, card) => total + (selected.has(card.instanceId) ? (card.equipment?.value ?? 0) : 0),
+      (total, card) => total + (selected.has(card.instanceId) ? (card.goldValue ?? 0) : 0),
       0,
     );
   }
@@ -194,7 +256,14 @@ export class App {
       command:
         targeting.kind === 'CURSE'
           ? { type: 'PLAY_CURSE', cardId: targeting.card.instanceId, targetPlayerId: playerId }
-          : { type: 'TRADE_ITEM', cardId: targeting.card.instanceId, recipientId: playerId },
+          : targeting.kind === 'COMBAT_CURSE'
+            ? {
+                type: 'PLAY_COMBAT_CURSE',
+                cardId: targeting.card.instanceId,
+                targetPlayerId: playerId,
+                reactionWindowId: game.combat!.reactionWindow!.windowId,
+              }
+            : { type: 'TRADE_ITEM', cardId: targeting.card.instanceId, recipientId: playerId },
     });
   }
 
@@ -204,6 +273,7 @@ export class App {
     this.lobbyClient.sendGameCommand(confirmation.command);
     this.confirmation.set(null);
     this.targeting.set(null);
+    this.combatCardTargeting.set(null);
   }
 
   protected resolveCharity(game: GameView): void {
@@ -240,13 +310,123 @@ export class App {
     return ids.includes(card.instanceId);
   }
 
-  protected playCombatCard(card: GameCardView, targetSide: 'PLAYERS' | 'MONSTER'): void {
+  protected playCombatCard(game: GameView, card: GameCardView): void {
     this.closeCardDetails();
     this.confirmation.set({
       card,
-      targetLabel: this.t(targetSide === 'PLAYERS' ? 'playerSide' : 'monsterSide'),
-      command: { type: 'PLAY_CARD', cardId: card.instanceId, targetSide },
+      targetLabel: this.t('playerSide'),
+      command: {
+        type: 'PLAY_CARD',
+        cardId: card.instanceId,
+        target: { type: 'PLAYERS' },
+        ...(game.combat?.reactionWindow === null || game.combat === null
+          ? {}
+          : { reactionWindowId: game.combat.reactionWindow.windowId }),
+      },
     });
+  }
+
+  protected beginMonsterCardTargeting(game: GameView, card: GameCardView): void {
+    const action = game.playableCombatCards.monsterTargetActions.find(
+      (candidate) => candidate.cardId === card.instanceId,
+    );
+    if (action === undefined) return;
+    this.closeCardDetails();
+    this.combatCardTargeting.set({
+      card,
+      type: 'MONSTER',
+      targetIds: action.encounterIds,
+    });
+  }
+
+  protected beginAddMonsterTargeting(game: GameView, card: GameCardView): void {
+    const action = game.playableCombatCards.addMonsterActions.find(
+      (candidate) => candidate.cardId === card.instanceId,
+    );
+    if (action === undefined) return;
+    this.closeCardDetails();
+    this.combatCardTargeting.set({
+      card,
+      type: 'HAND_MONSTER',
+      targetIds: action.monsterCardIds,
+    });
+  }
+
+  protected chooseEncounterTarget(game: GameView, encounterId: string): void {
+    const targeting = this.combatCardTargeting();
+    const monster = game.combat?.monsters.find(
+      (candidate) => candidate.encounterId === encounterId,
+    );
+    if (
+      targeting?.type !== 'MONSTER' ||
+      !targeting.targetIds.includes(encounterId) ||
+      monster === undefined
+    )
+      return;
+    this.confirmation.set({
+      card: targeting.card,
+      targetLabel: this.cardName(monster.monster),
+      command: {
+        type: 'PLAY_CARD',
+        cardId: targeting.card.instanceId,
+        target: { type: 'MONSTER', encounterId },
+        ...(game.combat?.reactionWindow === null || game.combat === null
+          ? {}
+          : { reactionWindowId: game.combat.reactionWindow.windowId }),
+      },
+    });
+    this.combatCardTargeting.set(null);
+  }
+
+  protected chooseHandMonsterTarget(game: GameView, monsterCardId: string): void {
+    const targeting = this.combatCardTargeting();
+    const monster = game.self.hand.find((card) => card.instanceId === monsterCardId);
+    if (
+      targeting?.type !== 'HAND_MONSTER' ||
+      !targeting.targetIds.includes(monsterCardId) ||
+      monster === undefined
+    )
+      return;
+    this.confirmation.set({
+      card: targeting.card,
+      targetLabel: this.cardName(monster),
+      command: {
+        type: 'PLAY_CARD',
+        cardId: targeting.card.instanceId,
+        target: { type: 'HAND_MONSTER', monsterCardId },
+        ...(game.combat?.reactionWindow === null || game.combat === null
+          ? {}
+          : { reactionWindowId: game.combat.reactionWindow.windowId }),
+      },
+    });
+    this.combatCardTargeting.set(null);
+  }
+
+  protected canAddMonster(game: GameView, card: GameCardView): boolean {
+    return game.playableCombatCards.addMonsterActions.some(
+      (action) => action.cardId === card.instanceId,
+    );
+  }
+
+  protected canPlayCombatCurse(game: GameView, card: GameCardView): boolean {
+    return game.playableCombatCards.playerTargetActions.some(
+      (action) => action.cardId === card.instanceId,
+    );
+  }
+
+  protected reactionCards(game: GameView): readonly GameCardView[] {
+    if (game.combat?.reactionWindow === null || game.combat === null) return [];
+    const ids = new Set([
+      ...game.playableCombatCards.playersSideCardIds,
+      ...game.playableCombatCards.monsterSideCardIds,
+      ...game.playableCombatCards.addMonsterActions.map((action) => action.cardId),
+      ...game.playableCombatCards.playerTargetActions.map((action) => action.cardId),
+    ]);
+    return game.self.hand.filter((card) => ids.has(card.instanceId));
+  }
+
+  protected reactionConfirmed(game: GameView, playerId = game.viewerPlayerId): boolean {
+    return game.combat?.reactionWindow?.confirmedPlayerIds.includes(playerId) ?? false;
   }
 
   protected canPlayCombatCard(
@@ -339,6 +519,10 @@ export class App {
         return `${player} ${this.t('logTurnEnded')}`;
       case 'DOOR_KICKED':
         return `${player} ${this.t('logDoorKicked')} ${card}.`;
+      case 'DECK_RESHUFFLED':
+        return `${this.deckLabel(entry.deck ?? 'DOOR')}: ${this.t('logDeckReshuffled')}`;
+      case 'LOOKED_FOR_TROUBLE':
+        return `${player} ${this.t('logLookedForTrouble')} ${card}.`;
       case 'CARD_DRAWN':
         return `${this.t('logCardDrawn')} ${card}.`;
       case 'CARD_ADDED_TO_HAND':
@@ -353,8 +537,20 @@ export class App {
         return `${this.t('logCurseResolved')} ${card} ${this.t('logOnPlayer')} ${player}.`;
       case 'COMBAT_STARTED':
         return `${player} ${this.t('historyCombatStarted')} ${card}.`;
+      case 'MONSTER_ADDED':
+        return `${player} ${this.t('logMonsterAdded')} ${cards}.`;
+      case 'MONSTER_CLONED':
+        return `${player} ${this.t('logMonsterCloned')} ${cards}.`;
       case 'COMBAT_UPDATED':
         return `${this.t('logCombatUpdated')} ${entry.playerPower ?? 0} : ${entry.monsterPower ?? 0}.`;
+      case 'COMBAT_VICTORY_DECLARED':
+        return `${player} ${this.t('logCombatVictoryDeclared')}`;
+      case 'COMBAT_REACTION_PASSED':
+        return `${player} ${this.t('logCombatReactionPassed')}`;
+      case 'COMBAT_REACTIONS_RESET':
+        return `${this.t('logCombatReactionsReset')}`;
+      case 'COMBAT_VICTORY_CANCELLED':
+        return `${this.t('logCombatVictoryCancelled')}`;
       case 'COMBAT_WON':
         return `${player} ${this.t('logCombatWon')} ${card}.`;
       case 'RUN_AWAY_ATTEMPTED':
@@ -434,6 +630,9 @@ export class App {
       ...game.availableEquipmentActions.unequipCardIds,
       ...game.playableCombatCards.playersSideCardIds,
       ...game.playableCombatCards.monsterSideCardIds,
+      ...game.playableCombatCards.addMonsterActions.map((action) => action.cardId),
+      ...game.playableCombatCards.playerTargetActions.map((action) => action.cardId),
+      ...game.lookForTroubleCardIds,
       ...game.expandedRuleActions.playableRoleCardIds,
       ...game.expandedRuleActions.playableCurseCardIds,
       ...game.expandedRuleActions.sellableItemCardIds,
@@ -449,6 +648,8 @@ export class App {
     const labels: Record<GameCardUnavailableReason, Parameters<typeof this.t>[0]> = {
       GAME_FINISHED: 'cardReasonFinished',
       PENDING_DECISION: 'cardReasonPendingDecision',
+      REACTION_WINDOW_ACTIVE: 'cardReasonReactionWindow',
+      REACTION_ALREADY_CONFIRMED: 'cardReasonReactionConfirmed',
       WAITING_FOR_TURN: 'cardReasonWaitingTurn',
       COMBAT_ACTIVE: 'cardReasonCombatActive',
       NO_ACTIVE_COMBAT: 'cardReasonNoCombat',
@@ -475,9 +676,17 @@ export class App {
   protected effectLabel(effect: GameEffectView): string {
     switch (effect.type) {
       case 'COMBAT_BONUS':
-        return `${this.t('effectCombatBonus')} +${effect.amount}`;
+        return `${this.t('effectCombatBonus')} ${effect.amount >= 0 ? '+' : ''}${effect.amount}`;
       case 'MONSTER_COMBAT_BONUS':
         return `${this.t('effectMonsterBonus')} +${effect.amount}`;
+      case 'MODIFY_MONSTER':
+        return `${this.t('effectMonsterStrength')} ${effect.strength >= 0 ? '+' : ''}${
+          effect.strength
+        }, ${this.t('treasures')} ${effect.treasures >= 0 ? '+' : ''}${effect.treasures}`;
+      case 'ADD_MONSTER_TO_COMBAT':
+        return this.t('effectAddMonster');
+      case 'CLONE_COMBAT_MONSTER':
+        return this.t('effectCloneMonster');
       case 'GAIN_LEVEL':
         return `${this.t('effectGainLevel')} ${effect.amount}`;
       case 'LOSE_LEVEL':
@@ -514,12 +723,19 @@ export class App {
       (total, effect) =>
         effect.type === 'COMBAT_BONUS' || effect.type === 'MONSTER_COMBAT_BONUS'
           ? total + effect.amount
-          : total,
+          : effect.type === 'MODIFY_MONSTER'
+            ? total + effect.strength
+            : total,
       0,
     );
   }
 
   protected expectedActionLabel(game: GameView): string {
+    if (game.expectedAction.type === 'COMBAT_REACTIONS') {
+      return `${this.t('expectedCombatReactions')}: ${game.expectedAction.waitingPlayerIds
+        .map((playerId) => this.lookupPlayerName(game, playerId))
+        .join(', ')}`;
+    }
     const actor = this.lookupPlayerName(game, game.expectedAction.playerId);
     const labels = {
       DISCARD_CARDS: 'expectedDiscard',
@@ -538,15 +754,18 @@ export class App {
 
   protected cancelTargeting(): void {
     this.targeting.set(null);
+    this.combatCardTargeting.set(null);
     this.confirmation.set(null);
   }
 
   @HostListener('document:keydown.escape')
   protected closeTopLayer(): void {
     if (this.confirmation() !== null) this.confirmation.set(null);
+    else if (this.combatCardTargeting() !== null) this.combatCardTargeting.set(null);
     else if (this.selectedLogEntry() !== null || this.selectedCard() !== null)
       this.closeCardDetails();
     else if (this.selectedPlayerId() !== null) this.selectedPlayerId.set(null);
+    else if (this.lookForTroubleOpen()) this.closeLookForTrouble();
     else if (this.saleOpen()) this.closeSale();
     else if (this.historyOpen()) this.historyOpen.set(false);
     else if (this.targeting() !== null) this.targeting.set(null);
@@ -593,6 +812,9 @@ export class App {
 
     const publicCardTypes = new Set<GameLogEntryView['type']>([
       'DOOR_KICKED',
+      'LOOKED_FOR_TROUBLE',
+      'MONSTER_ADDED',
+      'MONSTER_CLONED',
       'CARD_PLAYED',
       'ITEM_EQUIPPED',
       'ITEM_UNEQUIPPED',
@@ -652,6 +874,11 @@ export class App {
 
   protected turnStatusLabel(game: GameView): string {
     if (game.status === 'FINISHED') return this.phaseLabel(game.phase);
+    if (game.expectedAction.type === 'COMBAT_REACTIONS') {
+      return this.reactionConfirmed(game)
+        ? this.t('statusCombatReactionConfirmed')
+        : this.t('statusCombatReactionNeeded');
+    }
     if (game.expectedAction.playerId === game.viewerPlayerId) {
       return this.phaseLabel(game.phase);
     }
@@ -666,7 +893,6 @@ export class App {
     if (game.expectedAction.type === 'COMBAT_DECISION') {
       return `${actor} ${this.t('statusResolvingCombat')}`;
     }
-
     const labels = {
       LOBBY: 'statusWaitingInLobby',
       TURN_START: 'statusStartingTurn',
@@ -683,8 +909,10 @@ export class App {
   protected actionLabel(action: AvailableGameAction): string {
     const labels = {
       KICK_DOOR: 'actionKickDoor',
+      LOOK_FOR_TROUBLE: 'actionLookForTrouble',
       ACCEPT_HELP: 'actionAcceptHelp',
-      RESOLVE_COMBAT: 'actionResolveCombat',
+      DECLARE_COMBAT_VICTORY: 'actionDeclareCombatVictory',
+      PASS_COMBAT_REACTION: 'actionPassCombatReaction',
       RUN_AWAY: 'actionRunAway',
       LOOT_ROOM: 'actionLootRoom',
       END_TURN: 'actionEndTurn',
@@ -696,9 +924,12 @@ export class App {
     const labels = {
       MONSTER: 'cardMonster',
       CURSE: 'cardCurse',
+      COMBAT_CURSE: 'cardCombatCurse',
       EQUIPMENT: 'cardEquipment',
       TEMPORARY_BONUS: 'cardTemporaryBonus',
       MONSTER_MODIFIER: 'cardMonsterModifier',
+      ADD_MONSTER: 'cardAddMonster',
+      CLONE_MONSTER: 'cardCloneMonster',
       OTHER: 'cardOther',
       CLASS: 'cardClass',
       RACE: 'cardRace',

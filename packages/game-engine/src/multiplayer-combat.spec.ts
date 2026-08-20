@@ -11,6 +11,7 @@ import {
   parseCardDefinitionId,
   parseCardInstanceId,
   parseGameId,
+  parseEncounterId,
   parsePlayerId,
 } from "./identifiers.js";
 import type { RandomSource } from "./random-source.js";
@@ -19,10 +20,12 @@ const random: RandomSource = { nextInt: () => 0 };
 const heroId = parsePlayerId("hero");
 const helperId = parsePlayerId("helper");
 const outsiderId = parsePlayerId("outsider");
+const encounterId = parseEncounterId("encounter-1");
 const monsterDefinitionId = parseCardDefinitionId("monster");
 const equipmentDefinitionId = parseCardDefinitionId("equipment");
 const bonusDefinitionId = parseCardDefinitionId("bonus");
 const modifierDefinitionId = parseCardDefinitionId("modifier");
+const monsterBonusDefinitionId = parseCardDefinitionId("monster-bonus");
 const monster = {
   instanceId: parseCardInstanceId("monster-1"),
   definitionId: monsterDefinitionId,
@@ -38,6 +41,10 @@ const bonus = {
 const modifier = {
   instanceId: parseCardInstanceId("modifier-1"),
   definitionId: modifierDefinitionId,
+};
+const monsterBonus = {
+  instanceId: parseCardInstanceId("monster-bonus-1"),
+  definitionId: monsterBonusDefinitionId,
 };
 
 const definitions: readonly CardDefinition[] = [
@@ -75,11 +82,19 @@ const definitions: readonly CardDefinition[] = [
     deck: DeckType.TREASURE,
     effects: [{ type: "MONSTER_COMBAT_BONUS", amount: 4 }],
   },
+  {
+    id: monsterBonusDefinitionId,
+    name: "Monster side bonus",
+    description: "A temporary bonus for one Monster.",
+    type: CardType.TEMPORARY_BONUS,
+    deck: DeckType.TREASURE,
+    effects: [{ type: "MONSTER_COMBAT_BONUS", amount: 3 }],
+  },
 ];
 
 function state(): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: parseGameId("multiplayer-combat"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -104,7 +119,7 @@ function state(): GameState {
         id: outsiderId,
         name: "Outsider",
         level: 1,
-        hand: [bonus, modifier],
+        hand: [bonus, modifier, monsterBonus],
         equipment: [],
         temporaryCombatBonus: 0,
       },
@@ -117,12 +132,35 @@ function state(): GameState {
     treasureDiscard: [],
     combat: {
       playerId: heroId,
-      monster,
-      monsterBonus: 0,
+      revision: 1,
+      monsters: [
+        {
+          encounterId,
+          monster,
+          sourceCard: monster,
+          clonedFromEncounterId: null,
+          baseStrength: 8,
+          baseLevelRewards: 1,
+          baseTreasureRewards: 0,
+          badStuff: [],
+          strengthModifier: 0,
+          treasureModifier: 0,
+          playedCards: [],
+        },
+      ],
+      nextEncounterSequence: 2,
+      nextReactionWindowSequence: 1,
+      reactionWindow: null,
       requestedHelperId: null,
       helperId: null,
+      runAway: null,
       history: [
-        { type: "COMBAT_STARTED", playerId: heroId, monsterDefinitionId },
+        {
+          type: "COMBAT_STARTED",
+          playerId: heroId,
+          encounterId,
+          monsterDefinitionId,
+        },
       ],
     },
     lastRunAwayResult: null,
@@ -159,9 +197,33 @@ describe("multiplayer combat", () => {
       monsterPower: 8,
     });
 
-    const victory = executeCommand(
+    const declared = executeCommand(
       accepted.state,
-      { type: "RESOLVE_COMBAT", actorId: heroId },
+      {
+        type: "DECLARE_COMBAT_VICTORY",
+        actorId: heroId,
+        combatRevision: accepted.state.combat!.revision,
+      },
+      { random },
+    );
+    if (!declared.success) throw new Error(declared.error.message);
+    const helperPassed = executeCommand(
+      declared.state,
+      {
+        type: "PASS_COMBAT_REACTION",
+        actorId: helperId,
+        reactionWindowId: declared.state.combat!.reactionWindow!.windowId,
+      },
+      { random },
+    );
+    if (!helperPassed.success) throw new Error(helperPassed.error.message);
+    const victory = executeCommand(
+      helperPassed.state,
+      {
+        type: "PASS_COMBAT_REACTION",
+        actorId: outsiderId,
+        reactionWindowId: helperPassed.state.combat!.reactionWindow!.windowId,
+      },
       { random },
     );
     expect(victory.success).toBe(true);
@@ -207,26 +269,34 @@ describe("multiplayer combat", () => {
       monsterPower: 8,
     });
 
-    const monsterBonus = executeCommand(
+    const monsterModifierResult = executeCommand(
       playerBonus.state,
       {
         type: "PLAY_CARD",
         actorId: outsiderId,
         cardId: modifier.instanceId,
-        target: { type: "COMBAT", side: "MONSTER" },
+        target: { type: "COMBAT", side: "MONSTER", encounterId },
       },
       { random },
     );
-    if (!monsterBonus.success) throw new Error(monsterBonus.error.message);
-    expect(monsterBonus.state.combat).toMatchObject({ monsterBonus: 4 });
-    expect(monsterBonus.events.at(-1)).toMatchObject({
+    if (!monsterModifierResult.success)
+      throw new Error(monsterModifierResult.error.message);
+    expect(monsterModifierResult.state.combat?.monsters[0]).toMatchObject({
+      strengthModifier: 4,
+    });
+    expect(monsterModifierResult.events.at(-1)).toMatchObject({
       playerPower: 6,
       monsterPower: 12,
     });
     expect(
-      monsterBonus.state.combat?.history.map((entry) => entry.type),
+      monsterModifierResult.state.combat?.history.map((entry) => entry.type),
     ).toEqual(["COMBAT_STARTED", "CARD_PLAYED", "CARD_PLAYED"]);
-    expect(monsterBonus.state.treasureDiscard).toEqual([bonus, modifier]);
+    expect(monsterModifierResult.state.treasureDiscard).toEqual([bonus]);
+    expect(
+      monsterModifierResult.state.combat?.monsters[0]?.playedCards,
+    ).toMatchObject([
+      { card: modifier, strengthModifier: 4, treasureModifier: 0 },
+    ]);
   });
 
   it("lets a temporary combat bonus strengthen the monster side", () => {
@@ -235,14 +305,14 @@ describe("multiplayer combat", () => {
       {
         type: "PLAY_CARD",
         actorId: outsiderId,
-        cardId: bonus.instanceId,
-        target: { type: "COMBAT", side: "MONSTER" },
+        cardId: monsterBonus.instanceId,
+        target: { type: "COMBAT", side: "MONSTER", encounterId },
       },
       { random },
     );
     expect(result).toMatchObject({
       success: true,
-      state: { combat: { monsterBonus: 3 } },
+      state: { combat: { monsters: [{ strengthModifier: 3 }] } },
     });
     if (result.success) {
       expect(result.events.at(-1)).toMatchObject({
@@ -250,7 +320,7 @@ describe("multiplayer combat", () => {
         playerPower: 3,
         monsterPower: 11,
       });
-      expect(result.state.treasureDiscard).toEqual([bonus]);
+      expect(result.state.treasureDiscard).toEqual([]);
     }
   });
 

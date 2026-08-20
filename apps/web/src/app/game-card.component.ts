@@ -61,7 +61,8 @@ import type { GameCardView } from '@munchkin-lan/contracts';
       border-color: #a95b52;
       background: linear-gradient(150deg, #5a302c, #211715 70%);
     }
-    .game-card[data-card-type='CURSE'] {
+    .game-card[data-card-type='CURSE'],
+    .game-card[data-card-type='COMBAT_CURSE'] {
       border-color: #8d69b5;
       background: linear-gradient(150deg, #49345d, #1d1726 70%);
     }
@@ -76,6 +77,14 @@ import type { GameCardView } from '@munchkin-lan/contracts';
     .game-card[data-card-type='MONSTER_MODIFIER'] {
       border-color: #b65f7d;
       background: linear-gradient(150deg, #593044, #251720 70%);
+    }
+    .game-card[data-card-type='ADD_MONSTER'] {
+      border-color: #d06a5d;
+      background: linear-gradient(150deg, #65372f, #281916 70%);
+    }
+    .game-card[data-card-type='CLONE_MONSTER'] {
+      border-color: #7296cb;
+      background: linear-gradient(150deg, #344d73, #171f2d 70%);
     }
     .game-card[data-card-type='CLASS'] {
       border-color: #54a398;

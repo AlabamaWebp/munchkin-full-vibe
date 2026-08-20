@@ -6,12 +6,14 @@ import {
   parseCardDefinitionId,
   parseCardInstanceId,
   parseGameId,
+  parseEncounterId,
   parsePlayerId,
 } from "./identifiers.js";
 import type { RandomSource } from "./random-source.js";
 
 const random: RandomSource = { nextInt: () => 0 };
 const playerId = parsePlayerId("hero");
+const encounterId = parseEncounterId("encounter-1");
 const monsterDefinitionId = parseCardDefinitionId("test-monster");
 const bonusDefinitionId = parseCardDefinitionId("test-bonus");
 const otherDefinitionId = parseCardDefinitionId("test-other");
@@ -71,7 +73,7 @@ const definitions: readonly CardDefinition[] = [
 
 function combatState(): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: parseGameId("combat-test"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -93,11 +95,36 @@ function combatState(): GameState {
     treasureDiscard: [],
     combat: {
       playerId,
-      monster,
-      monsterBonus: 0,
+      revision: 1,
+      monsters: [
+        {
+          encounterId,
+          monster,
+          sourceCard: monster,
+          clonedFromEncounterId: null,
+          baseStrength: 4,
+          baseLevelRewards: 1,
+          baseTreasureRewards: 2,
+          badStuff: [],
+          strengthModifier: 0,
+          treasureModifier: 0,
+          playedCards: [],
+        },
+      ],
+      nextEncounterSequence: 2,
+      nextReactionWindowSequence: 1,
+      reactionWindow: null,
       requestedHelperId: null,
       helperId: null,
-      history: [{ type: "COMBAT_STARTED", playerId, monsterDefinitionId }],
+      runAway: null,
+      history: [
+        {
+          type: "COMBAT_STARTED",
+          playerId,
+          encounterId,
+          monsterDefinitionId,
+        },
+      ],
     },
     lastRunAwayResult: null,
     pendingDecision: null,
@@ -173,7 +200,11 @@ describe("basic combat", () => {
     };
     const result = executeCommand(
       state,
-      { type: "RESOLVE_COMBAT", actorId: playerId },
+      {
+        type: "DECLARE_COMBAT_VICTORY",
+        actorId: playerId,
+        combatRevision: state.combat!.revision,
+      },
       { random },
     );
 
@@ -193,7 +224,11 @@ describe("basic combat", () => {
     };
     const result = executeCommand(
       state,
-      { type: "RESOLVE_COMBAT", actorId: playerId },
+      {
+        type: "DECLARE_COMBAT_VICTORY",
+        actorId: playerId,
+        combatRevision: state.combat!.revision,
+      },
       { random },
     );
 
@@ -214,13 +249,14 @@ describe("basic combat", () => {
     expect(result.state.doorDiscard).toContain(monster);
     expect(result.state.treasureDeck).toEqual([]);
     expect(result.events.map((event) => event.type)).toEqual([
+      "COMBAT_VICTORY_DECLARED",
       "COMBAT_WON",
       "LEVEL_GAINED",
       "TREASURE_GAINED",
       "CARD_DRAWN",
       "CARD_DRAWN",
     ]);
-    expect(result.events.slice(3)).toEqual(
+    expect(result.events.slice(4)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           visibility: "PRIVATE",
@@ -228,7 +264,7 @@ describe("basic combat", () => {
         }),
       ]),
     );
-    expect(JSON.stringify(result.events.slice(0, 3))).not.toContain(
+    expect(JSON.stringify(result.events.slice(0, 4))).not.toContain(
       treasures[0]!.instanceId,
     );
   });
@@ -240,7 +276,11 @@ describe("basic combat", () => {
     };
     const result = executeCommand(
       state,
-      { type: "RESOLVE_COMBAT", actorId: playerId },
+      {
+        type: "DECLARE_COMBAT_VICTORY",
+        actorId: playerId,
+        combatRevision: state.combat!.revision,
+      },
       { random },
     );
 
@@ -281,7 +321,11 @@ describe("basic combat", () => {
     };
     const result = executeCommand(
       state,
-      { type: "RESOLVE_COMBAT", actorId: playerId },
+      {
+        type: "DECLARE_COMBAT_VICTORY",
+        actorId: playerId,
+        combatRevision: state.combat!.revision,
+      },
       { random },
     );
 

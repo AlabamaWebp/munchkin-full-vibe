@@ -11,12 +11,14 @@ import {
   parseCardDefinitionId,
   parseCardInstanceId,
   parseGameId,
+  parseEncounterId,
   parsePlayerId,
 } from "./identifiers.js";
 import type { RandomSource } from "./random-source.js";
 
 const heroId = parsePlayerId("hero");
 const helperId = parsePlayerId("helper");
+const encounterId = parseEncounterId("encounter-1");
 const monsterDefinitionId = parseCardDefinitionId("bad-monster");
 const equipmentDefinitionId = parseCardDefinitionId("lost-helmet");
 const monster = {
@@ -70,7 +72,7 @@ function sequenceRandom(...values: number[]): RandomSource {
 
 function losingState(): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: parseGameId("run-away-test"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -100,12 +102,35 @@ function losingState(): GameState {
     treasureDiscard: [],
     combat: {
       playerId: heroId,
-      monster,
-      monsterBonus: 0,
+      revision: 1,
+      monsters: [
+        {
+          encounterId,
+          monster,
+          sourceCard: monster,
+          clonedFromEncounterId: null,
+          baseStrength: 10,
+          baseLevelRewards: 1,
+          baseTreasureRewards: 1,
+          badStuff: definitions[0]!.monster!.badStuff,
+          strengthModifier: 0,
+          treasureModifier: 0,
+          playedCards: [],
+        },
+      ],
+      nextEncounterSequence: 2,
+      nextReactionWindowSequence: 1,
+      reactionWindow: null,
       requestedHelperId: null,
       helperId,
+      runAway: null,
       history: [
-        { type: "COMBAT_STARTED", playerId: heroId, monsterDefinitionId },
+        {
+          type: "COMBAT_STARTED",
+          playerId: heroId,
+          encounterId,
+          monsterDefinitionId,
+        },
       ],
     },
     lastRunAwayResult: null,
@@ -131,9 +156,14 @@ describe("losing combat", () => {
       combat: null,
       lastRunAwayResult: {
         playerId: heroId,
-        roll: 5,
-        escaped: true,
-        badStuffApplied: false,
+        attempts: [
+          {
+            encounterId,
+            roll: 5,
+            escaped: true,
+            badStuffApplied: false,
+          },
+        ],
       },
     });
     expect(result.state.players[0]).toMatchObject({
@@ -169,11 +199,14 @@ describe("losing combat", () => {
       temporaryCombatBonus: 0,
     });
     expect(result.state.treasureDiscard).toEqual([helmet]);
-    expect(result.state.lastRunAwayResult).toMatchObject({
-      roll: 4,
-      escaped: false,
-      badStuffApplied: true,
-    });
+    expect(result.state.lastRunAwayResult?.attempts).toMatchObject([
+      {
+        encounterId,
+        roll: 4,
+        escaped: false,
+        badStuffApplied: true,
+      },
+    ]);
     expect(result.events.map((event) => event.type)).toEqual([
       "RUN_AWAY_ATTEMPTED",
       "LEVEL_LOST",

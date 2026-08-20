@@ -93,27 +93,50 @@ export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
 export type GameCardType =
   | "MONSTER"
   | "CURSE"
+  | "COMBAT_CURSE"
   | "EQUIPMENT"
   | "TEMPORARY_BONUS"
   | "MONSTER_MODIFIER"
+  | "ADD_MONSTER"
+  | "CLONE_MONSTER"
   | "OTHER"
   | "CLASS"
   | "RACE";
 export type GameDeckType = "DOOR" | "TREASURE";
 export type GameEquipmentSlot = "HEAD" | "BODY" | "FEET" | "HANDS";
+export type GameCardPlayTiming =
+  "TURN" | "ACTIVE_COMBAT" | "VICTORY_REACTION" | "WHEN_DRAWN";
+export type GameCardTarget =
+  | "SELF"
+  | "ANY_PLAYER"
+  | "COMBAT_PLAYERS"
+  | "COMBAT_PLAYER"
+  | "MONSTER_ENCOUNTER"
+  | "HAND_MONSTER";
 
 export interface GameCardView {
   readonly instanceId: string;
   readonly definitionId: string;
+  readonly artKey: string;
   readonly name: string;
   readonly description: string;
   readonly type: GameCardType;
   readonly deck: GameDeckType;
+  readonly goldValue?: number;
+  readonly play?: {
+    readonly timings: readonly GameCardPlayTiming[];
+    readonly target: GameCardTarget;
+  };
   readonly effects: readonly GameEffectView[];
   readonly equipment?: {
     readonly slot: GameEquipmentSlot;
-    readonly hands?: 1 | 2;
+    readonly hands: 0 | 1 | 2;
     readonly combatBonus: number;
+    readonly restrictions: readonly (
+      | { readonly type: "CLASS"; readonly definitionId: string }
+      | { readonly type: "RACE"; readonly definitionId: string }
+    )[];
+    /** @deprecated Use the card-level goldValue. */
     readonly value: number;
     readonly requiredClass?: string;
     readonly requiredRace?: string;
@@ -132,6 +155,12 @@ export type GameEffectView =
         "COMBAT_BONUS" | "MONSTER_COMBAT_BONUS" | "GAIN_LEVEL" | "LOSE_LEVEL";
       readonly amount: number;
     }
+  | {
+      readonly type: "MODIFY_MONSTER";
+      readonly strength: number;
+      readonly treasures: number;
+    }
+  | { readonly type: "ADD_MONSTER_TO_COMBAT" | "CLONE_COMBAT_MONSTER" }
   | {
       readonly type: "DRAW_CARDS";
       readonly deck: GameDeckType;
@@ -175,8 +204,10 @@ export interface OwnPlayerView extends GamePlayerView {
 
 export type AvailableGameAction =
   | "KICK_DOOR"
+  | "LOOK_FOR_TROUBLE"
   | "ACCEPT_HELP"
-  | "RESOLVE_COMBAT"
+  | "DECLARE_COMBAT_VICTORY"
+  | "PASS_COMBAT_REACTION"
   | "RUN_AWAY"
   | "LOOT_ROOM"
   | "END_TURN";
@@ -185,6 +216,7 @@ export type CombatHistoryView =
   | {
       readonly type: "COMBAT_STARTED";
       readonly playerId: string;
+      readonly encounterId: string;
       readonly monster: GameCardView;
     }
   | {
@@ -197,6 +229,23 @@ export type CombatHistoryView =
       readonly playerId: string;
       readonly card: GameCardView;
       readonly side: "PLAYERS" | "MONSTER";
+      readonly encounterId?: string;
+      readonly targetPlayerId?: string;
+    }
+  | {
+      readonly type: "MONSTER_ADDED";
+      readonly playerId: string;
+      readonly encounterId: string;
+      readonly monster: GameCardView;
+      readonly card: GameCardView;
+    }
+  | {
+      readonly type: "MONSTER_CLONED";
+      readonly playerId: string;
+      readonly encounterId: string;
+      readonly sourceEncounterId: string;
+      readonly monster: GameCardView;
+      readonly card: GameCardView;
     };
 
 export type GameLogEventType =
@@ -205,6 +254,8 @@ export type GameLogEventType =
   | "CARDS_DEALT"
   | "TURN_STARTED"
   | "DOOR_KICKED"
+  | "DECK_RESHUFFLED"
+  | "LOOKED_FOR_TROUBLE"
   | "CARD_DRAWN"
   | "CARD_ADDED_TO_HAND"
   | "CARDS_DISCARDED"
@@ -212,7 +263,13 @@ export type GameLogEventType =
   | "CARD_DISCARD_REQUIRED"
   | "CURSE_RESOLVED"
   | "COMBAT_STARTED"
+  | "MONSTER_ADDED"
+  | "MONSTER_CLONED"
   | "COMBAT_UPDATED"
+  | "COMBAT_VICTORY_DECLARED"
+  | "COMBAT_REACTION_PASSED"
+  | "COMBAT_REACTIONS_RESET"
+  | "COMBAT_VICTORY_CANCELLED"
   | "COMBAT_WON"
   | "RUN_AWAY_ATTEMPTED"
   | "BAD_STUFF_APPLIED"
@@ -252,6 +309,10 @@ export interface GameLogEntryView {
   readonly monsterPower?: number;
   readonly roll?: number;
   readonly escaped?: boolean;
+  readonly encounterId?: string;
+  readonly reactionWindowId?: number;
+  readonly sourceEncounterId?: string;
+  readonly deck?: GameDeckType;
   readonly side?: "PLAYERS" | "MONSTER";
   readonly role?: "CLASS" | "RACE";
   readonly zone?: "HAND" | "EQUIPMENT";
@@ -260,6 +321,8 @@ export interface GameLogEntryView {
 export type GameCardUnavailableReason =
   | "GAME_FINISHED"
   | "PENDING_DECISION"
+  | "REACTION_WINDOW_ACTIVE"
+  | "REACTION_ALREADY_CONFIRMED"
   | "WAITING_FOR_TURN"
   | "COMBAT_ACTIVE"
   | "NO_ACTIVE_COMBAT"
@@ -274,6 +337,11 @@ export type ExpectedGameActionView =
   | { readonly type: "DISCARD_CARDS"; readonly playerId: string }
   | { readonly type: "RESPOND_TO_HELP"; readonly playerId: string }
   | { readonly type: "COMBAT_DECISION"; readonly playerId: string }
+  | {
+      readonly type: "COMBAT_REACTIONS";
+      readonly playerId: string;
+      readonly waitingPlayerIds: readonly string[];
+    }
   | { readonly type: "TAKE_TURN_ACTION"; readonly playerId: string };
 
 export interface GameView {
@@ -288,21 +356,49 @@ export interface GameView {
   readonly self: OwnPlayerView;
   readonly combat: {
     readonly playerId: string;
-    readonly monster: GameCardView;
+    readonly revision: number;
+    readonly monsters: readonly {
+      readonly encounterId: string;
+      readonly monster: GameCardView;
+      readonly sourceCard: GameCardView;
+      readonly clonedFromEncounterId: string | null;
+      readonly baseStrength: number;
+      readonly strengthModifier: number;
+      readonly currentStrength: number;
+      readonly baseLevelRewards: number;
+      readonly baseTreasureRewards: number;
+      readonly treasureModifier: number;
+      readonly currentTreasures: number;
+      readonly playedCards: readonly {
+        readonly card: GameCardView;
+        readonly playerId: string;
+        readonly strengthModifier: number;
+        readonly treasureModifier: number;
+        readonly purpose: "MODIFIER" | "ADD_MONSTER" | "CLONE_MONSTER";
+      }[];
+    }[];
     readonly playerPower: number;
     readonly monsterPower: number;
-    readonly monsterBonus: number;
     readonly requestedHelperId: string | null;
     readonly helperId: string | null;
     readonly helperContribution: number;
+    readonly reactionWindow: {
+      readonly windowId: number;
+      readonly claimantId: string;
+      readonly confirmedPlayerIds: readonly string[];
+      readonly waitingPlayerIds: readonly string[];
+    } | null;
     readonly history: readonly CombatHistoryView[];
   } | null;
   readonly lastRunAwayResult: {
     readonly playerId: string;
-    readonly monster: GameCardView;
-    readonly roll: number;
-    readonly escaped: boolean;
-    readonly badStuffApplied: boolean;
+    readonly attempts: readonly {
+      readonly encounterId: string;
+      readonly monster: GameCardView;
+      readonly roll: number;
+      readonly escaped: boolean;
+      readonly badStuffApplied: boolean;
+    }[];
   } | null;
   readonly pendingDecision: {
     readonly type: "DISCARD_CARDS";
@@ -316,6 +412,7 @@ export interface GameView {
   readonly expectedAction: ExpectedGameActionView;
   readonly deckCounts: { readonly door: number; readonly treasure: number };
   readonly availableActions: readonly AvailableGameAction[];
+  readonly lookForTroubleCardIds: readonly string[];
   readonly availableEquipmentActions: {
     readonly equipCardIds: readonly string[];
     readonly unequipCardIds: readonly string[];
@@ -324,6 +421,18 @@ export interface GameView {
   readonly playableCombatCards: {
     readonly playersSideCardIds: readonly string[];
     readonly monsterSideCardIds: readonly string[];
+    readonly monsterTargetActions: readonly {
+      readonly cardId: string;
+      readonly encounterIds: readonly string[];
+    }[];
+    readonly addMonsterActions: readonly {
+      readonly cardId: string;
+      readonly monsterCardIds: readonly string[];
+    }[];
+    readonly playerTargetActions: readonly {
+      readonly cardId: string;
+      readonly playerIds: readonly string[];
+    }[];
   };
   readonly expandedRuleActions: {
     readonly playableRoleCardIds: readonly string[];
@@ -341,14 +450,32 @@ export interface GameView {
 
 export type GameClientCommand =
   | { readonly type: "KICK_DOOR" }
+  | { readonly type: "LOOK_FOR_TROUBLE"; readonly cardId: string }
   | { readonly type: "LOOT_ROOM" }
   | { readonly type: "END_TURN" }
-  | { readonly type: "RESOLVE_COMBAT" }
+  | {
+      readonly type: "DECLARE_COMBAT_VICTORY";
+      readonly combatRevision: number;
+    }
+  | {
+      readonly type: "PASS_COMBAT_REACTION";
+      readonly reactionWindowId: number;
+    }
   | { readonly type: "RUN_AWAY" }
   | {
       readonly type: "PLAY_CARD";
       readonly cardId: string;
-      readonly targetSide: "PLAYERS" | "MONSTER";
+      readonly target:
+        | { readonly type: "PLAYERS" }
+        | { readonly type: "MONSTER"; readonly encounterId: string }
+        | { readonly type: "HAND_MONSTER"; readonly monsterCardId: string };
+      readonly reactionWindowId?: number;
+    }
+  | {
+      readonly type: "PLAY_COMBAT_CURSE";
+      readonly cardId: string;
+      readonly targetPlayerId: string;
+      readonly reactionWindowId: number;
     }
   | { readonly type: "REQUEST_HELP"; readonly helperId: string }
   | { readonly type: "ACCEPT_HELP" }

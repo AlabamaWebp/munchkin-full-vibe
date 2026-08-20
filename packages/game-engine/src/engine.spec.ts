@@ -152,13 +152,13 @@ describe("game setup", () => {
     });
     expect(
       set.definitions.filter((card) => card.type === CardType.MONSTER),
-    ).toHaveLength(5);
+    ).toHaveLength(8);
     expect(
       set.definitions.filter((card) => card.type === CardType.EQUIPMENT),
-    ).toHaveLength(5);
+    ).toHaveLength(10);
     expect(
       set.definitions.filter((card) => card.type === CardType.CURSE),
-    ).toHaveLength(4);
+    ).toHaveLength(6);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
   });
 
@@ -353,7 +353,9 @@ describe("turn commands", () => {
     expect(kicked.phase).toBe(GamePhase.DOOR_RESOLUTION);
     expect(kicked.combat).toMatchObject({
       playerId: parsePlayerId("ada"),
-      monster: { definitionId: parseCardDefinitionId("test-monster") },
+      monsters: [
+        { monster: { definitionId: parseCardDefinitionId("test-monster") } },
+      ],
     });
     expect(result.events.map((event) => event.type)).toEqual([
       "DOOR_KICKED",

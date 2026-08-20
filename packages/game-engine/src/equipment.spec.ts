@@ -68,7 +68,7 @@ function stateWith(
   phase: GamePhase = GamePhase.TURN_START,
 ): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: parseGameId("equipment-game"),
     status: GameStatus.IN_PROGRESS,
     phase,

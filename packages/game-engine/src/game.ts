@@ -37,7 +37,7 @@ export function createGame(options: CreateGameOptions): GameState {
   assertValidCardSet(cardSet);
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: options.id,
     status: GameStatus.LOBBY,
     phase: GamePhase.LOBBY,

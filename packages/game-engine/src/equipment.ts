@@ -33,11 +33,12 @@ export function equipmentCombatBonus(
     const definition = getCardDefinition(state, card);
     return (
       total +
-      definition.effects.reduce(
-        (bonus, effect) =>
-          effect.type === "COMBAT_BONUS" ? bonus + effect.amount : bonus,
-        0,
-      )
+      (definition.equipment?.combatBonus ??
+        definition.effects.reduce(
+          (bonus, effect) =>
+            effect.type === "COMBAT_BONUS" ? bonus + effect.amount : bonus,
+          0,
+        ))
     );
   }, 0);
 }
@@ -61,16 +62,23 @@ export function calculateMonsterPower(state: GameState): number {
   if (state.combat === null) {
     throw new TypeError("Monster power requires an active combat.");
   }
-  const definition = getCardDefinition(state, state.combat.monster);
-  if (
-    definition.type !== CardType.MONSTER ||
-    definition.monster === undefined
-  ) {
-    throw new TypeError(
-      `Combat card ${state.combat.monster.instanceId} is not a monster.`,
-    );
-  }
-  return definition.monster.level + state.combat.monsterBonus;
+  return state.combat.monsters.reduce(
+    (total, monster) =>
+      total + Math.max(1, monster.baseStrength + monster.strengthModifier),
+    0,
+  );
+}
+
+export function calculateMonsterStrength(
+  monster: import("./game-state.js").CombatMonsterState,
+): number {
+  return Math.max(1, monster.baseStrength + monster.strengthModifier);
+}
+
+export function calculateMonsterTreasures(
+  monster: import("./game-state.js").CombatMonsterState,
+): number {
+  return Math.max(0, monster.baseTreasureRewards + monster.treasureModifier);
 }
 
 export function calculateCombatSidePower(state: GameState): number {
@@ -118,14 +126,24 @@ export function equipmentRestriction(
 ): EquipmentRestriction | null {
   const equipment = candidate.equipment;
   if (equipment === undefined) return null;
+  const classRestriction = equipment.restrictions?.find(
+    (restriction) => restriction.type === "CLASS",
+  );
+  const raceRestriction = equipment.restrictions?.find(
+    (restriction) => restriction.type === "RACE",
+  );
   if (
-    equipment.requiredClass !== undefined &&
-    player.classCard?.definitionId !== equipment.requiredClass
+    (classRestriction !== undefined &&
+      player.classCard?.definitionId !== classRestriction.definitionId) ||
+    (equipment.requiredClass !== undefined &&
+      player.classCard?.definitionId !== equipment.requiredClass)
   )
     return "CLASS_REQUIRED";
   if (
-    equipment.requiredRace !== undefined &&
-    player.raceCard?.definitionId !== equipment.requiredRace
+    (raceRestriction !== undefined &&
+      player.raceCard?.definitionId !== raceRestriction.definitionId) ||
+    (equipment.requiredRace !== undefined &&
+      player.raceCard?.definitionId !== equipment.requiredRace)
   )
     return "RACE_REQUIRED";
   return null;

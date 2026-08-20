@@ -3,6 +3,7 @@ import type { DeckType } from "./cards.js";
 import type {
   CardDefinitionId,
   CardInstanceId,
+  EncounterId,
   PlayerId,
 } from "./identifiers.js";
 
@@ -38,6 +39,16 @@ export type GameEvent =
       readonly playerId: PlayerId;
       readonly cardId: CardInstanceId;
       readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "DECK_RESHUFFLED";
+      readonly deck: DeckType;
+    })
+  | (PublicEvent & {
+      readonly type: "LOOKED_FOR_TROUBLE";
+      readonly playerId: PlayerId;
+      readonly monsterCardId: CardInstanceId;
+      readonly monsterDefinitionId: CardDefinitionId;
     })
   | (PrivateEvent & {
       readonly type: "CARD_DRAWN";
@@ -80,8 +91,26 @@ export type GameEvent =
   | (PublicEvent & {
       readonly type: "COMBAT_STARTED";
       readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
       readonly monsterCardId: CardInstanceId;
       readonly monsterDefinitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "MONSTER_ADDED";
+      readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
+      readonly monsterCardId: CardInstanceId;
+      readonly monsterDefinitionId: CardDefinitionId;
+      readonly cardId: CardInstanceId;
+    })
+  | (PublicEvent & {
+      readonly type: "MONSTER_CLONED";
+      readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
+      readonly sourceEncounterId: EncounterId;
+      readonly monsterCardId: CardInstanceId;
+      readonly monsterDefinitionId: CardDefinitionId;
+      readonly cardId: CardInstanceId;
     })
   | (PublicEvent & {
       readonly type: "COMBAT_UPDATED";
@@ -90,14 +119,35 @@ export type GameEvent =
       readonly monsterPower: number;
     })
   | (PublicEvent & {
+      readonly type: "COMBAT_VICTORY_DECLARED";
+      readonly playerId: PlayerId;
+      readonly reactionWindowId: number;
+    })
+  | (PublicEvent & {
+      readonly type: "COMBAT_REACTION_PASSED";
+      readonly playerId: PlayerId;
+      readonly reactionWindowId: number;
+    })
+  | (PublicEvent & {
+      readonly type: "COMBAT_REACTIONS_RESET";
+      readonly playerId: PlayerId;
+      readonly reactionWindowId: number;
+    })
+  | (PublicEvent & {
+      readonly type: "COMBAT_VICTORY_CANCELLED";
+      readonly playerId: PlayerId;
+    })
+  | (PublicEvent & {
       readonly type: "COMBAT_WON";
       readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
       readonly monsterCardId: CardInstanceId;
       readonly monsterDefinitionId: CardDefinitionId;
     })
   | (PublicEvent & {
       readonly type: "RUN_AWAY_ATTEMPTED";
       readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
       readonly monsterCardId: CardInstanceId;
       readonly monsterDefinitionId: CardDefinitionId;
       readonly roll: number;
@@ -106,6 +156,7 @@ export type GameEvent =
   | (PublicEvent & {
       readonly type: "BAD_STUFF_APPLIED";
       readonly playerId: PlayerId;
+      readonly encounterId: EncounterId;
       readonly monsterCardId: CardInstanceId;
       readonly monsterDefinitionId: CardDefinitionId;
     })

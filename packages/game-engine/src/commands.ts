@@ -1,4 +1,4 @@
-import type { CardInstanceId, PlayerId } from "./identifiers.js";
+import type { CardInstanceId, EncounterId, PlayerId } from "./identifiers.js";
 
 export type CardTarget =
   | {
@@ -7,7 +7,16 @@ export type CardTarget =
     }
   | {
       readonly type: "COMBAT";
-      readonly side: "PLAYERS" | "MONSTER";
+      readonly side: "PLAYERS";
+    }
+  | {
+      readonly type: "COMBAT";
+      readonly side: "MONSTER";
+      readonly encounterId: EncounterId;
+    }
+  | {
+      readonly type: "HAND_MONSTER";
+      readonly cardId: CardInstanceId;
     };
 
 interface PlayerCommand {
@@ -26,9 +35,14 @@ export type GameCommand =
       readonly type: "KICK_DOOR";
     })
   | (PlayerCommand & {
+      readonly type: "LOOK_FOR_TROUBLE";
+      readonly cardId: CardInstanceId;
+    })
+  | (PlayerCommand & {
       readonly type: "PLAY_CARD";
       readonly cardId: CardInstanceId;
       readonly target: CardTarget | null;
+      readonly reactionWindowId?: number;
     })
   | (PlayerCommand & {
       readonly type: "EQUIP_ITEM";
@@ -64,7 +78,12 @@ export type GameCommand =
       readonly cardIds: readonly CardInstanceId[];
     })
   | (PlayerCommand & {
-      readonly type: "RESOLVE_COMBAT";
+      readonly type: "DECLARE_COMBAT_VICTORY";
+      readonly combatRevision: number;
+    })
+  | (PlayerCommand & {
+      readonly type: "PASS_COMBAT_REACTION";
+      readonly reactionWindowId: number;
     })
   | (PlayerCommand & {
       readonly type: "RUN_AWAY";

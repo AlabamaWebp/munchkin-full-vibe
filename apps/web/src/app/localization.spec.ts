@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import type { GameCardView } from '@munchkin-lan/contracts';
-import { LocalizationService } from './localization';
+import { createDevelopmentCardSet } from '@munchkin-lan/game-engine';
+import { LocalizationService, RUSSIAN_CARDS } from './localization';
 
 const card: GameCardView = {
   instanceId: 'dust-bunny-brigade-1',
   definitionId: 'dust-bunny-brigade',
+  artKey: 'test.dust-bunny-brigade',
   name: 'Dust Bunny Brigade',
   description: 'A surprisingly organized threat from beneath the sofa.',
   type: 'MONSTER',
@@ -14,6 +16,12 @@ const card: GameCardView = {
 };
 
 describe('LocalizationService', () => {
+  it('contains Russian names and descriptions for every catalog definition', () => {
+    for (const definition of createDevelopmentCardSet().definitions) {
+      expect(RUSSIAN_CARDS[definition.id]?.name).toBeTruthy();
+      expect(RUSSIAN_CARDS[definition.id]?.description).toBeTruthy();
+    }
+  });
   beforeEach(() => {
     window.localStorage.clear();
     TestBed.configureTestingModule({});

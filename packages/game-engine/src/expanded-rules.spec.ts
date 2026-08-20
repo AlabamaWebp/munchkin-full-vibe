@@ -17,6 +17,7 @@ import {
   parseCardDefinitionId,
   parseCardInstanceId,
   parseGameId,
+  parseEncounterId,
   parsePlayerId,
 } from "./identifiers.js";
 
@@ -116,7 +117,7 @@ function player(
 
 function state(players: readonly PlayerState[]): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: parseGameId("expanded"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.TURN_START,
@@ -338,10 +339,28 @@ describe("expanded rules", () => {
       phase: GamePhase.DOOR_RESOLUTION,
       combat: {
         playerId: adaId,
-        monster: monsterCard,
-        monsterBonus: 0,
+        revision: 1,
+        monsters: [
+          {
+            encounterId: parseEncounterId("encounter-1"),
+            monster: monsterCard,
+            sourceCard: monsterCard,
+            clonedFromEncounterId: null,
+            baseStrength: 30,
+            baseLevelRewards: 1,
+            baseTreasureRewards: 0,
+            badStuff: fatalMonster.monster!.badStuff,
+            strengthModifier: 0,
+            treasureModifier: 0,
+            playedCards: [],
+          },
+        ],
+        nextEncounterSequence: 2,
+        nextReactionWindowSequence: 1,
+        reactionWindow: null,
         requestedHelperId: null,
         helperId: null,
+        runAway: null,
         history: [],
       },
     };

@@ -358,3 +358,112 @@ Reusing `GameView`, its audience-filtered log, and public combat history keeps o
 privacy boundary and one source of truth while allowing the mobile UI to explain
 cards and actions without copying engine rules. The local acknowledgement affects
 only transient presentation and cannot hide or alter authoritative history.
+
+---
+
+## ADR-026 — Atomic cyclic deck draws
+
+Every post-setup Door or Treasure draw uses one engine-owned operation. It
+consumes the current draw-pile remainder first, then shuffles only the matching
+discard through `RandomSource` when more cards are required. A draw is rejected
+without changing game state when the draw pile and discard together cannot
+provide the complete requested count.
+
+Recycling emits a public `DECK_RESHUFFLED` event containing only the deck type.
+Card identities continue to follow the visibility of the draw that requested
+them.
+
+Reason:
+
+A single typed operation prevents opening Doors, effects, combat rewards, and
+revival from developing different exhaustion rules. Prechecking the combined
+card count preserves command atomicity, while the identity-free public event
+makes the lifecycle visible without weakening hidden-card privacy.
+
+---
+
+## ADR-027 — Encounter-addressed multi-Monster combat snapshots
+
+This decision refines ADR-019's original single Monster-side target model.
+
+`CombatState` stores an ordered array of Monster encounters instead of one
+Monster-side aggregate. Each encounter has a stable branded `encounterId`, base
+Monster parameters, independent strength and Treasure modifiers, and public
+physical cards attached to it. Monster-targeted commands must carry the exact
+encounter id; side-wide Monster modification is not a valid command.
+
+Adding a Monster moves both the typed add card and selected owned Monster into
+combat. Cloning creates a new encounter whose numbers and attached-card history
+are a snapshot of the selected encounter, while the clone card is its physical
+source. Cleanup de-duplicates physical card ids before moving cards to their
+typed discard piles.
+
+Run away is a serialized ordered sequence over encounter ids. Its completed
+attempts and next index live in combat state, while a chosen-discard bad-stuff
+effect continues to use the existing typed pending decision. Resolving that
+decision resumes the sequence with the next Monster.
+
+Reason:
+
+Stable encounter identity makes targets unambiguous when identical cards or
+clones coexist. Per-encounter snapshots prevent later effects from retroactively
+changing a clone, and serialized escape progress preserves deterministic
+server-authoritative behavior across pending choices and reconnects without
+functions, client calculations, or card-name checks.
+
+---
+
+## ADR-028 — Versioned, serialized combat-victory reactions
+
+Direct combat resolution is replaced by two intentions:
+`DECLARE_COMBAT_VICTORY`, addressed to the current combat revision, and
+`PASS_COMBAT_REACTION`, addressed to a current reaction-window id. The
+serializable `CombatState` stores the combat revision, monotonically increasing
+reaction-window sequence, claimant, and confirmed permanent player ids. Socket
+connection state never participates in confirmation.
+
+Every typed combat intervention validates the current window id and rejects an
+actor who already passed. A successful intervention increments the combat
+revision and either creates a new window with only the claimant confirmed or
+cancels the claim when the player side no longer leads. Other commands are
+blocked during the window. The last required pass and combat reward resolution
+run in one engine command, including a fresh authoritative power comparison and
+the existing atomic reward-availability check. One-player declarations take the
+same path without persisting an externally visible wait.
+
+Combat Curses are a separate typed card category addressed only to the active
+combat player or accepted helper. Temporary player-side and Monster-side bonuses
+use distinct typed effects, so side legality remains data-driven.
+
+Reason:
+
+Persisted player-id confirmations make the wait visible after refresh or
+reconnect and ensure an offline participant is never silently skipped. Explicit
+revisions make duplicate and delayed Socket.IO commands harmless, while keeping
+all power calculations, reaction legality, and the transition to combat rewards
+inside the framework-independent server-authoritative engine.
+
+---
+
+## ADR-029 — Complete catalog metadata and stable illustration identity
+
+Every production card definition carries a stable unique `artKey` independent of
+its physical instance id. Treasure value is stored as card-level `goldValue`, so
+equipment and consumable Treasure cards share one economy field. Equipment owns
+its typed combat bonus, exact occupied-hand count, and explicit Class/Race
+restriction list. Action definitions expose typed permitted timings and targets
+when those are not unambiguous from their card type. All of these fields pass
+through the player-specific `GameCardView` projection.
+
+Behaviorless `OTHER` definitions are not permitted in the production catalog.
+An empty effect list is accepted only when Monster, equipment, Class, or Race
+fields completely define the card's current game role. Compatibility fallbacks
+for older in-memory/test fixtures remain internal to the engine and projection;
+catalog completeness tests enforce the stricter production shape.
+
+Reason:
+
+Stable visual identity allows illustrations to be added later without coupling
+assets to shuffled physical copies. Explicit economy, equipment, timing, and
+target fields make content auditable and projectable without parsing prose,
+checking names, or duplicating domain assumptions in Angular.
