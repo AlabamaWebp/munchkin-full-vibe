@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 
 function hashKey(value: string): number {
   let hash = 2166136261;
@@ -23,10 +23,19 @@ function hashKey(value: string): number {
       [style.--art-angle]="palette().angle"
       [style.--art-shift]="palette().shift"
     >
-      <span class="orb orb-one"></span>
-      <span class="orb orb-two"></span>
-      <span class="glyph">{{ glyph() }}</span>
-      <small>{{ label() }}</small>
+      @if (imageUrl()) {
+        <img
+          class="card-image"
+          [class.hidden]="imageError()"
+          [src]="imageUrl()"
+          [alt]="label()"
+          (error)="imageError.set(true)"
+        />
+      }
+      <span class="orb orb-one" [class.hidden]="!imageError()"></span>
+      <span class="orb orb-two" [class.hidden]="!imageError()"></span>
+      <span class="glyph" [class.hidden]="!imageError()">{{ glyph() }}</span>
+      <small [class.hidden]="!imageError()">{{ label() }}</small>
     </div>
   `,
   styles: `
@@ -125,12 +134,29 @@ function hashKey(value: string): number {
     .artwork.compact small {
       display: none;
     }
+    .card-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 0.6rem;
+    }
+    .hidden {
+      display: none;
+    }
   `,
 })
 export class CardArtworkComponent {
   readonly artKey = input.required<string>();
   readonly label = input.required<string>();
   readonly compact = input(false);
+
+  readonly imageError = signal(false);
+
+  readonly imageUrl = computed(() => {
+    const lastDot = this.artKey().lastIndexOf('.');
+    const fileName = lastDot === -1 ? this.artKey() : this.artKey().slice(lastDot + 1);
+    return `/assets/cards/${fileName}.png`;
+  });
 
   readonly palette = computed(() => {
     const hash = hashKey(this.artKey());
