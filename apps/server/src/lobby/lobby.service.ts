@@ -11,6 +11,8 @@ import {
   type LobbyErrorCode,
   type LobbyState,
   type ResumeSessionPayload,
+  type SetLobbySettingsPayload,
+  type SetPlayerSexPayload,
   type StartLobbyPayload,
 } from '@munchkin-lan/contracts';
 import { RoomCodeService } from './room-code.service';
@@ -21,6 +23,7 @@ interface LobbyPlayerRecord {
   readonly sessionToken: string;
   socketId: string | null;
   connected: boolean;
+  sex: import('@munchkin-lan/contracts').PlayerSex | null;
 }
 
 interface LobbyRoomRecord {
@@ -28,6 +31,10 @@ interface LobbyRoomRecord {
   status: LobbyStatus;
   readonly hostPlayerId: string;
   readonly players: LobbyPlayerRecord[];
+  settings: {
+    mode: import('@munchkin-lan/contracts').GameMode;
+    enabledSetIds: readonly import('@munchkin-lan/contracts').CardSetId[];
+  };
 }
 
 export interface LobbyOperationSuccess {
@@ -53,6 +60,7 @@ export interface LobbyDeparture {
 export interface LobbyGamePlayer {
   readonly playerId: string;
   readonly name: string;
+  readonly sex: import('@munchkin-lan/contracts').PlayerSex;
 }
 
 export interface ConnectedLobbyPlayer extends LobbyGamePlayer {
@@ -97,6 +105,7 @@ export class LobbyService {
       status: LobbyStatus.LOBBY,
       hostPlayerId: player.playerId,
       players: [player],
+      settings: { mode: 'BALANCED', enabledSetIds: ['CORE'] },
     };
     this.rooms.set(roomCode, room);
     this.trackPlayer(roomCode, player);
@@ -211,8 +220,78 @@ export class LobbyService {
     if (room.status !== LobbyStatus.LOBBY) {
       return failure('GAME_ALREADY_STARTED', 'The game has already started.');
     }
+    if (room.players.some((candidate) => candidate.sex === null)) {
+      return failure(
+        'SEX_REQUIRED',
+        'Every player must choose a sex before starting.',
+      );
+    }
 
     room.status = LobbyStatus.STARTED;
+    return this.success(room, player);
+  }
+
+  setPlayerSex(
+    socketId: string,
+    payload: SetPlayerSexPayload,
+  ): LobbyOperationResult {
+    const roomCode = this.normalizeRoomCode(payload?.roomCode);
+    const room = roomCode === null ? undefined : this.rooms.get(roomCode);
+    const player = room?.players.find(
+      (candidate) =>
+        candidate.socketId === socketId &&
+        candidate.playerId === payload?.playerId,
+    );
+    if (room === undefined || player === undefined)
+      return failure(
+        'PLAYER_NOT_FOUND',
+        'This connection is not a player in that room.',
+      );
+    if (room.status !== LobbyStatus.LOBBY)
+      return failure('GAME_ALREADY_STARTED', 'The game has already started.');
+    if (payload.sex !== 'MALE' && payload.sex !== 'FEMALE')
+      return failure('INVALID_GAME_SETTINGS', 'Choose a valid sex.');
+    player.sex = payload.sex;
+    return this.success(room, player);
+  }
+
+  setSettings(
+    socketId: string,
+    payload: SetLobbySettingsPayload,
+  ): LobbyOperationResult {
+    const roomCode = this.normalizeRoomCode(payload?.roomCode);
+    const room = roomCode === null ? undefined : this.rooms.get(roomCode);
+    const player = room?.players.find(
+      (candidate) =>
+        candidate.socketId === socketId &&
+        candidate.playerId === payload?.playerId,
+    );
+    if (room === undefined || player === undefined)
+      return failure(
+        'PLAYER_NOT_FOUND',
+        'This connection is not a player in that room.',
+      );
+    if (room.hostPlayerId !== player.playerId)
+      return failure('NOT_HOST', 'Only the host can change game settings.');
+    if (room.status !== LobbyStatus.LOBBY)
+      return failure('GAME_ALREADY_STARTED', 'The game has already started.');
+    if (
+      (payload.mode !== 'BALANCED' && payload.mode !== 'CLASSIC_CHAOS') ||
+      !Array.isArray(payload.enabledSetIds)
+    )
+      return failure('INVALID_GAME_SETTINGS', 'Choose valid game settings.');
+    const valid = new Set(['CORE', 'COMPANIONS', 'ARSENAL', 'DUAL_IDENTITY']);
+    const ids = payload.enabledSetIds;
+    if (
+      !ids.includes('CORE') ||
+      ids.length !== new Set(ids).size ||
+      ids.some((id) => !valid.has(id))
+    )
+      return failure(
+        'INVALID_GAME_SETTINGS',
+        'CORE must be enabled and card sets must be unique.',
+      );
+    room.settings = { mode: payload.mode, enabledSetIds: [...ids] };
     return this.success(room, player);
   }
 
@@ -254,8 +333,14 @@ export class LobbyService {
     return (
       this.rooms
         .get(roomCode)
-        ?.players.map(({ playerId, name }) => ({ playerId, name })) ?? []
+        ?.players.flatMap(({ playerId, name, sex }) =>
+          sex === null ? [] : [{ playerId, name, sex }],
+        ) ?? []
     );
+  }
+
+  getGameConfig(roomCode: string): LobbyRoomRecord['settings'] | null {
+    return this.rooms.get(roomCode)?.settings ?? null;
   }
 
   getConnectedPlayers(roomCode: string): readonly ConnectedLobbyPlayer[] {
@@ -266,6 +351,7 @@ export class LobbyService {
               {
                 playerId: player.playerId,
                 name: player.name,
+                sex: player.sex ?? 'MALE',
                 socketId: player.socketId,
               },
             ]
@@ -290,7 +376,9 @@ export class LobbyService {
       ?.players.find((candidate) => candidate.socketId === socketId);
     return player === undefined
       ? null
-      : { playerId: player.playerId, name: player.name };
+      : player.sex === null
+        ? null
+        : { playerId: player.playerId, name: player.name, sex: player.sex };
   }
 
   private findHost(
@@ -373,6 +461,7 @@ export class LobbyService {
       sessionToken: randomUUID(),
       socketId,
       connected: true,
+      sex: null,
     };
   }
 
@@ -407,7 +496,9 @@ export class LobbyService {
         name: player.name,
         isHost: player.playerId === room.hostPlayerId,
         connected: player.connected,
+        sex: player.sex,
       })),
+      settings: room.settings,
     };
   }
 }

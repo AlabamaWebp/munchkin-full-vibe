@@ -2,6 +2,7 @@
   "name": "munchkin-lan",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "A mobile-first LAN multiplayer card game foundation.",
   "license": "UNLICENSED",
   "packageManager": "npm@11.12.1",
@@ -22,7 +23,8 @@
     "typecheck": "npm run build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "generate:card-art-csv": "npm run build --workspace @munchkin-lan/game-engine && node --experimental-strip-types scripts/generate-card-art-csv.ts"
+    "generate:card-art-csv": "npm run build --workspace @munchkin-lan/game-engine && node --experimental-strip-types scripts/generate-card-art-csv.ts",
+    "balance:simulate": "npm run build --workspace @munchkin-lan/game-engine && node --experimental-strip-types scripts/balance-sim.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

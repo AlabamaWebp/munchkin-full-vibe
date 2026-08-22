@@ -50,7 +50,7 @@ function addPlayer(
   return requireSuccess(
     executeCommand(
       state,
-      { type: "ADD_PLAYER", actorId: parsePlayerId(id), name },
+      { type: "ADD_PLAYER", actorId: parsePlayerId(id), name, sex: "MALE" },
       { random },
     ),
   );
@@ -74,6 +74,10 @@ function definition(
 ): CardDefinition {
   return {
     id: parseCardDefinitionId(id),
+    artKey: `test.${id}`,
+    setId: "CORE",
+    tier: 1,
+    tags: [],
     name: id,
     description: `${id} test card`,
     type,
@@ -82,7 +86,7 @@ function definition(
     ...(type === CardType.MONSTER
       ? {
           monster: {
-            level: 2,
+            strength: 2,
             levelRewards: 1,
             treasureRewards: 1,
             badStuff: [],
@@ -101,14 +105,14 @@ function instance(definitionId: string, copy: number): CardInstance {
 
 function cardSetWithDoor(
   target: CardDefinition,
-  followingType: CardType = CardType.OTHER,
+  followingType: CardType = CardType.UTILITY,
   playerCount = 1,
 ): CardSet {
-  const fillerDoor = definition("filler-door", CardType.OTHER, DeckType.DOOR);
+  const fillerDoor = definition("filler-door", CardType.UTILITY, DeckType.DOOR);
   const following = definition("following-door", followingType, DeckType.DOOR);
   const treasure = definition(
     "filler-treasure",
-    CardType.OTHER,
+    CardType.UTILITY,
     DeckType.TREASURE,
   );
   const initialCards = STARTING_HAND_SIZE_PER_DECK * playerCount;
@@ -132,6 +136,7 @@ function startedSinglePlayerGame(target: CardDefinition): GameState {
   let state = createGame({
     id: parseGameId("focused-game"),
     cardSet: cardSetWithDoor(target),
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
   });
   state = addPlayer(state, "ada", "Ada");
   return startGame(state);
@@ -152,13 +157,13 @@ describe("game setup", () => {
     });
     expect(
       set.definitions.filter((card) => card.type === CardType.MONSTER),
-    ).toHaveLength(8);
+    ).toHaveLength(20);
     expect(
       set.definitions.filter((card) => card.type === CardType.EQUIPMENT),
-    ).toHaveLength(10);
+    ).toHaveLength(28);
     expect(
       set.definitions.filter((card) => card.type === CardType.CURSE),
-    ).toHaveLength(6);
+    ).toHaveLength(11);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
   });
 
@@ -304,7 +309,7 @@ describe("turn commands", () => {
 
   it("rejects commands issued in the wrong phase", () => {
     const state = startedSinglePlayerGame(
-      definition("other", CardType.OTHER, DeckType.DOOR),
+      definition("other", CardType.UTILITY, DeckType.DOOR),
     );
     const result = executeCommand(
       state,
@@ -321,7 +326,7 @@ describe("turn commands", () => {
 
   it("reveals an Other Door card and puts it in the active hand", () => {
     const state = startedSinglePlayerGame(
-      definition("odd-door", CardType.OTHER, DeckType.DOOR),
+      definition("odd-door", CardType.UTILITY, DeckType.DOOR),
     );
     const result = executeCommand(
       state,
@@ -447,6 +452,7 @@ describe("turn commands", () => {
       {
         type: "RESOLVE_CARD_DISCARD",
         actorId: parsePlayerId("ada"),
+        decisionId: kicked.pendingDecision!.decisionId,
         cardIds: chosen.map((card) => card.instanceId),
       },
       { random: keepOrderRandom },
@@ -468,7 +474,7 @@ describe("turn commands", () => {
 
   it("loots one facedown Door card and keeps its identity private", () => {
     const state = startedSinglePlayerGame(
-      definition("other", CardType.OTHER, DeckType.DOOR),
+      definition("other", CardType.UTILITY, DeckType.DOOR),
     );
     const afterDoor = requireSuccess(
       executeCommand(
@@ -501,10 +507,11 @@ describe("turn commands", () => {
   });
 
   it("ends the turn, advances player order, and increments the turn", () => {
-    const other = definition("turn-other", CardType.OTHER, DeckType.DOOR);
+    const other = definition("turn-other", CardType.UTILITY, DeckType.DOOR);
     let state = createGame({
       id: parseGameId("turn-order"),
-      cardSet: cardSetWithDoor(other, CardType.OTHER, 2),
+      cardSet: cardSetWithDoor(other, CardType.UTILITY, 2),
+      config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     });
     state = addPlayer(state, "ada");
     state = addPlayer(state, "bob");
@@ -562,7 +569,7 @@ describe("turn commands", () => {
 
   it("validates card ownership for unavailable card-play commands", () => {
     const state = startedSinglePlayerGame(
-      definition("other", CardType.OTHER, DeckType.DOOR),
+      definition("other", CardType.UTILITY, DeckType.DOOR),
     );
     const result = executeCommand(
       state,

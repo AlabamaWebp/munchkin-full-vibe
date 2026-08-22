@@ -102,6 +102,11 @@ describe('LobbyService', () => {
   it('allows the host to start a one-player game and closes the room to joins', () => {
     const created = service.createRoom('socket-host', { playerName: 'Ada' });
     if (!created.success) throw new Error('Expected room creation to succeed.');
+    service.setPlayerSex('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+      sex: 'FEMALE',
+    });
 
     const started = service.startRoom('socket-host', {
       roomCode: 'ABCD',
@@ -154,6 +159,16 @@ describe('LobbyService', () => {
     });
     if (!created.success || !joined.success)
       throw new Error('Expected room setup to succeed.');
+    service.setPlayerSex('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+      sex: 'FEMALE',
+    });
+    service.setPlayerSex('socket-guest', {
+      roomCode: 'ABCD',
+      playerId: joined.acknowledgement.playerId,
+      sex: 'MALE',
+    });
     service.startRoom('socket-host', {
       roomCode: 'ABCD',
       playerId: created.acknowledgement.playerId,
@@ -187,6 +202,11 @@ describe('LobbyService', () => {
     });
     if (!created.success || !joined.success)
       throw new Error('Expected room setup to succeed.');
+    service.setPlayerSex('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+      sex: 'FEMALE',
+    });
 
     const departure = service.disconnect('socket-host');
 

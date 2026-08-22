@@ -1,85 +1,339 @@
 import { describe, expect, it } from "vitest";
-import { CardType, DeckType, EquipmentSlot } from "./cards.js";
-import { createDevelopmentCardSet } from "./development-cards.js";
+import {
+  CardSetId,
+  CardType,
+  DeckType,
+  GamePhase,
+  GameStatus,
+  createDevelopmentCardSet,
+  createGame,
+  createSeededRandomSource,
+  executeCommand,
+  parseGameId,
+  parsePlayerId,
+  permanentCombatPower,
+  roleCapacity,
+  type CardDefinition,
+  type CardInstance,
+  type GameState,
+  type PlayerState,
+} from "./index.js";
 
-describe("development card catalog", () => {
+describe("V2 production card catalog", () => {
   const cardSet = createDevelopmentCardSet();
   const definitions = cardSet.definitions;
+  const allCards = [...cardSet.doorDeck, ...cardSet.treasureDeck];
 
-  it("contains a varied catalog sized for three to six players", () => {
-    const doorDefinitions = definitions.filter(
-      (definition) => definition.deck === DeckType.DOOR,
-    );
-    const treasureDefinitions = definitions.filter(
-      (definition) => definition.deck === DeckType.TREASURE,
-    );
-
-    expect(doorDefinitions.length).toBeGreaterThanOrEqual(18);
-    expect(treasureDefinitions.length).toBeGreaterThanOrEqual(20);
-    expect(cardSet.doorDeck.length).toBeGreaterThanOrEqual(48);
-    expect(cardSet.treasureDeck.length).toBeGreaterThanOrEqual(60);
-  });
-
-  it("has no placeholder cards and only permits empty effects for typed cards", () => {
-    expect(
-      definitions.some((definition) => definition.type === CardType.OTHER),
-    ).toBe(false);
-
-    const typedWithoutEffects = new Set<CardType>([
-      CardType.MONSTER,
-      CardType.EQUIPMENT,
-      CardType.CLASS,
-      CardType.RACE,
-    ]);
-    for (const definition of definitions) {
-      if (definition.effects.length === 0) {
-        expect(typedWithoutEffects.has(definition.type)).toBe(true);
-      }
+  it("has the explicit target size for Core and every optional set", () => {
+    const expected = {
+      CORE: [80, 192],
+      COMPANIONS: [12, 24],
+      ARSENAL: [16, 36],
+      DUAL_IDENTITY: [12, 24],
+    } as const;
+    for (const setId of Object.values(CardSetId)) {
+      const ids = new Set(
+        definitions
+          .filter((definition) => definition.setId === setId)
+          .map((definition) => definition.id),
+      );
+      expect([
+        ids.size,
+        allCards.filter((card) => ids.has(card.definitionId)).length,
+      ]).toEqual(expected[setId]);
     }
   });
 
-  it("uses unique stable definition ids and illustration keys", () => {
-    const ids = definitions.map((definition) => definition.id);
-    const artKeys = definitions.map((definition) => definition.artKey);
-
-    expect(new Set(ids).size).toBe(ids.length);
+  it("uses unique ids, art keys, instances, and valid references", () => {
+    expect(new Set(definitions.map((definition) => definition.id)).size).toBe(
+      definitions.length,
+    );
     expect(
-      artKeys.every(
-        (artKey) => typeof artKey === "string" && artKey.length > 0,
+      new Set(definitions.map((definition) => definition.artKey)).size,
+    ).toBe(definitions.length);
+    expect(new Set(allCards.map((card) => card.instanceId)).size).toBe(
+      allCards.length,
+    );
+    const ids = new Set(definitions.map((definition) => definition.id));
+    expect(allCards.every((card) => ids.has(card.definitionId))).toBe(true);
+    for (const definition of definitions)
+      for (const restriction of definition.equipment?.restrictions ?? [])
+        expect(ids.has(restriction.definitionId), definition.id).toBe(true);
+  });
+
+  it("matches the authored Core category and tier curve", () => {
+    const core = definitions.filter(
+      (definition) => definition.setId === CardSetId.CORE,
+    );
+    const count = (predicate: (definition: CardDefinition) => boolean) =>
+      core.filter(predicate).length;
+    expect(count((card) => card.type === CardType.MONSTER)).toBe(20);
+    expect(
+      count(
+        (card) =>
+          card.type === CardType.CURSE || card.type === CardType.COMBAT_CURSE,
+      ),
+    ).toBe(12);
+    expect(count((card) => card.type === CardType.CLASS)).toBe(4);
+    expect(count((card) => card.type === CardType.RACE)).toBe(4);
+    expect(count((card) => card.type === CardType.EQUIPMENT)).toBe(20);
+    expect(count((card) => card.type === CardType.TEMPORARY_BONUS)).toBe(8);
+    expect(
+      count((card) =>
+        [
+          CardType.MONSTER_MODIFIER,
+          CardType.ADD_MONSTER,
+          CardType.CLONE_MONSTER,
+        ].includes(card.type),
+      ),
+    ).toBe(6);
+    expect(count((card) => card.type === CardType.UTILITY)).toBe(6);
+    expect(
+      core
+        .filter((card) => card.type === CardType.MONSTER)
+        .map((card) => card.tier),
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3]);
+  });
+
+  it("gives every actionable card timing/target and every sellable Treasure positive value", () => {
+    for (const definition of definitions) {
+      expect(definition.name.trim(), definition.id).not.toHaveLength(0);
+      expect(definition.description.trim(), definition.id).not.toHaveLength(0);
+      expect(
+        definition.description
+          .split(".")
+          .filter((sentence) => sentence.trim().length > 0).length,
+        definition.id,
+      ).toBeLessThanOrEqual(2);
+      if (definition.type !== CardType.MONSTER) {
+        expect(definition.play?.timings.length, definition.id).toBeGreaterThan(
+          0,
+        );
+        expect(definition.play?.target, definition.id).toEqual(
+          expect.any(String),
+        );
+      }
+      const defaultSellable =
+        definition.deck === DeckType.TREASURE &&
+        (definition.goldValue ?? 0) > 0;
+      if (definition.sellable ?? defaultSellable)
+        expect(definition.goldValue, definition.id).toBeGreaterThan(0);
+      if (
+        [
+          CardType.MONSTER,
+          CardType.CURSE,
+          CardType.COMBAT_CURSE,
+          CardType.CLASS,
+          CardType.RACE,
+          CardType.ROLE_PERMISSION,
+        ].includes(definition.type)
+      )
+        expect(definition.sellable ?? false, definition.id).toBe(false);
+    }
+  });
+
+  it("has a bounded six-player starter pool", () => {
+    const starters = definitions.filter(
+      (definition) => definition.starterEligible,
+    );
+    const copies = allCards.filter((card) =>
+      starters.some((definition) => definition.id === card.definitionId),
+    );
+    expect(starters.length).toBeGreaterThanOrEqual(5);
+    expect(copies.length).toBeGreaterThanOrEqual(12);
+    for (const starter of starters) {
+      expect(starter).toMatchObject({
+        setId: CardSetId.CORE,
+        tier: 1,
+        type: CardType.EQUIPMENT,
+      });
+      expect(starter.equipment?.restrictions).toEqual([]);
+      expect(starter.equipment?.combatBonus).toBeGreaterThanOrEqual(1);
+      expect(starter.equipment?.combatBonus).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("filters disabled expansions out of GameState", () => {
+    const core = createGame({ id: parseGameId("core-catalog") });
+    expect(
+      core.cardDefinitions.every(
+        (definition) => definition.setId === CardSetId.CORE,
       ),
     ).toBe(true);
-    expect(new Set(artKeys).size).toBe(artKeys.length);
+    const expanded = createGame({
+      id: parseGameId("expanded-catalog"),
+      config: { mode: "BALANCED", enabledSetIds: Object.values(CardSetId) },
+    });
+    expect(expanded.cardDefinitions).toHaveLength(120);
+    expect(
+      new Set(expanded.cardDefinitions.map((definition) => definition.setId)),
+    ).toEqual(new Set(Object.values(CardSetId)));
   });
+});
 
-  it("gives every Treasure an explicit value and every actionable card a policy", () => {
-    for (const definition of definitions) {
-      if (definition.deck === DeckType.TREASURE) {
-        expect(definition.goldValue).toEqual(expect.any(Number));
-        expect(definition.goldValue).toBeGreaterThanOrEqual(0);
-      }
-      if (definition.effects.length > 0) {
-        expect(definition.play?.timings.length).toBeGreaterThan(0);
-        expect(definition.play?.target).toEqual(expect.any(String));
-      }
+function instance(
+  state: GameState,
+  definitionId: string,
+  suffix: string,
+): CardInstance {
+  const card = [...state.doorDeck, ...state.treasureDeck].find(
+    (candidate) => candidate.definitionId === definitionId,
+  );
+  if (card === undefined) throw new Error(`Missing ${definitionId}`);
+  return {
+    ...card,
+    instanceId: `${card.instanceId}-${suffix}` as CardInstance["instanceId"],
+  };
+}
+function player(
+  value: string,
+  hand: readonly CardInstance[] = [],
+): PlayerState {
+  return {
+    id: parsePlayerId(value),
+    name: value,
+    sex: "MALE",
+    level: 1,
+    hand,
+    equipment: [],
+    equipmentAttachments: [],
+    classCards: [],
+    raceCards: [],
+    rolePermissionCards: [],
+    hirelingCard: null,
+    mountCard: null,
+    activeEffects: [],
+    isDead: false,
+  };
+}
+function playable(players: readonly PlayerState[]): GameState {
+  const base = createGame({
+    id: parseGameId("catalog-abilities"),
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: Object.values(CardSetId) },
+  });
+  return {
+    ...base,
+    status: GameStatus.IN_PROGRESS,
+    phase: GamePhase.TURN_START,
+    activePlayerId: players[0]!.id,
+    players,
+  };
+}
+
+describe("V2 catalog abilities", () => {
+  const random = createSeededRandomSource(7);
+
+  it("enforces one Hireling and one Mount slot", () => {
+    const base = playable([player("ada")]);
+    const first = instance(base, "eager-intern", "a");
+    const second = instance(base, "lantern-scout", "b");
+    const mount = instance(base, "stubborn-pony", "c");
+    let state = { ...base, players: [player("ada", [first, second, mount])] };
+    for (const card of [first, mount, second]) {
+      const result = executeCommand(
+        state,
+        {
+          type: "PLAY_CARD",
+          actorId: state.players[0]!.id,
+          cardId: card.instanceId,
+          target: null,
+        },
+        { random },
+      );
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      state = result.state;
     }
+    expect(state.players[0]?.hirelingCard).toEqual(second);
+    expect(state.players[0]?.mountCard).toEqual(mount);
+    expect(state.treasureDiscard).toContainEqual(first);
   });
 
-  it("fully describes equipment, including hands, bonus, and restrictions", () => {
-    const equipment = definitions.filter(
-      (definition) => definition.type === CardType.EQUIPMENT,
+  it("allows one compatible enhancer per equipped weapon", () => {
+    const base = playable([player("ada")]);
+    const weapon = instance(base, "spatula-of-resolve", "host");
+    const enhancer = instance(base, "sharpening-chorus", "one");
+    const duplicate = instance(base, "sharpening-chorus", "two");
+    const state = {
+      ...base,
+      players: [
+        { ...player("ada", [enhancer, duplicate]), equipment: [weapon] },
+      ],
+    };
+    const actorId = state.players[0]!.id;
+    const attached = executeCommand(
+      state,
+      {
+        type: "PLAY_CARD",
+        actorId,
+        cardId: enhancer.instanceId,
+        target: { type: "EQUIPMENT", cardId: weapon.instanceId },
+      },
+      { random },
     );
-    expect(equipment.length).toBeGreaterThanOrEqual(8);
+    expect(attached.success).toBe(true);
+    if (!attached.success) return;
+    expect(attached.state.players[0]?.equipmentAttachments).toEqual([
+      { card: enhancer, attachedToCardId: weapon.instanceId },
+    ]);
+    expect(permanentCombatPower(attached.state, actorId)).toBe(4);
+    expect(
+      executeCommand(
+        attached.state,
+        {
+          type: "PLAY_CARD",
+          actorId,
+          cardId: duplicate.instanceId,
+          target: { type: "EQUIPMENT", cardId: weapon.instanceId },
+        },
+        { random },
+      ).success,
+    ).toBe(false);
+  });
 
-    for (const definition of equipment) {
-      expect(definition.equipment).toBeDefined();
-      expect(definition.equipment?.combatBonus).toEqual(expect.any(Number));
-      expect(definition.equipment?.hands).toEqual(expect.any(Number));
-      expect(definition.equipment?.restrictions).toBeInstanceOf(Array);
-      expect(
-        definition.equipment?.slot === EquipmentSlot.HANDS
-          ? [1, 2].includes(definition.equipment.hands ?? -1)
-          : definition.equipment?.hands === 0,
-      ).toBe(true);
-    }
+  it("cancels a matching Curse through typed protection", () => {
+    const base = playable([player("ada"), player("bob")]);
+    const ward = instance(base, "hexproof-cap", "ward");
+    const curse = instance(base, "curse-shortcut-tax", "curse");
+    const ada = { ...player("ada"), equipment: [ward] };
+    const bob = player("bob", [curse]);
+    const state = { ...base, players: [ada, bob], activePlayerId: bob.id };
+    const result = executeCommand(
+      state,
+      {
+        type: "PLAY_CARD",
+        actorId: bob.id,
+        cardId: curse.instanceId,
+        target: { type: "PLAYER", playerId: ada.id },
+      },
+      { random },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.state.players[0]?.level).toBe(1);
+    expect(result.state.doorDiscard).toContainEqual(curse);
+  });
+
+  it("role permissions increase only their authored capacity", () => {
+    const base = playable([player("ada")]);
+    const permission = instance(base, "double-major", "permission");
+    const state = { ...base, players: [player("ada", [permission])] };
+    const result = executeCommand(
+      state,
+      {
+        type: "PLAY_ROLE_PERMISSION",
+        actorId: state.players[0]!.id,
+        cardId: permission.instanceId,
+      },
+      { random },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(roleCapacity(result.state, result.state.players[0]!, "CLASS")).toBe(
+      2,
+    );
+    expect(roleCapacity(result.state, result.state.players[0]!, "RACE")).toBe(
+      1,
+    );
   });
 });

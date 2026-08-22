@@ -95,20 +95,65 @@ revealed kicked-Door card is public.
 Door and Treasure draws use the same server-authoritative lifecycle, while the
 two deck types remain completely separate:
 
-- a draw first consumes the remaining cards from the current draw pile in their
-  existing order;
-- if the requested draw crosses the end of that pile, the engine shuffles only
-  the corresponding discard pile through the injected `RandomSource` and
-  continues the draw;
+- `CLASSIC_CHAOS` shuffles enabled decks and consumes the top card in order;
+- `BALANCED` selects each physical card with the level-based Door profile or the
+  defeated encounter's final-strength Treasure profile, using only the injected
+  `RandomSource`;
+- a Balanced draw renormalizes weights across tiers currently present and falls
+  back to a uniform present-tier choice when every preferred tier is absent;
+- the matching discard is recycled only when its draw pile is empty;
 - recycling the discard produces a public `DECK_RESHUFFLED` event that identifies
   only the Door or Treasure deck and never reveals card identities;
-- the engine rejects the action atomically only when the matching draw pile and
-  discard pile together contain fewer cards than the complete requested draw;
+- every complete request is preflighted and rejects atomically when the matching
+  draw pile plus discard contains too few physical cards;
 - this lifecycle applies to kicking the Door, looting the room, typed card-draw
   effects, combat Treasure rewards, and both four-card revival draws;
 - revival requires exactly four Door and four Treasure cards. If either combined
   deck and discard cannot provide all four, ending the preceding turn fails
   atomically and the player remains dead until the action can be completed.
+
+## V2 gameplay core
+
+The rules in this section supersede the earlier simplified milestone behavior.
+
+- Balanced setup reserves one distinct neutral, legal Tier-1 starter Equipment
+  instance per player, deals three weighted Treasure and four weighted Door
+  cards, then shuffles each private hand. Classic Chaos deals normally.
+- Makeshift Tools is a computed combat-power source for an eligible alive level-1
+  active player in one ordinary weak Tier-1 encounter without a helper. It is
+  recalculated from authoritative permanent power and is never a card or asset.
+- At `POST_DOOR`, an eligible weak level-1 player may `SCAVENGE` instead of
+  `LOOT_ROOM`. The engine uniformly selects one currently available legal
+  recovery item; it does not search discard. Recovered items are explicitly
+  non-sellable and non-tradeable, and a full-table-round cooldown applies.
+- Any eligible positive-value Treasure may be sold when its definition permits
+  it. The engine validates ownership, uniqueness, timing, value, and sellability;
+  each complete 1,000 gold grants one level and the remainder is lost. A sale is
+  unavailable at level 9 and a selection that would cross the pre-victory level
+  limit is rejected atomically.
+- One public help offer may exist per combat. The active player proposes a helper
+  and 0 through the current expected Treasure reward; the invitee may accept,
+  reject, or counter, and the active player may accept/reject the counter or
+  cancel an outstanding offer. Commands use stable offer ids and combat revisions.
+  Acceptance creates one immutable reconnect-safe agreement.
+- At victory, only the active player receives levels. The helper receives the
+  smaller of the promised count and final Treasure count, and the active player
+  receives the remainder. The full reward is drawn atomically and shuffled before
+  partitioning; public events reveal counts only, while each recipient privately
+  receives only their own card identities.
+- When a helper joined a losing combat, each encounter is processed in
+  encounter-major order: active player, then helper. Every living combatant rolls
+  independently with server randomness and typed modifiers. Death records later
+  attempts as skipped; pending Bad Stuff choices and shared-effect progress are
+  serialized so reconnect resumes without reroll or duplicate resolution.
+- Sex, Class, Race, Monster tags, Equipment tags, and approved card-family
+  conditions are typed data evaluated by the engine; card names never select a
+  rule. Their contributions are separate sources in the projected breakdown.
+- A player normally has one Class and one Race. A non-stacking role-permission
+  card raises one capacity to two; duplicate role definitions remain illegal.
+  Losing permission with two roles creates a reconnect-safe choice of which role
+  to keep, then revalidates equipment once and returns incompatible items and
+  their attachments to the private hand.
 
 ## Core V1 feature set
 
@@ -455,13 +500,14 @@ Losing combat should eventually support:
 
 ## Victory
 
-The winning level is 10. Reaching level 10 through any authoritative level gain
-(including combat rewards or selling items) immediately finishes the game.
+The winning level is 10. Monster combat may grant the final level; ordinary
+sales and ordinary `GAIN_LEVEL` effects stop at level 9. A non-combat card may
+grant the final level only when its typed effect explicitly declares
+`victoryEligible: true`.
 
-The combat reaction window delays only the resolution of a won combat. It does
-not change the winning-level rule: when the eventually granted combat level reward
-reaches level 10, the game still finishes immediately in that same authoritative
-resolution.
+The combat reaction window delays only the resolution of a won combat. When the
+eventually granted combat level reward reaches level 10, the game finishes
+immediately in that same authoritative resolution. Levels are capped at 10.
 
 Only the game engine may decide that a player has won.
 

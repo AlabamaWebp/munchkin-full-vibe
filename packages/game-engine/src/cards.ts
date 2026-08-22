@@ -1,5 +1,29 @@
 import type { CardDefinitionId, CardInstanceId } from "./identifiers.js";
 
+export const GameMode = {
+  BALANCED: "BALANCED",
+  CLASSIC_CHAOS: "CLASSIC_CHAOS",
+} as const;
+export type GameMode = (typeof GameMode)[keyof typeof GameMode];
+
+export const PlayerSex = { MALE: "MALE", FEMALE: "FEMALE" } as const;
+export type PlayerSex = (typeof PlayerSex)[keyof typeof PlayerSex];
+
+export const CardSetId = {
+  CORE: "CORE",
+  COMPANIONS: "COMPANIONS",
+  ARSENAL: "ARSENAL",
+  DUAL_IDENTITY: "DUAL_IDENTITY",
+} as const;
+export type CardSetId = (typeof CardSetId)[keyof typeof CardSetId];
+export type CardTier = 1 | 2 | 3;
+
+export type MonsterTag = "BEAST" | "CONSTRUCT" | "ARCANE" | "UNDEAD";
+export type EquipmentTag = "WEAPON" | "ARMOR" | "BLADE" | "BLUNT" | "MAGIC";
+export type CurseTag = "HEX" | "TRAP";
+export type CardTag = MonsterTag | EquipmentTag | CurseTag;
+export type CurseSeverity = "EARLY" | "MID" | "LATE";
+
 export const CardType = {
   MONSTER: "MONSTER",
   CURSE: "CURSE",
@@ -9,9 +33,13 @@ export const CardType = {
   MONSTER_MODIFIER: "MONSTER_MODIFIER",
   ADD_MONSTER: "ADD_MONSTER",
   CLONE_MONSTER: "CLONE_MONSTER",
-  OTHER: "OTHER",
+  UTILITY: "UTILITY",
   CLASS: "CLASS",
   RACE: "RACE",
+  HIRELING: "HIRELING",
+  MOUNT: "MOUNT",
+  ROLE_PERMISSION: "ROLE_PERMISSION",
+  ATTACHMENT: "ATTACHMENT",
 } as const;
 
 export type CardType = (typeof CardType)[keyof typeof CardType];
@@ -49,6 +77,7 @@ export const CardPlayTarget = {
   COMBAT_PLAYER: "COMBAT_PLAYER",
   MONSTER_ENCOUNTER: "MONSTER_ENCOUNTER",
   HAND_MONSTER: "HAND_MONSTER",
+  EQUIPMENT: "EQUIPMENT",
 } as const;
 
 export type CardPlayTarget =
@@ -70,13 +99,60 @@ export interface EquipmentDefinition {
   readonly hands?: 0 | 1 | 2;
   readonly combatBonus?: number;
   readonly restrictions?: readonly EquipmentRestrictionDefinition[];
-  /** @deprecated Gold value belongs to CardDefinition.goldValue. */
-  readonly value?: number;
-  /** @deprecated Use the typed restrictions array. */
-  readonly requiredClass?: CardDefinitionId;
-  /** @deprecated Use the typed restrictions array. */
-  readonly requiredRace?: CardDefinitionId;
+  readonly modifier?: ConditionalModifierDefinition;
 }
+
+export type ConditionDefinition =
+  | {
+      readonly type: "PLAYER_HAS_CLASS";
+      readonly anyOf: readonly CardDefinitionId[];
+    }
+  | {
+      readonly type: "PLAYER_HAS_RACE";
+      readonly anyOf: readonly CardDefinitionId[];
+    }
+  | { readonly type: "PLAYER_SEX_IS"; readonly sex: PlayerSex }
+  | { readonly type: "MONSTER_HAS_TAG"; readonly anyOf: readonly MonsterTag[] }
+  | {
+      readonly type: "EQUIPPED_HAS_TAG";
+      readonly anyOf: readonly EquipmentTag[];
+      readonly atLeast: number;
+      readonly scope: "OWNER" | "COMBAT_SIDE";
+    }
+  | {
+      readonly type: "CARD_DEFINITION_IS";
+      readonly anyOf: readonly CardDefinitionId[];
+    }
+  | {
+      readonly type: "CURSE_MATCHES";
+      readonly severities?: readonly CurseSeverity[];
+      readonly anyTag?: readonly CurseTag[];
+    };
+
+export type ConditionalModifierDefinition =
+  | {
+      readonly type: "COMBAT_POWER";
+      readonly amount: number;
+      readonly maxAmount?: number;
+      readonly conditions: readonly ConditionDefinition[];
+    }
+  | {
+      readonly type: "EQUIPMENT_TAG_BONUS";
+      readonly amountPerCard: number;
+      readonly maxCards: number;
+      readonly tags: readonly EquipmentTag[];
+      readonly conditions: readonly ConditionDefinition[];
+    }
+  | {
+      readonly type: "RUN_AWAY_ROLL";
+      readonly amount: number;
+      readonly conditions: readonly ConditionDefinition[];
+    }
+  | {
+      readonly type: "AUTOMATIC_PROTECTION";
+      readonly protection: "CANCEL" | "PROTECT_ONE_ITEM" | "IGNORE_BAD_STUFF";
+      readonly conditions: readonly ConditionDefinition[];
+    };
 
 export interface CardPlayDefinition {
   readonly timings: readonly CardPlayTiming[];
@@ -106,6 +182,7 @@ export type CardEffect =
   | {
       readonly type: "GAIN_LEVEL";
       readonly amount: number;
+      readonly victoryEligible?: boolean;
     }
   | {
       readonly type: "LOSE_LEVEL";
@@ -149,22 +226,54 @@ export type BadStuffEffect = Extract<
 export interface CardDefinition {
   readonly id: CardDefinitionId;
   /** Stable key for future illustration assets; unique within a card set. */
-  readonly artKey?: string;
+  readonly artKey: string;
+  readonly setId: CardSetId;
+  readonly tier: CardTier;
   readonly name: string;
   readonly description: string;
   readonly type: CardType;
   readonly deck: DeckType;
-  /** Required by the production catalog for every Treasure definition. */
+  readonly tags: readonly CardTag[];
   readonly goldValue?: number;
+  readonly sellable?: boolean;
+  readonly tradeable?: boolean;
+  readonly starterEligible?: boolean;
+  readonly scavengeEligible?: boolean;
   /** Explicit when timing or target is not inherent in the card type. */
   readonly play?: CardPlayDefinition;
   readonly effects: readonly CardEffect[];
   readonly equipment?: EquipmentDefinition;
   readonly monster?: {
-    readonly level: number;
-    readonly levelRewards: number;
+    readonly strength: number;
+    readonly levelRewards: 1 | 2;
     readonly treasureRewards: number;
+    readonly badStuffTarget?: "FAILED_COMBATANT" | "ALL_COMBATANTS";
     readonly badStuff: readonly BadStuffEffect[];
+    readonly modifiers?: readonly ConditionalModifierDefinition[];
+  };
+  readonly curse?: { readonly severity: CurseSeverity };
+  /** A target-only response played from hand while a Curse is pending. */
+  readonly curseProtection?: {
+    readonly mode: "CANCEL" | "PROTECT_ONE_ITEM";
+    readonly conditions?: readonly ConditionDefinition[];
+  };
+  readonly role?: {
+    readonly role: "CLASS" | "RACE";
+    readonly modifier?: ConditionalModifierDefinition;
+  };
+  readonly companion?: {
+    readonly kind: "HIRELING" | "MOUNT";
+    readonly combatBonus: number;
+    readonly modifier?: ConditionalModifierDefinition;
+  };
+  readonly rolePermission?: {
+    readonly role: "CLASS" | "RACE";
+    readonly additionalSlots: 1;
+  };
+  readonly attachment?: {
+    readonly allowedTags: readonly EquipmentTag[];
+    readonly allowedDefinitionIds?: readonly CardDefinitionId[];
+    readonly combatBonus: number;
   };
 }
 
@@ -177,4 +286,9 @@ export interface CardSet {
   readonly definitions: readonly CardDefinition[];
   readonly doorDeck: readonly CardInstance[];
   readonly treasureDeck: readonly CardInstance[];
+}
+
+export interface CardCatalogEntry {
+  readonly definition: CardDefinition;
+  readonly copies: number;
 }

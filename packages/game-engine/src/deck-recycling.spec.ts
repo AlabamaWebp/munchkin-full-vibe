@@ -5,7 +5,8 @@ import {
   type CardDefinition,
   type CardInstance,
 } from "./cards.js";
-import { executeCommand, type CommandResult } from "./engine.js";
+import type { CommandResult } from "./engine.js";
+import { executeCommand } from "./legacy-test-command.js";
 import {
   GamePhase,
   GameStatus,
@@ -46,7 +47,7 @@ function definition(
     ...(type === CardType.MONSTER
       ? {
           monster: {
-            level: 2,
+            strength: 2,
             levelRewards: 1,
             treasureRewards: 2,
             badStuff: [],
@@ -56,10 +57,10 @@ function definition(
   };
 }
 
-const doorDefinition = definition("door-card", CardType.OTHER, DeckType.DOOR);
+const doorDefinition = definition("door-card", CardType.UTILITY, DeckType.DOOR);
 const treasureDefinition = definition(
   "treasure-card",
-  CardType.OTHER,
+  CardType.UTILITY,
   DeckType.TREASURE,
 );
 const monsterDefinition = definition(
@@ -94,19 +95,25 @@ function player(
   return {
     id,
     name: id,
+    sex: "MALE",
     level: 5,
     hand,
     equipment: [],
-    classCard: null,
-    raceCard: null,
+    equipmentAttachments: [],
+    classCards: [],
+    raceCards: [],
+    rolePermissionCards: [],
+    hirelingCard: null,
+    mountCard: null,
     isDead: false,
-    temporaryCombatBonus: 0,
+    activeEffects: [],
   };
 }
 
 function state(overrides: Partial<GameState> = {}): GameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("deck-recycling"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.POST_DOOR,
@@ -120,6 +127,7 @@ function state(overrides: Partial<GameState> = {}): GameState {
     combat: null,
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,
@@ -255,6 +263,8 @@ describe("recycling deck draws", () => {
           baseStrength: 2,
           baseLevelRewards: 1,
           baseTreasureRewards: 2,
+          tier: 1,
+          tags: [],
           badStuff: [],
           strengthModifier: 0,
           treasureModifier: 0,
@@ -262,10 +272,11 @@ describe("recycling deck draws", () => {
         },
       ],
       nextEncounterSequence: 2,
+      nextHelpOfferSequence: 1,
       nextReactionWindowSequence: 1,
       reactionWindow: null,
-      requestedHelperId: null,
-      helperId: null,
+      helpOffer: null,
+      helpAgreement: null,
       history: [],
       runAway: null,
     };
@@ -406,8 +417,8 @@ describe("LOOK_FOR_TROUBLE", () => {
     expect(fighting.combat).toMatchObject({
       playerId: heroId,
       monsters: [{ encounterId: parseEncounterId("encounter-1"), monster }],
-      requestedHelperId: null,
-      helperId: null,
+      helpOffer: null,
+      helpAgreement: null,
     });
     expect(result.events).toEqual([
       {
@@ -481,6 +492,8 @@ describe("LOOK_FOR_TROUBLE", () => {
           baseStrength: 2,
           baseLevelRewards: 1,
           baseTreasureRewards: 2,
+          tier: 1,
+          tags: [],
           badStuff: [],
           strengthModifier: 0,
           treasureModifier: 0,
@@ -488,10 +501,11 @@ describe("LOOK_FOR_TROUBLE", () => {
         },
       ],
       nextEncounterSequence: 2,
+      nextHelpOfferSequence: 1,
       nextReactionWindowSequence: 1,
       reactionWindow: null,
-      requestedHelperId: null,
-      helperId: null,
+      helpOffer: null,
+      helpAgreement: null,
       history: [],
       runAway: null,
     };

@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { CardType, DeckType, type CardDefinition } from "./cards.js";
 import type { GameCommand } from "./commands.js";
-import { executeCommand } from "./engine.js";
+import { executeCommand } from "./legacy-test-command.js";
 import { GamePhase, GameStatus, type GameState } from "./game-state.js";
 import {
   parseCardDefinitionId,
   parseCardInstanceId,
   parseEncounterId,
   parseGameId,
+  parseHelpOfferId,
   parsePlayerId,
 } from "./identifiers.js";
 import type { RandomSource } from "./random-source.js";
@@ -82,7 +83,7 @@ const definitions: readonly CardDefinition[] = [
     deck: DeckType.DOOR,
     effects: [],
     monster: {
-      level: 5,
+      strength: 5,
       levelRewards: 1,
       treasureRewards: 0,
       badStuff: [],
@@ -96,7 +97,7 @@ const definitions: readonly CardDefinition[] = [
     deck: DeckType.DOOR,
     effects: [],
     monster: {
-      level: 2,
+      strength: 2,
       levelRewards: 1,
       treasureRewards: 0,
       badStuff: [],
@@ -168,13 +169,18 @@ function player(
   return {
     id,
     name: id,
+    sex: "MALE",
     level,
     hand,
     equipment: [],
-    classCard: null,
-    raceCard: null,
+    equipmentAttachments: [],
+    classCards: [],
+    raceCards: [],
+    rolePermissionCards: [],
+    hirelingCard: null,
+    mountCard: null,
     isDead: false,
-    temporaryCombatBonus: 0,
+    activeEffects: [],
   };
 }
 
@@ -198,7 +204,8 @@ function combatState(options?: {
     ]),
   ];
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("combat-reaction"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -221,6 +228,8 @@ function combatState(options?: {
           baseStrength: 5,
           baseLevelRewards: 1,
           baseTreasureRewards: 0,
+          tier: 1,
+          tags: [],
           badStuff: [],
           strengthModifier: 0,
           treasureModifier: 0,
@@ -228,15 +237,25 @@ function combatState(options?: {
         },
       ],
       nextEncounterSequence: 2,
+      nextHelpOfferSequence: 1,
       nextReactionWindowSequence: 1,
       reactionWindow: null,
-      requestedHelperId: null,
-      helperId: options?.helperId ?? null,
+      helpOffer: null,
+      helpAgreement:
+        options?.helperId == null
+          ? null
+          : {
+              helperId: options.helperId,
+              promisedTreasures: 0,
+              acceptedOfferId: parseHelpOfferId("accepted-offer"),
+              agreedAtCombatRevision: 1,
+            },
       history: [],
       runAway: null,
     },
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,
@@ -354,6 +373,7 @@ describe("combat victory reaction window", () => {
       "COMBAT_WON",
       "LEVEL_GAINED",
       "TREASURE_GAINED",
+      "COMBAT_REWARD_CARDS",
     ]);
     expect(
       executeCommand(
@@ -367,7 +387,7 @@ describe("combat victory reaction window", () => {
       ),
     ).toMatchObject({
       success: false,
-      error: { code: "STALE_COMBAT_REACTION" },
+      error: { code: "STALE_COMBAT_STATE" },
     });
   });
 
@@ -384,6 +404,7 @@ describe("combat victory reaction window", () => {
         "COMBAT_WON",
         "LEVEL_GAINED",
         "TREASURE_GAINED",
+        "COMBAT_REWARD_CARDS",
       ]);
     }
   });
@@ -686,16 +707,14 @@ describe("combat victory reaction window", () => {
     expect(cursed).toMatchObject({
       success: true,
       state: {
-        players: expect.arrayContaining([
-          expect.objectContaining({
-            id: firstResponderId,
-            temporaryCombatBonus: -2,
-          }),
-        ]),
         combat: { reactionWindow: { windowId: 2 } },
       },
     });
     if (!cursed.success) throw new Error(cursed.error.message);
+    expect(
+      cursed.state.players.find((player) => player.id === firstResponderId)
+        ?.activeEffects,
+    ).toEqual([expect.objectContaining({ type: "COMBAT_POWER", amount: -2 })]);
     const firstPass = executeCommand(
       cursed.state,
       {
@@ -718,9 +737,13 @@ describe("combat victory reaction window", () => {
     expect(resolved).toMatchObject({ success: true, state: { combat: null } });
     if (resolved.success) {
       expect(
-        resolved.state.players.find(
-          (candidate) => candidate.id === firstResponderId,
-        )?.temporaryCombatBonus,
+        resolved.state.players
+          .find((candidate) => candidate.id === firstResponderId)
+          ?.activeEffects.reduce(
+            (sum, effect) =>
+              effect.type === "COMBAT_POWER" ? sum + effect.amount : sum,
+            0,
+          ),
       ).toBe(0);
     }
   });

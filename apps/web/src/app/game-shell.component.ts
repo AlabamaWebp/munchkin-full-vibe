@@ -1,0 +1,1765 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import type {
+  AvailableGameAction,
+  AvailableIntentView,
+  GameCardView,
+  GameClientCommand,
+  GameView,
+} from '@munchkin-lan/contracts';
+import { ActionDockComponent } from './action-dock.component';
+import { AutoFocusDirective } from './auto-focus.directive';
+import { CardArtworkComponent } from './card-artwork.component';
+import { CompactGameCardComponent } from './compact-game-card.component';
+import { EquipmentLayoutComponent } from './equipment-layout.component';
+import { FocusTrapDirective } from './focus-trap.directive';
+import { GameStageComponent } from './game-stage.component';
+import { presentEvents, selectStage, unavailableReason } from './game-ui.model';
+import { HandDockComponent } from './hand-dock.component';
+import { LobbyClient, type UserFacingError } from './lobby-client';
+import { LocalizationService } from './localization';
+import { PlayerHudComponent } from './player-hud.component';
+import { RecentEventsComponent } from './recent-events.component';
+
+interface PickerOption {
+  readonly id: string;
+  readonly label: string;
+  readonly facts?: string;
+}
+
+interface TargetPickerState {
+  readonly title: string;
+  readonly card: GameCardView;
+  readonly kind: 'CURSE' | 'COMBAT_CURSE' | 'MONSTER' | 'HAND_MONSTER' | 'TRADE';
+  readonly options: readonly PickerOption[];
+}
+
+interface CardUse {
+  readonly label: string;
+  readonly command?: GameClientCommand;
+  readonly picker?: TargetPickerState;
+}
+
+@Component({
+  selector: 'app-game-shell',
+  imports: [
+    FormsModule,
+    ActionDockComponent,
+    AutoFocusDirective,
+    CardArtworkComponent,
+    CompactGameCardComponent,
+    EquipmentLayoutComponent,
+    FocusTrapDirective,
+    GameStageComponent,
+    HandDockComponent,
+    PlayerHudComponent,
+    RecentEventsComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <main class="game-shell" aria-label="Игровой стол">
+      <app-player-hud
+        [game]="game()"
+        [connection]="connection()"
+        (playerOpened)="selectedPlayerId.set($event)"
+        (menuOpened)="menuOpen.set(true)"
+      />
+      <app-recent-events [events]="recentEvents()" (historyOpened)="historyOpen.set(true)" />
+      <app-game-stage
+        [game]="game()"
+        [stage]="stage()"
+        (cardOpened)="selectedCard.set($event)"
+        (breakdownOpened)="breakdownOpen.set(true)"
+        (helpOpened)="openHelp()"
+      />
+      <app-hand-dock
+        [game]="game()"
+        [playableIds]="playableIds()"
+        (cardActivated)="activateCard($event)"
+        (cardDetails)="selectedCard.set($event)"
+        (fullHandOpened)="fullHandOpen.set(true)"
+      />
+      <app-action-dock [actions]="primaryActions()" (actionSelected)="sendAction($event)" />
+      @if (error(); as commandError) {
+        <p class="command-error" role="alert">{{ errorMessage(commandError) }}</p>
+      }
+
+      @if (game().curseResponse; as response) {
+        <div class="backdrop blocking-backdrop">
+          <section class="sheet decision-sheet" appFocusTrap role="dialog" aria-modal="true">
+            <header>
+              <div>
+                <small>ОТВЕТ НА ПРОКЛЯТИЕ</small>
+                <h2>{{ cardName(response.curseCard) }}</h2>
+                <time>до {{ deadlineLabel(response.expiresAtEpochMs) }}</time>
+              </div>
+            </header>
+            @if (response.playerId === game().viewerPlayerId) {
+              <div class="sheet-scroll">
+                <button type="button" class="primary" (click)="declineCurse(response.responseId)">
+                  Принять проклятие
+                </button>
+                @for (cardId of response.cancelCardIds; track cardId) {
+                  <button type="button" (click)="cancelCurse(response.responseId, cardId)">
+                    Отменить · {{ ownCardName(cardId) }}
+                  </button>
+                }
+                @for (cardId of response.itemGuardCardIds; track cardId) {
+                  @for (itemId of response.protectableItemIds; track itemId) {
+                    <button
+                      type="button"
+                      (click)="protectCurseItem(response.responseId, cardId, itemId)"
+                    >
+                      {{ ownCardName(cardId) }} · защитить {{ ownCardName(itemId) }}
+                    </button>
+                  }
+                }
+              </div>
+            } @else {
+              <footer>
+                <p>Ждём {{ playerName(response.playerId) }}</p>
+              </footer>
+            }
+          </section>
+        </div>
+      }
+
+      @if (game().pendingDecision; as decision) {
+        <div class="backdrop blocking-backdrop">
+          <section
+            class="sheet decision-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="decision-title"
+          >
+            <header>
+              <div>
+                <small>ОБЯЗАТЕЛЬНО</small>
+                <h2 id="decision-title">
+                  {{ decision.type === 'DISCARD_CARDS' ? 'Выберите карты' : 'Оставьте одну роль' }}
+                </h2>
+                <time>до {{ deadlineLabel(decision.expiresAtEpochMs) }}</time>
+              </div>
+            </header>
+            <div class="sheet-scroll">
+              <p>
+                {{
+                  decision.type === 'DISCARD_CARDS'
+                    ? 'Выберите ровно ' + decision.count + '. Причина: ' + decision.sourceCard.name
+                    : 'Этот выбор нужен, чтобы продолжить игру.'
+                }}
+              </p>
+              <div class="picker-grid">
+                @for (card of decisionCards(); track card.instanceId) {
+                  <button
+                    type="button"
+                    [class.selected]="decisionSelection().includes(card.instanceId)"
+                    (click)="toggleDecision(card.instanceId)"
+                  >
+                    {{ card.name }}
+                  </button>
+                }
+              </div>
+            </div>
+            @if (decision.playerId === game().viewerPlayerId) {
+              <footer>
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="!decisionReady()"
+                  (click)="confirmDecision()"
+                >
+                  Подтвердить
+                </button>
+              </footer>
+            } @else {
+              <footer>
+                <p>Ждём {{ playerName(decision.playerId) }}</p>
+              </footer>
+            }
+          </section>
+        </div>
+      }
+
+      @if (fullHandOpen()) {
+        <div class="backdrop">
+          <section
+            class="sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hand-title"
+          >
+            <header>
+              <h2 id="hand-title">Рука · {{ game().self.hand.length }}</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть руку"
+                (click)="fullHandOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll">
+              <div class="hand-filters" aria-label="Фильтр руки">
+                @for (filter of handFilters; track filter.id) {
+                  <button
+                    type="button"
+                    [class.selected]="handFilter() === filter.id"
+                    [attr.aria-pressed]="handFilter() === filter.id"
+                    (click)="handFilter.set(filter.id)"
+                  >
+                    {{ filter.label }}
+                  </button>
+                }
+              </div>
+              <div class="full-hand-grid">
+                @for (card of filteredHand(); track card.instanceId) {
+                  <app-compact-game-card
+                    [card]="card"
+                    [playable]="playableIds().includes(card.instanceId)"
+                    [reason]="cardReason(card)"
+                    (activated)="activateCard($event)"
+                    (detailsOpened)="selectedCard.set($event)"
+                  />
+                } @empty {
+                  <p>В этой группе нет карт.</p>
+                }
+              </div>
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (targetPicker(); as picker) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="target-title"
+          >
+            <header>
+              <h2 id="target-title">{{ picker.title }}</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть выбор"
+                (click)="targetPicker.set(null)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll option-list">
+              @for (option of picker.options; track option.id) {
+                <button type="button" (click)="chooseTarget(picker, option.id)">
+                  <strong>{{ option.label }}</strong>
+                  @if (option.facts) {
+                    <small>{{ option.facts }}</small>
+                  }
+                </button>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (cardUses(); as uses) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="use-title"
+          >
+            <header>
+              <h2 id="use-title">Как сыграть карту?</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть меню действий"
+                (click)="cardUses.set(null)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll option-list">
+              @for (use of uses; track use.label) {
+                <button type="button" (click)="chooseUse(use)">{{ use.label }}</button>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (helpOpen()) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-title"
+          >
+            <header>
+              <h2 id="help-title">Помощь в бою</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть переговоры"
+                (click)="helpOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll help-sheet">
+              @if (game().combat?.helpOffer; as offer) {
+                <p>
+                  <strong>{{ playerName(game().combat!.playerId) }}</strong> просит
+                  <strong>{{ playerName(offer.helperId) }}</strong>
+                </p>
+                <div class="power-preview">
+                  <span>Активный {{ activeCombatPower() }}</span
+                  ><span>Помощник {{ helperPower(offer.helperId) }}</span
+                  ><span>Вместе {{ activeCombatPower() + helperPower(offer.helperId) }}</span
+                  ><span>Монстры {{ game().combat!.monsterPower }}</span>
+                </div>
+                <p>
+                  Предложено сокровищ: <b>{{ offer.treasureCount }}</b>
+                </p>
+                <p>
+                  <time>Ответ до {{ deadlineLabel(offer.expiresAtEpochMs) }}</time>
+                </p>
+                @if (hasIntent('ACCEPT_HELP_OFFER')) {
+                  <button class="primary" type="button" (click)="sendAction('ACCEPT_HELP_OFFER')">
+                    Принять
+                  </button>
+                  <div class="counter">
+                    <button type="button" (click)="decreaseHelpTreasure()">−</button
+                    ><b>{{ helpTreasure() }}</b
+                    ><button type="button" (click)="helpTreasure.update((value) => value + 1)">
+                      +</button
+                    ><button type="button" (click)="counterHelp()">Ответить</button>
+                  </div>
+                  <button type="button" (click)="sendAction('REJECT_HELP_OFFER')">
+                    Отказаться
+                  </button>
+                }
+              } @else {
+                <label
+                  >Кого позвать
+                  <select
+                    [ngModel]="selectedHelperId()"
+                    (ngModelChange)="selectedHelperId.set($event)"
+                  >
+                    @for (id of helperIds(); track id) {
+                      <option [value]="id">{{ playerName(id) }}</option>
+                    }
+                  </select>
+                </label>
+                <div class="counter">
+                  <span>Сокровищ</span
+                  ><button type="button" (click)="decreaseHelpTreasure()">−</button
+                  ><b>{{ helpTreasure() }}</b
+                  ><button type="button" (click)="helpTreasure.update((value) => value + 1)">
+                    +
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="selectedHelperId() === null"
+                  (click)="proposeHelp()"
+                >
+                  Отправить
+                </button>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (selectedCard(); as card) {
+        <div class="backdrop">
+          <section
+            class="sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="details-title"
+          >
+            <header>
+              <div>
+                <small>{{ cardType(card) }}</small>
+                <h2 id="details-title">{{ cardName(card) }}</h2>
+              </div>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть описание карты"
+                (click)="selectedCard.set(null)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll card-details">
+              <app-card-artwork [artKey]="card.artKey" [label]="cardName(card)" />
+              <p>{{ cardDescription(card) }}</p>
+              @for (fact of cardFacts(card); track fact) {
+                <span>{{ fact }}</span>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (historyOpen()) {
+        <div class="backdrop">
+          <section
+            class="sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-title"
+          >
+            <header>
+              <h2 id="history-title">История</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть историю"
+                (click)="historyOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll history-list" #historyList>
+              <div class="history-filters" aria-label="Фильтр истории">
+                @for (filter of historyFilters; track filter.id) {
+                  <button
+                    type="button"
+                    [class.selected]="historyFilter() === filter.id"
+                    [attr.aria-pressed]="historyFilter() === filter.id"
+                    (click)="historyFilter.set(filter.id)"
+                  >
+                    {{ filter.label }}
+                  </button>
+                }
+              </div>
+              @for (turn of historyTurns(); track turn.turnNumber) {
+                <section class="history-turn">
+                  <h3>Ход {{ turn.turnNumber }}</h3>
+                  @for (event of turn.events; track event.entry.sequence) {
+                    <button
+                      type="button"
+                      [class.private]="event.entry.visibility === 'PRIVATE'"
+                      (click)="openEventCard(event.entry.card ?? event.entry.cards?.[0] ?? null)"
+                    >
+                      <small>
+                        {{ event.entry.visibility === 'PRIVATE' ? 'Только вам · ' : ''
+                        }}{{ phaseLabel(event.entry.phase) }}
+                      </small>
+                      <span>{{ event.summary }}</span>
+                    </button>
+                  }
+                </section>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (breakdownOpen()) {
+        @if (game().combat; as combat) {
+          <div class="backdrop">
+            <section
+              class="sheet compact-sheet"
+              appFocusTrap
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="breakdown-title"
+            >
+              <header>
+                <h2 id="breakdown-title">Расчёт силы</h2>
+                <button
+                  type="button"
+                  appAutoFocus
+                  aria-label="Закрыть расчёт"
+                  (click)="breakdownOpen.set(false)"
+                >
+                  ×
+                </button>
+              </header>
+              <div class="sheet-scroll breakdown">
+                <h3>Игроки · {{ combat.playerPower }}</h3>
+                @for (line of combatBreakdown(combat.playerId); track $index) {
+                  <p>
+                    <span>{{ powerSource(line.source) }}</span
+                    ><b>{{ signed(line.amount) }}</b>
+                  </p>
+                }
+                <h3>Монстры · {{ combat.monsterPower }}</h3>
+                @for (monster of combat.monsters; track monster.encounterId) {
+                  <p>
+                    <span>{{ monster.monster.name }}</span
+                    ><b>{{ monster.currentStrength }}</b>
+                  </p>
+                }
+              </div>
+            </section>
+          </div>
+        }
+      }
+
+      @if (selectedPlayerId(); as id) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="character-title"
+          >
+            <header>
+              <h2 id="character-title">{{ playerName(id) }}</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть персонажа"
+                (click)="selectedPlayerId.set(null)"
+              >
+                ×
+              </button>
+            </header>
+            @if (player(id); as value) {
+              <div class="sheet-scroll character">
+                <b>Уровень {{ value.level }} · сила {{ value.combatPower }}</b>
+                <p>Пол: {{ sexLabel(value.sex) }} · Рука: {{ value.handCount }}/5</p>
+                <p>{{ characterStatus(value) }}</p>
+                <p>
+                  Классы: {{ rolesLabel(value.classCards, value.classCard) }} · Расы:
+                  {{ rolesLabel(value.raceCards, value.raceCard) }}
+                </p>
+                @if (value.hirelingCard || value.mountCard) {
+                  <p>
+                    Спутники: {{ value.hirelingCard?.name ?? '—' }} ·
+                    {{ value.mountCard?.name ?? '—' }}
+                  </p>
+                }
+                <h3>Снаряжение</h3>
+                <app-equipment-layout
+                  [player]="value"
+                  [labels]="equipmentLabels"
+                  [cardName]="displayCardName"
+                  (cardOpened)="selectedCard.set($event)"
+                />
+                @if (id === game().viewerPlayerId && unequipIds().length > 0) {
+                  <div class="character-actions">
+                    @for (card of value.equipment; track card.instanceId) {
+                      @if (unequipIds().includes(card.instanceId)) {
+                        <button
+                          type="button"
+                          (click)="send({ type: 'UNEQUIP_ITEM', cardId: card.instanceId })"
+                        >
+                          Снять {{ cardName(card) }}
+                        </button>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        </div>
+      }
+
+      @if (menuOpen()) {
+        <div class="backdrop">
+          <section
+            class="sheet menu-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="menu-title"
+          >
+            <header>
+              <h2 id="menu-title">Меню</h2>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть меню"
+                (click)="menuOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll option-list">
+              @if (saleCards().length > 0 && game().self.level < 9) {
+                <button type="button" (click)="saleOpen.set(true); menuOpen.set(false)">
+                  Продать карты
+                </button>
+              }
+              @if (charityIntent(); as charity) {
+                <button type="button" (click)="charityOpen.set(true); menuOpen.set(false)">
+                  Раздать милостыню · {{ charity.count }}
+                </button>
+              }
+              <button type="button" (click)="historyOpen.set(true); menuOpen.set(false)">
+                Полная история
+              </button>
+              <button type="button" (click)="toggleLocale()">
+                Язык: {{ locale() === 'ru' ? 'Русский' : 'English' }}
+              </button>
+              @if (fullscreenSupported) {
+                <button type="button" (click)="toggleFullscreen()">
+                  {{ isFullscreen() ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим' }}
+                </button>
+              }
+              @if (game().status === 'FINISHED') {
+                <button type="button" (click)="rematch()">Играть снова</button
+                ><button type="button" (click)="returnToLobby()">В лобби</button>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (saleOpen()) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sale-title"
+          >
+            <header>
+              <div>
+                <small>ПРОДАЖА</small>
+                <h2 id="sale-title">{{ saleTotal() }} / 1000</h2>
+              </div>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть продажу"
+                (click)="saleOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll sale-sheet">
+              <p>
+                Будет получено уровней: {{ saleLevels() }}. Остаток {{ saleRemainder() }} не
+                сохраняется.
+              </p>
+              @if (game().self.level >= 9) {
+                <p class="warning-copy">Продажа не может дать 10-й победный уровень.</p>
+              }
+              @for (card of saleCards(); track card.instanceId) {
+                <button
+                  type="button"
+                  [class.selected]="saleSelection().includes(card.instanceId)"
+                  (click)="toggleSale(card.instanceId)"
+                >
+                  <span>{{ cardName(card) }}</span
+                  ><b>{{ card.goldValue ?? card.equipment?.value ?? 0 }}</b>
+                </button>
+              }
+            </div>
+            <footer>
+              <button
+                type="button"
+                class="primary"
+                [disabled]="saleTotal() < 1000 || saleLevels() === 0"
+                (click)="confirmSale()"
+              >
+                Продать
+              </button>
+            </footer>
+          </section>
+        </div>
+      }
+
+      @if (charityOpen()) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="charity-title"
+          >
+            <header>
+              <div>
+                <small>ЛИМИТ РУКИ</small>
+                <h2 id="charity-title">Отдайте {{ charityIntent()?.count ?? 0 }}</h2>
+              </div>
+              <button
+                type="button"
+                appAutoFocus
+                aria-label="Закрыть милостыню"
+                (click)="charityOpen.set(false)"
+              >
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll sale-sheet">
+              <p>{{ charityRecipientCopy() }}</p>
+              @for (card of game().self.hand; track card.instanceId) {
+                <button
+                  type="button"
+                  [class.selected]="charitySelection().includes(card.instanceId)"
+                  (click)="toggleCharity(card.instanceId)"
+                >
+                  {{ cardName(card) }}
+                </button>
+              }
+              @if ((charityIntent()?.recipientIds?.length ?? 0) > 1) {
+                <label
+                  >Получатель
+                  <select
+                    [ngModel]="charityRecipientId()"
+                    (ngModelChange)="charityRecipientId.set($event)"
+                  >
+                    @for (id of charityIntent()?.recipientIds ?? []; track id) {
+                      <option [value]="id">{{ playerName(id) }}</option>
+                    }
+                  </select></label
+                >
+              }
+            </div>
+            <footer>
+              <button
+                type="button"
+                class="primary"
+                [disabled]="charitySelection().length !== (charityIntent()?.count ?? 0)"
+                (click)="confirmCharity()"
+              >
+                Отдать
+              </button>
+            </footer>
+          </section>
+        </div>
+      }
+    </main>
+  `,
+  styleUrl: './game-shell.component.scss',
+})
+export class GameShellComponent {
+  private readonly lobbyClient = inject(LobbyClient);
+  private readonly localization = inject(LocalizationService);
+  readonly game = input.required<GameView>();
+  readonly error = input<UserFacingError | null>(null);
+  protected readonly connection = this.lobbyClient.connection;
+  protected readonly locale = this.localization.locale;
+  protected readonly stage = computed(() => selectStage(this.game()));
+  protected readonly allEvents = computed(() => presentEvents(this.game()));
+  protected readonly recentEvents = computed(() =>
+    this.allEvents()
+      .filter((event) => event.priority !== 'ROUTINE')
+      .slice(-3)
+      .reverse(),
+  );
+  protected readonly playableIds = computed(() => this.collectPlayableIds());
+  protected readonly sortedHand = computed(() =>
+    [...this.game().self.hand].sort(
+      (a, b) =>
+        Number(this.playableIds().includes(b.instanceId)) -
+        Number(this.playableIds().includes(a.instanceId)),
+    ),
+  );
+  protected readonly filteredHand = computed(() => {
+    const filter = this.handFilter();
+    return this.sortedHand().filter((card) => {
+      if (filter === 'PLAYABLE') return this.playableIds().includes(card.instanceId);
+      if (filter === 'EQUIPMENT') return card.type === 'EQUIPMENT';
+      if (filter === 'COMBAT')
+        return [
+          'MONSTER',
+          'TEMPORARY_BONUS',
+          'MONSTER_MODIFIER',
+          'ADD_MONSTER',
+          'CLONE_MONSTER',
+          'COMBAT_CURSE',
+        ].includes(card.type);
+      return ![
+        'EQUIPMENT',
+        'MONSTER',
+        'TEMPORARY_BONUS',
+        'MONSTER_MODIFIER',
+        'ADD_MONSTER',
+        'CLONE_MONSTER',
+        'COMBAT_CURSE',
+      ].includes(card.type);
+    });
+  });
+  protected readonly primaryActions = computed(() =>
+    this.game()
+      .availableIntents.map((intent) => intent.kind)
+      .filter((kind): kind is AvailableGameAction =>
+        [
+          'KICK_DOOR',
+          'LOOK_FOR_TROUBLE',
+          'SCAVENGE',
+          'PROPOSE_HELP',
+          'COUNTER_HELP',
+          'ACCEPT_HELP_OFFER',
+          'REJECT_HELP_OFFER',
+          'CANCEL_HELP_OFFER',
+          'DECLARE_COMBAT_VICTORY',
+          'PASS_COMBAT_REACTION',
+          'RUN_AWAY',
+          'LOOT_ROOM',
+          'END_TURN',
+        ].includes(kind),
+      ),
+  );
+  protected readonly helperIds = computed(() => {
+    const intent = this.intent('PROPOSE_HELP');
+    return intent?.kind === 'PROPOSE_HELP' ? intent.helperIds : [];
+  });
+  protected readonly unequipIds = computed(() =>
+    this.game().availableIntents.flatMap((intent) =>
+      intent.kind === 'UNEQUIP_ITEM' ? [intent.cardId] : [],
+    ),
+  );
+  protected readonly charityIntent = computed(() =>
+    this.game().availableIntents.find(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'GIVE_CHARITY' }> =>
+        intent.kind === 'GIVE_CHARITY',
+    ),
+  );
+  protected readonly saleCards = computed(() => {
+    const ids =
+      this.game().availableIntents.find(
+        (intent): intent is Extract<AvailableIntentView, { kind: 'SELL_CARDS' }> =>
+          intent.kind === 'SELL_CARDS',
+      )?.cardIds ?? [];
+    return [...this.game().self.hand, ...this.game().self.equipment].filter((card) =>
+      ids.includes(card.instanceId),
+    );
+  });
+  protected readonly saleTotal = computed(() =>
+    this.saleSelection().reduce(
+      (total, cardId) =>
+        total +
+        (this.saleCards().find((card) => card.instanceId === cardId)?.goldValue ??
+          this.saleCards().find((card) => card.instanceId === cardId)?.equipment?.value ??
+          0),
+      0,
+    ),
+  );
+  protected readonly saleLevels = computed(() =>
+    Math.min(Math.floor(this.saleTotal() / 1000), Math.max(0, 9 - this.game().self.level)),
+  );
+  protected readonly saleRemainder = computed(() => this.saleTotal() % 1000);
+  protected readonly historyTurns = computed(() => {
+    const events = this.allEvents().filter((event) => {
+      if (this.historyFilter() === 'COMBAT')
+        return [
+          'COMBAT_STARTED',
+          'COMBAT_WON',
+          'COMBAT_VICTORY_DECLARED',
+          'COMBAT_VICTORY_CANCELLED',
+          'RUN_AWAY_ATTEMPTED',
+          'BAD_STUFF_APPLIED',
+          'HELP_OFFERED',
+          'HELP_COUNTERED',
+          'HELP_OFFER_ACCEPTED',
+        ].includes(event.entry.type);
+      return (
+        this.historyFilter() !== 'ME' ||
+        event.entry.playerId === this.game().viewerPlayerId ||
+        event.entry.targetPlayerId === this.game().viewerPlayerId
+      );
+    });
+    const grouped = new Map<number, typeof events>();
+    for (const event of events)
+      grouped.set(event.entry.turnNumber, [...(grouped.get(event.entry.turnNumber) ?? []), event]);
+    return [...grouped.entries()].map(([turnNumber, turnEvents]) => ({
+      turnNumber,
+      events: turnEvents,
+    }));
+  });
+  protected readonly handFilters = [
+    { id: 'PLAYABLE', label: 'Сейчас' },
+    { id: 'EQUIPMENT', label: 'Снаряжение' },
+    { id: 'COMBAT', label: 'Бой' },
+    { id: 'OTHER', label: 'Остальное' },
+  ] as const;
+  protected readonly historyFilters = [
+    { id: 'ALL', label: 'Все' },
+    { id: 'COMBAT', label: 'Бой' },
+    { id: 'ME', label: 'Я' },
+  ] as const;
+  protected readonly equipmentLabels = {
+    head: 'Голова',
+    body: 'Тело',
+    feet: 'Ноги',
+    leftHand: 'Левая рука',
+    rightHand: 'Правая рука',
+    class: 'Класс',
+    race: 'Раса',
+    empty: 'Свободно',
+    twoHanded: 'две руки',
+  };
+  protected readonly displayCardName = (card: GameCardView): string => this.cardName(card);
+  protected readonly selectedCard = signal<GameCardView | null>(null);
+  protected readonly selectedPlayerId = signal<string | null>(null);
+  protected readonly fullHandOpen = signal(false);
+  protected readonly historyOpen = signal(false);
+  protected readonly breakdownOpen = signal(false);
+  protected readonly helpOpen = signal(false);
+  protected readonly menuOpen = signal(false);
+  protected readonly saleOpen = signal(false);
+  protected readonly charityOpen = signal(false);
+  protected readonly handFilter = signal<(typeof this.handFilters)[number]['id']>('PLAYABLE');
+  protected readonly historyFilter = signal<(typeof this.historyFilters)[number]['id']>('ALL');
+  protected readonly saleSelection = signal<readonly string[]>([]);
+  protected readonly charitySelection = signal<readonly string[]>([]);
+  protected readonly charityRecipientId = signal<string | null>(null);
+  protected readonly targetPicker = signal<TargetPickerState | null>(null);
+  protected readonly cardUses = signal<readonly CardUse[] | null>(null);
+  protected readonly selectedHelperId = signal<string | null>(null);
+  protected readonly helpTreasure = signal(0);
+  protected readonly decisionSelection = signal<readonly string[]>([]);
+  protected readonly isFullscreen = signal(document.fullscreenElement !== null);
+  protected readonly fullscreenSupported =
+    typeof document.documentElement.requestFullscreen === 'function';
+
+  constructor() {
+    effect(() => {
+      const game = this.game();
+      if (this.saleOpen() && (game.self.level >= 9 || this.saleCards().length === 0))
+        this.saleOpen.set(false);
+      if (this.charityOpen() && this.charityIntent() === undefined) this.charityOpen.set(false);
+      const validSaleIds = new Set(this.saleCards().map((card) => card.instanceId));
+      this.saleSelection.update((ids) => ids.filter((id) => validSaleIds.has(id)));
+      const validHandIds = new Set(game.self.hand.map((card) => card.instanceId));
+      this.charitySelection.update((ids) => ids.filter((id) => validHandIds.has(id)));
+    });
+  }
+
+  protected sendAction(action: AvailableGameAction): void {
+    if (action === 'LOOK_FOR_TROUBLE') {
+      const cards = this.game().self.hand.filter((card) =>
+        this.game().availableIntents.some(
+          (intent) => intent.kind === 'LOOK_FOR_TROUBLE' && intent.cardId === card.instanceId,
+        ),
+      );
+      this.openPickerForCards('Выберите монстра', cards, 'HAND_MONSTER');
+      return;
+    }
+    if (action === 'PROPOSE_HELP') {
+      this.openHelp();
+      return;
+    }
+    if (action === 'COUNTER_HELP') return;
+    const intent = this.intent(action);
+    const command = intent === undefined ? null : this.commandForIntent(intent);
+    if (command !== null) {
+      this.helpOpen.set(false);
+      this.send(command);
+    }
+  }
+
+  protected activateCard(card: GameCardView): void {
+    if (!this.playableIds().includes(card.instanceId)) {
+      this.selectedCard.set(card);
+      return;
+    }
+    const uses = this.cardActions(card);
+    if (uses.length === 1) this.chooseUse(uses[0]!);
+    else if (uses.length > 1) this.cardUses.set(uses);
+    else this.selectedCard.set(card);
+  }
+
+  protected chooseUse(use: CardUse): void {
+    this.cardUses.set(null);
+    this.fullHandOpen.set(false);
+    if (use.command) this.send(use.command);
+    else if (use.picker) this.targetPicker.set(use.picker);
+  }
+
+  protected chooseTarget(picker: TargetPickerState, id: string): void {
+    this.targetPicker.set(null);
+    const reactionWindowId = this.game().combat?.reactionWindow?.windowId;
+    if (picker.kind === 'CURSE')
+      this.send({ type: 'PLAY_CURSE', cardId: picker.card.instanceId, targetPlayerId: id });
+    else if (picker.kind === 'COMBAT_CURSE' && reactionWindowId !== undefined)
+      this.send({
+        type: 'PLAY_COMBAT_CURSE',
+        cardId: picker.card.instanceId,
+        targetPlayerId: id,
+        reactionWindowId,
+        combatId: this.game().combat!.combatId,
+        combatRevision: this.game().combat!.revision,
+      });
+    else if (picker.kind === 'MONSTER')
+      this.send({
+        type: 'PLAY_CARD',
+        cardId: picker.card.instanceId,
+        target: { type: 'MONSTER', encounterId: id },
+        combatId: this.game().combat?.combatId,
+        combatRevision: this.game().combat?.revision,
+      });
+    else if (picker.kind === 'HAND_MONSTER') {
+      if (
+        this.game().availableIntents.some(
+          (intent) => intent.kind === 'LOOK_FOR_TROUBLE' && intent.cardId === id,
+        )
+      )
+        this.send({ type: 'LOOK_FOR_TROUBLE', cardId: id });
+      else
+        this.send({
+          type: 'PLAY_CARD',
+          cardId: picker.card.instanceId,
+          target: { type: 'HAND_MONSTER', monsterCardId: id },
+          combatId: this.game().combat?.combatId,
+          combatRevision: this.game().combat?.revision,
+        });
+    } else if (picker.kind === 'TRADE')
+      this.send({ type: 'TRADE_ITEM', cardId: picker.card.instanceId, recipientId: id });
+  }
+
+  protected openHelp(): void {
+    this.selectedHelperId.set(
+      this.helperIds()[0] ?? this.game().combat?.helpOffer?.helperId ?? null,
+    );
+    this.helpTreasure.set(this.game().combat?.helpOffer?.treasureCount ?? 0);
+    this.helpOpen.set(true);
+  }
+  protected proposeHelp(): void {
+    const combat = this.game().combat,
+      id = this.selectedHelperId();
+    if (combat && id) {
+      this.send({
+        type: 'PROPOSE_HELP',
+        helperId: id,
+        treasureCount: this.helpTreasure(),
+        combatId: combat.combatId,
+        combatRevision: combat.revision,
+      });
+      this.helpOpen.set(false);
+    }
+  }
+  protected counterHelp(): void {
+    const combat = this.game().combat,
+      offer = combat?.helpOffer;
+    if (combat && offer) {
+      this.send({
+        type: 'COUNTER_HELP',
+        offerId: offer.offerId,
+        treasureCount: this.helpTreasure(),
+        combatId: combat.combatId,
+        combatRevision: combat.revision,
+      });
+      this.helpOpen.set(false);
+    }
+  }
+  protected decreaseHelpTreasure(): void {
+    this.helpTreasure.update((value) => Math.max(0, value - 1));
+  }
+  protected activeCombatPower(): number {
+    return (
+      this.game().players.find((player) => player.playerId === this.game().combat?.playerId)
+        ?.combatPower ?? 0
+    );
+  }
+  protected helperPower(id: string): number {
+    return this.game().players.find((player) => player.playerId === id)?.combatPower ?? 0;
+  }
+  protected playerName(id: string): string {
+    return this.player(id)?.name ?? 'Игрок';
+  }
+  protected ownCardName(id: string): string {
+    const card = [...this.game().self.hand, ...this.game().self.equipment].find(
+      (candidate) => candidate.instanceId === id,
+    );
+    return card === undefined ? 'карта' : this.cardName(card);
+  }
+  protected deadlineLabel(expiresAtEpochMs: number): string {
+    return new Date(expiresAtEpochMs).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  }
+  protected declineCurse(responseId: string): void {
+    this.send({
+      type: 'RESPOND_TO_CURSE',
+      responseId,
+      response: { type: 'DECLINE' },
+    });
+  }
+  protected cancelCurse(responseId: string, cardId: string): void {
+    this.send({
+      type: 'RESPOND_TO_CURSE',
+      responseId,
+      response: { type: 'USE_PROTECTION', cardId },
+    });
+  }
+  protected protectCurseItem(responseId: string, cardId: string, protectedCardId: string): void {
+    this.send({
+      type: 'RESPOND_TO_CURSE',
+      responseId,
+      response: { type: 'USE_PROTECTION', cardId, protectedCardId },
+    });
+  }
+  protected player(id: string) {
+    return this.game().players.find((candidate) => candidate.playerId === id) ?? null;
+  }
+  protected cardReason(card: GameCardView): string {
+    return unavailableReason(this.game(), card.instanceId);
+  }
+  protected errorMessage(error: UserFacingError): string {
+    return this.localization.errorMessage(error);
+  }
+  protected cardName(card: GameCardView): string {
+    return this.localization.cardName(card);
+  }
+  protected cardDescription(card: GameCardView): string {
+    return this.localization.cardDescription(card);
+  }
+  protected cardType(card: GameCardView): string {
+    return (
+      {
+        MONSTER: 'Монстр',
+        CURSE: 'Проклятие',
+        COMBAT_CURSE: 'Боевое проклятие',
+        EQUIPMENT: 'Снаряжение',
+        TEMPORARY_BONUS: 'Разовый бонус',
+        MONSTER_MODIFIER: 'Модификатор монстра',
+        ADD_MONSTER: 'Добавить монстра',
+        CLONE_MONSTER: 'Клон монстра',
+        CLASS: 'Класс',
+        RACE: 'Раса',
+        HIRELING: 'Наёмник',
+        MOUNT: 'Скакун',
+        ROLE_PERMISSION: 'Разрешение роли',
+        ATTACHMENT: 'Усилитель',
+        UTILITY: 'Утилита',
+        OTHER: 'Карта',
+      } as Record<GameCardView['type'], string>
+    )[card.type];
+  }
+  protected sexLabel(sex: GameView['self']['sex']): string {
+    return sex === 'MALE' ? 'мужской' : sex === 'FEMALE' ? 'женский' : 'не выбран';
+  }
+  protected characterStatus(player: GameView['players'][number]): string {
+    if (player.isDead)
+      return 'Вы мертвы. В начале своего следующего хода вернётесь с новыми закрытыми картами.';
+    if (this.game().combat?.playerId === player.playerId) return 'Сейчас в бою.';
+    if (this.game().combat?.helpAgreement?.helperId === player.playerId)
+      return 'Помогает в текущем бою.';
+    return 'В игре.';
+  }
+  protected rolesLabel(
+    cards: readonly GameCardView[] | undefined,
+    fallback: GameCardView | null,
+  ): string {
+    const values = cards ?? (fallback ? [fallback] : []);
+    return values.length ? values.map((card) => this.cardName(card)).join(', ') : 'нет';
+  }
+  protected openEventCard(card: GameCardView | null): void {
+    if (card) this.selectedCard.set(card);
+  }
+  protected toggleSale(cardId: string): void {
+    this.saleSelection.update((ids) =>
+      ids.includes(cardId) ? ids.filter((id) => id !== cardId) : [...ids, cardId],
+    );
+  }
+  protected confirmSale(): void {
+    if (this.saleTotal() < 1000 || this.saleLevels() === 0) return;
+    this.send({ type: 'SELL_ITEMS', cardIds: this.saleSelection() });
+    this.saleOpen.set(false);
+  }
+  protected toggleCharity(cardId: string): void {
+    const limit = this.charityIntent()?.count ?? 0;
+    this.charitySelection.update((ids) =>
+      ids.includes(cardId)
+        ? ids.filter((id) => id !== cardId)
+        : ids.length < limit
+          ? [...ids, cardId]
+          : ids,
+    );
+  }
+  protected charityRecipientCopy(): string {
+    const recipients = this.charityIntent()?.recipientIds ?? [];
+    return recipients.length === 0
+      ? 'Вы наименьшего уровня: выбранные карты будут сброшены.'
+      : recipients.length === 1
+        ? `Карты получит ${this.playerName(recipients[0]!)}`
+        : 'Выберите игрока с наименьшим уровнем.';
+  }
+  protected confirmCharity(): void {
+    const recipients = this.charityIntent()?.recipientIds ?? [];
+    const recipientId = recipients.length === 1 ? recipients[0]! : this.charityRecipientId();
+    if (this.charitySelection().length !== (this.charityIntent()?.count ?? 0)) return;
+    this.send({ type: 'GIVE_CHARITY', cardIds: this.charitySelection(), recipientId });
+    this.charityOpen.set(false);
+  }
+  protected signed(value: number): string {
+    return value > 0 ? `+${value}` : `${value}`;
+  }
+  protected powerSource(source: string): string {
+    return (
+      (
+        {
+          LEVEL: 'Уровень',
+          EQUIPMENT: 'Снаряжение',
+          ROLE: 'Роль',
+          COMPANION: 'Спутник',
+          ACTIVE_EFFECT: 'Эффект',
+          MAKESHIFT_TOOLS: 'Подручные средства',
+        } as Record<string, string>
+      )[source] ?? source
+    );
+  }
+  protected phaseLabel(phase: GameView['phase']): string {
+    return (
+      {
+        LOBBY: 'лобби',
+        TURN_START: 'начало хода',
+        KICK_DOOR: 'дверь',
+        DOOR_RESOLUTION: 'результат двери',
+        POST_DOOR: 'выбор',
+        LOOT_ROOM: 'добыча',
+        END_TURN: 'конец хода',
+        FINISHED: 'конец игры',
+      } as Record<GameView['phase'], string>
+    )[phase];
+  }
+  protected combatBreakdown(playerId: string) {
+    return (
+      this.game().players.find((player) => player.playerId === playerId)?.combatPowerBreakdown ?? []
+    );
+  }
+
+  protected decisionCards(): readonly GameCardView[] {
+    const decision = this.game().pendingDecision;
+    if (!decision) return [];
+    const pool =
+      decision.type === 'DISCARD_CARDS' && decision.zone === 'EQUIPMENT'
+        ? this.game().self.equipment
+        : this.game().self.hand;
+    return pool.filter((card) => decision.selectableCardIds.includes(card.instanceId));
+  }
+  protected toggleDecision(id: string): void {
+    const decision = this.game().pendingDecision;
+    if (!decision || decision.playerId !== this.game().viewerPlayerId) return;
+    if (decision.type === 'CHOOSE_ROLE_TO_KEEP') {
+      this.decisionSelection.set([id]);
+      return;
+    }
+    this.decisionSelection.update((ids) =>
+      ids.includes(id)
+        ? ids.filter((value) => value !== id)
+        : ids.length < decision.count
+          ? [...ids, id]
+          : ids,
+    );
+  }
+  protected decisionReady(): boolean {
+    const decision = this.game().pendingDecision;
+    if (!decision || decision.playerId !== this.game().viewerPlayerId) return false;
+    return (
+      this.decisionSelection().length === (decision.type === 'DISCARD_CARDS' ? decision.count : 1)
+    );
+  }
+  protected confirmDecision(): void {
+    const decision = this.game().pendingDecision;
+    if (!decision || !this.decisionReady()) return;
+    if (decision.type === 'DISCARD_CARDS') {
+      const intent = this.game().availableIntents.find(
+        (candidate): candidate is Extract<AvailableIntentView, { kind: 'RESOLVE_CARD_DISCARD' }> =>
+          candidate.kind === 'RESOLVE_CARD_DISCARD',
+      );
+      this.send({
+        type: 'RESOLVE_CARD_DISCARD',
+        decisionId: decision.decisionId,
+        cardIds: this.decisionSelection(),
+        ...(intent?.combatId === undefined
+          ? {}
+          : {
+              combatId: intent.combatId,
+              combatRevision: intent.combatRevision,
+            }),
+      });
+    } else {
+      this.send({
+        type: 'RESOLVE_ROLE_RETENTION',
+        decisionId: decision.decisionId,
+        keepCardId: this.decisionSelection()[0]!,
+      });
+    }
+    this.decisionSelection.set([]);
+  }
+
+  protected cardFacts(card: GameCardView): readonly string[] {
+    const facts: string[] = [];
+    if (card.monster) {
+      facts.push(
+        `Сила: ${card.monster.strength ?? card.monster.level ?? 0}`,
+        `Уровней: ${card.monster.levelRewards}`,
+        `Сокровищ: ${card.monster.treasureRewards}`,
+      );
+      if (card.monster.badStuff.length)
+        facts.push(
+          `Непотребство: ${card.monster.badStuff.map((effect) => this.effectLabel(effect)).join(', ')}`,
+        );
+    }
+    if (card.equipment)
+      facts.push(
+        `Бонус: +${card.equipment.combatBonus}`,
+        `Слот: ${this.slotLabel(card.equipment.slot)}`,
+        `Руки: ${card.equipment.hands}`,
+      );
+    if (card.goldValue) facts.push(`Цена: ${card.goldValue}`);
+    if (card.sellable === false) facts.push('Не продаётся');
+    if (card.sellable === true) facts.push('Можно продать');
+    if (card.tags?.length)
+      facts.push(`Метки: ${card.tags.map((tag) => this.tagLabel(tag)).join(', ')}`);
+    if (card.play)
+      facts.push(
+        `Время: ${card.play.timings.map((timing) => this.timingLabel(timing)).join(', ')} · цель: ${this.targetLabel(card.play.target)}`,
+      );
+    if (card.equipment?.restrictions.length)
+      facts.push(
+        `Ограничения: ${card.equipment.restrictions.map((restriction) => `${restriction.type === 'CLASS' ? 'класс' : 'раса'} ${this.localization.definitionName(restriction.definitionId)}`).join(', ')}`,
+      );
+    return facts;
+  }
+  private slotLabel(slot: NonNullable<GameCardView['equipment']>['slot']): string {
+    return ({ HEAD: 'голова', BODY: 'тело', FEET: 'ноги', HANDS: 'руки' } as const)[slot];
+  }
+  private effectLabel(
+    effect: GameCardView['monster'] extends infer Monster
+      ? NonNullable<Monster> extends { readonly badStuff: readonly (infer Effect)[] }
+        ? Effect
+        : never
+      : never,
+  ): string {
+    if (typeof effect !== 'object' || effect === null || !('type' in effect)) return 'эффект';
+    if (effect.type === 'LOSE_LEVEL') return `потеря уровня ${effect.amount}`;
+    if (effect.type === 'DEATH') return 'смерть';
+    if (effect.type === 'DISCARD_ROLE')
+      return `сброс ${effect.role === 'CLASS' ? 'класса' : 'расы'}`;
+    return `сброс ${effect.count} карт`;
+  }
+  private tagLabel(tag: NonNullable<GameCardView['tags']>[number]): string {
+    return (
+      {
+        BEAST: 'зверь',
+        CONSTRUCT: 'конструкт',
+        ARCANE: 'магия',
+        UNDEAD: 'нежить',
+        WEAPON: 'оружие',
+        ARMOR: 'доспех',
+        BLADE: 'клинок',
+        BLUNT: 'дробящее',
+        MAGIC: 'магическое',
+        HEX: 'сглаз',
+        TRAP: 'ловушка',
+      } as const
+    )[tag];
+  }
+  private timingLabel(timing: NonNullable<GameCardView['play']>['timings'][number]): string {
+    return (
+      {
+        TURN: 'ход',
+        ACTIVE_COMBAT: 'бой',
+        VICTORY_REACTION: 'реакция на победу',
+        WHEN_DRAWN: 'при взятии',
+      } as const
+    )[timing];
+  }
+  private targetLabel(target: NonNullable<GameCardView['play']>['target']): string {
+    return (
+      {
+        SELF: 'себя',
+        ANY_PLAYER: 'игрока',
+        COMBAT_PLAYERS: 'сторону игроков',
+        COMBAT_PLAYER: 'участника боя',
+        MONSTER_ENCOUNTER: 'монстра',
+        HAND_MONSTER: 'монстра из руки',
+        EQUIPMENT: 'снаряжение',
+      } as const
+    )[target];
+  }
+  protected toggleLocale(): void {
+    this.localization.setLocale(this.locale() === 'ru' ? 'en' : 'ru');
+  }
+  protected async toggleFullscreen(): Promise<void> {
+    if (!this.fullscreenSupported) return;
+    if (document.fullscreenElement === null) await document.documentElement.requestFullscreen();
+    else await document.exitFullscreen();
+    this.isFullscreen.set(document.fullscreenElement !== null);
+  }
+  protected rematch(): void {
+    this.lobbyClient.rematch();
+  }
+  protected returnToLobby(): void {
+    this.lobbyClient.returnToLobby();
+  }
+
+  @HostListener('document:fullscreenchange') protected syncFullscreen(): void {
+    this.isFullscreen.set(document.fullscreenElement !== null);
+  }
+  @HostListener('document:keydown.escape') protected closeTopLayer(): void {
+    if (this.selectedCard()) this.selectedCard.set(null);
+    else if (this.targetPicker()) this.targetPicker.set(null);
+    else if (this.cardUses()) this.cardUses.set(null);
+    else if (this.selectedPlayerId()) this.selectedPlayerId.set(null);
+    else if (this.breakdownOpen()) this.breakdownOpen.set(false);
+    else if (this.helpOpen()) this.helpOpen.set(false);
+    else if (this.charityOpen()) this.charityOpen.set(false);
+    else if (this.saleOpen()) this.saleOpen.set(false);
+    else if (this.fullHandOpen()) this.fullHandOpen.set(false);
+    else if (this.historyOpen()) this.historyOpen.set(false);
+    else if (this.menuOpen()) this.menuOpen.set(false);
+  }
+
+  protected send(command: GameClientCommand): void {
+    this.lobbyClient.sendGameCommand(command);
+  }
+  protected hasIntent(kind: AvailableIntentView['kind']): boolean {
+    return this.game().availableIntents.some((intent) => intent.kind === kind);
+  }
+  private intent(kind: AvailableIntentView['kind']): AvailableIntentView | undefined {
+    return this.game().availableIntents.find((intent) => intent.kind === kind);
+  }
+  private commandForIntent(intent: AvailableIntentView): GameClientCommand | null {
+    switch (intent.kind) {
+      case 'KICK_DOOR':
+      case 'LOOT_ROOM':
+      case 'SCAVENGE':
+      case 'END_TURN':
+        return { type: intent.kind };
+      case 'LOOK_FOR_TROUBLE':
+      case 'EQUIP_ITEM':
+      case 'UNEQUIP_ITEM':
+      case 'PLAY_ROLE_PERMISSION':
+      case 'DISCARD_ROLE_PERMISSION':
+        return { type: intent.kind, cardId: intent.cardId };
+      case 'PLAY_ROLE':
+        return {
+          type: intent.kind,
+          cardId: intent.cardId,
+          ...(intent.replaceCardId === undefined ? {} : { replaceCardId: intent.replaceCardId }),
+        };
+      case 'DECLARE_COMBAT_VICTORY':
+      case 'RUN_AWAY':
+        return {
+          type: intent.kind,
+          combatId: intent.combatId,
+          combatRevision: intent.combatRevision,
+        };
+      case 'PASS_COMBAT_REACTION':
+        return {
+          type: intent.kind,
+          combatId: intent.combatId,
+          combatRevision: intent.combatRevision,
+          reactionWindowId: intent.reactionWindowId,
+        };
+      case 'ACCEPT_HELP_OFFER':
+      case 'REJECT_HELP_OFFER':
+      case 'CANCEL_HELP_OFFER':
+        return {
+          type: intent.kind,
+          offerId: intent.offerId,
+          combatId: intent.combatId,
+          combatRevision: intent.combatRevision,
+        };
+      case 'PLAY_CARD': {
+        const target = intent.target;
+        if (target.type === 'PLAYER')
+          return 'combatId' in intent
+            ? {
+                type: 'PLAY_COMBAT_CURSE',
+                cardId: intent.cardId,
+                targetPlayerId: target.playerId,
+                reactionWindowId: intent.reactionWindowId!,
+                combatId: intent.combatId,
+                combatRevision: intent.combatRevision,
+              }
+            : {
+                type: 'PLAY_CURSE',
+                cardId: intent.cardId,
+                targetPlayerId: target.playerId,
+              };
+        if (target.type === 'SELF')
+          return {
+            type: 'PLAY_CARD',
+            cardId: intent.cardId,
+            target,
+          };
+        if (target.type === 'EQUIPMENT')
+          return {
+            type: 'PLAY_CARD',
+            cardId: intent.cardId,
+            target,
+          };
+        if (!('combatId' in intent)) return null;
+        return {
+          type: 'PLAY_CARD',
+          cardId: intent.cardId,
+          target:
+            target.type === 'PLAYERS'
+              ? target
+              : target.type === 'MONSTER'
+                ? target
+                : { type: 'HAND_MONSTER', monsterCardId: target.monsterCardId },
+          combatId: intent.combatId,
+          combatRevision: intent.combatRevision,
+          ...(intent.reactionWindowId === undefined
+            ? {}
+            : { reactionWindowId: intent.reactionWindowId }),
+        };
+      }
+      default:
+        return null;
+    }
+  }
+  private collectPlayableIds(): readonly string[] {
+    return [
+      ...new Set(
+        this.game().availableIntents.flatMap((intent) =>
+          'cardId' in intent ? [intent.cardId] : [],
+        ),
+      ),
+    ];
+  }
+  private cardActions(card: GameCardView): readonly CardUse[] {
+    const game = this.game(),
+      uses: CardUse[] = [];
+    const intents = game.availableIntents.filter(
+      (intent) => 'cardId' in intent && intent.cardId === card.instanceId,
+    );
+    const lookIntent = intents.find((intent) => intent.kind === 'LOOK_FOR_TROUBLE');
+    const equipIntent = intents.find((intent) => intent.kind === 'EQUIP_ITEM');
+    const roleIntent = intents.find((intent) => intent.kind === 'PLAY_ROLE');
+    const curseIntents = intents.filter(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'PLAYER' && !('combatId' in intent),
+    );
+    const combatCurseIntents = intents.filter(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'PLAYER' && 'combatId' in intent,
+    );
+    const playerSideIntent = intents.find(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD'; combatId: string }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'PLAYERS' && 'combatId' in intent,
+    );
+    const monsterIntents = intents.filter(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'MONSTER',
+    );
+    const addIntents = intents.filter(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'HAND_MONSTER',
+    );
+    if (lookIntent)
+      uses.push({
+        label: 'Искать неприятности',
+        command: { type: 'LOOK_FOR_TROUBLE', cardId: card.instanceId },
+      });
+    if (equipIntent)
+      uses.push({ label: 'Надеть', command: { type: 'EQUIP_ITEM', cardId: card.instanceId } });
+    if (roleIntent?.kind === 'PLAY_ROLE')
+      uses.push({
+        label: 'Сыграть роль',
+        command: {
+          type: 'PLAY_ROLE',
+          cardId: card.instanceId,
+          ...(roleIntent.replaceCardId === undefined
+            ? {}
+            : { replaceCardId: roleIntent.replaceCardId }),
+        },
+      });
+    if (curseIntents.length > 0) {
+      const options = curseIntents.map((intent) => ({
+        id: intent.target.type === 'PLAYER' ? intent.target.playerId : '',
+        label: this.playerName(intent.target.type === 'PLAYER' ? intent.target.playerId : ''),
+      }));
+      uses.push(this.useWithTargets('Наложить проклятие', 'Выберите цель', card, 'CURSE', options));
+    }
+    if (combatCurseIntents.length > 0) {
+      uses.push(
+        this.useWithTargets(
+          'Сыграть на игрока',
+          'Выберите игрока',
+          card,
+          'COMBAT_CURSE',
+          combatCurseIntents.map((intent) => ({
+            id: intent.target.type === 'PLAYER' ? intent.target.playerId : '',
+            label: this.playerName(intent.target.type === 'PLAYER' ? intent.target.playerId : ''),
+          })),
+        ),
+      );
+    }
+    if (playerSideIntent)
+      uses.push({
+        label: 'Сыграть за игроков',
+        command: {
+          type: 'PLAY_CARD',
+          cardId: card.instanceId,
+          target: { type: 'PLAYERS' },
+          reactionWindowId: playerSideIntent.reactionWindowId,
+          combatId: playerSideIntent.combatId,
+          combatRevision: playerSideIntent.combatRevision,
+        },
+      });
+    if (monsterIntents.length > 0) {
+      uses.push(
+        this.useWithTargets(
+          'Усилить монстра',
+          'Выберите монстра',
+          card,
+          'MONSTER',
+          monsterIntents.map((intent) => ({
+            id: intent.target.type === 'MONSTER' ? intent.target.encounterId : '',
+            label:
+              game.combat?.monsters.find(
+                (monster) =>
+                  monster.encounterId ===
+                  (intent.target.type === 'MONSTER' ? intent.target.encounterId : ''),
+              )?.monster.name ?? 'Монстр',
+            facts: (() => {
+              const target = game.combat?.monsters.find(
+                (monster) =>
+                  monster.encounterId ===
+                  (intent.target.type === 'MONSTER' ? intent.target.encounterId : ''),
+              );
+              return target
+                ? `Сила ${target.currentStrength} · ${target.currentTreasures} сокр.`
+                : '';
+            })(),
+          })),
+        ),
+      );
+    }
+    if (addIntents.length > 0) {
+      uses.push(
+        this.useWithTargets(
+          'Добавить монстра',
+          'Выберите монстра из руки',
+          card,
+          'HAND_MONSTER',
+          addIntents.map((intent) => ({
+            id: intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : '',
+            label:
+              game.self.hand.find(
+                (value) =>
+                  value.instanceId ===
+                  (intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : ''),
+              )?.name ?? 'Монстр',
+            facts: this.cardFacts(
+              game.self.hand.find(
+                (value) =>
+                  value.instanceId ===
+                  (intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : ''),
+              ) ?? card,
+            ).join(' · '),
+          })),
+        ),
+      );
+    }
+    return uses;
+  }
+  private useWithTargets(
+    label: string,
+    title: string,
+    card: GameCardView,
+    kind: TargetPickerState['kind'],
+    options: readonly PickerOption[],
+  ): CardUse {
+    if (options.length === 1) {
+      const option = options[0]!;
+      if (kind === 'CURSE')
+        return {
+          label,
+          command: { type: 'PLAY_CURSE', cardId: card.instanceId, targetPlayerId: option.id },
+        };
+      if (kind === 'COMBAT_CURSE' && this.game().combat?.reactionWindow)
+        return {
+          label,
+          command: {
+            type: 'PLAY_COMBAT_CURSE',
+            cardId: card.instanceId,
+            targetPlayerId: option.id,
+            reactionWindowId: this.game().combat!.reactionWindow!.windowId,
+            combatId: this.game().combat!.combatId,
+            combatRevision: this.game().combat!.revision,
+          },
+        };
+      if (kind === 'MONSTER')
+        return {
+          label,
+          command: {
+            type: 'PLAY_CARD',
+            cardId: card.instanceId,
+            target: { type: 'MONSTER', encounterId: option.id },
+            combatId: this.game().combat?.combatId,
+            combatRevision: this.game().combat?.revision,
+          },
+        };
+      if (kind === 'HAND_MONSTER')
+        return {
+          label,
+          command: {
+            type: 'PLAY_CARD',
+            cardId: card.instanceId,
+            target: { type: 'HAND_MONSTER', monsterCardId: option.id },
+            combatId: this.game().combat?.combatId,
+            combatRevision: this.game().combat?.revision,
+          },
+        };
+    }
+    return { label, picker: { title, card, kind, options } };
+  }
+  private openPickerForCards(
+    title: string,
+    cards: readonly GameCardView[],
+    kind: TargetPickerState['kind'],
+  ): void {
+    if (cards.length === 1) {
+      this.send({ type: 'LOOK_FOR_TROUBLE', cardId: cards[0]!.instanceId });
+      return;
+    }
+    this.targetPicker.set({
+      title,
+      card:
+        cards[0] ??
+        ({
+          instanceId: '',
+          definitionId: '',
+          artKey: '',
+          name: '',
+          description: '',
+          type: 'OTHER',
+          deck: 'DOOR',
+          effects: [],
+        } satisfies GameCardView),
+      kind,
+      options: cards.map((card) => ({
+        id: card.instanceId,
+        label: this.cardName(card),
+        facts: this.cardFacts(card).join(' · '),
+      })),
+    });
+  }
+}

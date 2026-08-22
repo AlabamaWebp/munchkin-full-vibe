@@ -55,7 +55,7 @@ const trinket: CardDefinition = {
   id: parseCardDefinitionId("trinket"),
   name: "Trinket",
   description: "Not equipment",
-  type: CardType.OTHER,
+  type: CardType.UTILITY,
   deck: DeckType.TREASURE,
   effects: [],
 };
@@ -68,7 +68,8 @@ function stateWith(
   phase: GamePhase = GamePhase.TURN_START,
 ): GameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("equipment-game"),
     status: GameStatus.IN_PROGRESS,
     phase,
@@ -76,10 +77,25 @@ function stateWith(
       {
         id: playerId,
         name: "Ada",
+        sex: "FEMALE",
         level: 3,
         hand,
         equipment,
-        temporaryCombatBonus: 2,
+        equipmentAttachments: [],
+        classCards: [],
+        raceCards: [],
+        rolePermissionCards: [],
+        hirelingCard: null,
+        mountCard: null,
+        isDead: false,
+        activeEffects: [
+          {
+            type: "COMBAT_POWER",
+            sourceDefinitionId: parseCardDefinitionId("trinket"),
+            amount: 2,
+            expires: "END_OF_COMBAT",
+          },
+        ],
       },
     ],
     activePlayerId: playerId,
@@ -91,6 +107,7 @@ function stateWith(
     combat: null,
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,

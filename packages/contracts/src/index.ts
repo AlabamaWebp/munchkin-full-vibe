@@ -14,12 +14,16 @@ export const ROOM_CODE_LENGTH = 4;
 
 export const LobbyStatus = { LOBBY: "LOBBY", STARTED: "STARTED" } as const;
 export type LobbyStatus = (typeof LobbyStatus)[keyof typeof LobbyStatus];
+export type GameMode = "BALANCED" | "CLASSIC_CHAOS";
+export type PlayerSex = "MALE" | "FEMALE";
+export type CardSetId = "CORE" | "COMPANIONS" | "ARSENAL" | "DUAL_IDENTITY";
 
 export interface LobbyPlayerView {
   readonly playerId: string;
   readonly name: string;
   readonly isHost: boolean;
   readonly connected: boolean;
+  readonly sex?: PlayerSex | null;
 }
 
 export interface LobbyState {
@@ -27,6 +31,10 @@ export interface LobbyState {
   readonly status: LobbyStatus;
   readonly hostPlayerId: string;
   readonly players: readonly LobbyPlayerView[];
+  readonly settings?: {
+    readonly mode: GameMode;
+    readonly enabledSetIds: readonly CardSetId[];
+  };
 }
 
 export interface CreateLobbyPayload {
@@ -45,6 +53,13 @@ export interface ResumeSessionPayload {
   readonly roomCode: string;
   readonly sessionToken: string;
 }
+export interface SetPlayerSexPayload extends StartLobbyPayload {
+  readonly sex: PlayerSex;
+}
+export interface SetLobbySettingsPayload extends StartLobbyPayload {
+  readonly mode: GameMode;
+  readonly enabledSetIds: readonly CardSetId[];
+}
 
 export type LobbyErrorCode =
   | "ALREADY_IN_ROOM"
@@ -56,7 +71,9 @@ export type LobbyErrorCode =
   | "PLAYER_NOT_FOUND"
   | "ROOM_FULL"
   | "ROOM_NOT_FOUND"
-  | "GAME_NOT_FINISHED";
+  | "GAME_NOT_FINISHED"
+  | "SEX_REQUIRED"
+  | "INVALID_GAME_SETTINGS";
 
 export interface LobbyActionSuccess {
   readonly success: true;
@@ -100,8 +117,13 @@ export type GameCardType =
   | "ADD_MONSTER"
   | "CLONE_MONSTER"
   | "OTHER"
+  | "UTILITY"
   | "CLASS"
-  | "RACE";
+  | "RACE"
+  | "HIRELING"
+  | "MOUNT"
+  | "ROLE_PERMISSION"
+  | "ATTACHMENT";
 export type GameDeckType = "DOOR" | "TREASURE";
 export type GameEquipmentSlot = "HEAD" | "BODY" | "FEET" | "HANDS";
 export type GameCardPlayTiming =
@@ -112,7 +134,8 @@ export type GameCardTarget =
   | "COMBAT_PLAYERS"
   | "COMBAT_PLAYER"
   | "MONSTER_ENCOUNTER"
-  | "HAND_MONSTER";
+  | "HAND_MONSTER"
+  | "EQUIPMENT";
 
 export interface GameCardView {
   readonly instanceId: string;
@@ -122,6 +145,22 @@ export interface GameCardView {
   readonly description: string;
   readonly type: GameCardType;
   readonly deck: GameDeckType;
+  readonly setId?: CardSetId;
+  readonly tags?: readonly (
+    | "BEAST"
+    | "CONSTRUCT"
+    | "ARCANE"
+    | "UNDEAD"
+    | "WEAPON"
+    | "ARMOR"
+    | "BLADE"
+    | "BLUNT"
+    | "MAGIC"
+    | "HEX"
+    | "TRAP"
+  )[];
+  readonly sellable?: boolean;
+  readonly tradeable?: boolean;
   readonly goldValue?: number;
   readonly play?: {
     readonly timings: readonly GameCardPlayTiming[];
@@ -142,7 +181,8 @@ export interface GameCardView {
     readonly requiredRace?: string;
   };
   readonly monster?: {
-    readonly level: number;
+    readonly strength?: number;
+    readonly level?: number;
     readonly levelRewards: number;
     readonly treasureRewards: number;
     readonly badStuff: readonly GameBadStuffEffectView[];
@@ -187,14 +227,35 @@ export type GameBadStuffEffectView =
 export interface GamePlayerView {
   readonly playerId: string;
   readonly name: string;
+  readonly sex?: PlayerSex;
   readonly level: number;
   readonly handCount: number;
   readonly equipment: readonly GameCardView[];
+  readonly equipmentAttachments?: readonly {
+    readonly card: GameCardView;
+    readonly attachedToCardId: string;
+  }[];
   readonly temporaryCombatBonus: number;
   readonly equipmentCombatBonus: number;
   readonly combatPower: number;
+  readonly combatPowerBreakdown?: readonly {
+    readonly source:
+      | "LEVEL"
+      | "EQUIPMENT"
+      | "ROLE"
+      | "COMPANION"
+      | "ACTIVE_EFFECT"
+      | "MAKESHIFT_TOOLS";
+    readonly sourceDefinitionId?: string;
+    readonly amount: number;
+  }[];
   readonly classCard: GameCardView | null;
   readonly raceCard: GameCardView | null;
+  readonly classCards?: readonly GameCardView[];
+  readonly raceCards?: readonly GameCardView[];
+  readonly rolePermissionCards?: readonly GameCardView[];
+  readonly hirelingCard?: GameCardView | null;
+  readonly mountCard?: GameCardView | null;
   readonly isDead: boolean;
 }
 
@@ -205,12 +266,146 @@ export interface OwnPlayerView extends GamePlayerView {
 export type AvailableGameAction =
   | "KICK_DOOR"
   | "LOOK_FOR_TROUBLE"
-  | "ACCEPT_HELP"
+  | "SCAVENGE"
+  | "PROPOSE_HELP"
+  | "COUNTER_HELP"
+  | "ACCEPT_HELP_OFFER"
+  | "REJECT_HELP_OFFER"
+  | "CANCEL_HELP_OFFER"
   | "DECLARE_COMBAT_VICTORY"
   | "PASS_COMBAT_REACTION"
   | "RUN_AWAY"
   | "LOOT_ROOM"
   | "END_TURN";
+
+export type IntentReasonCode =
+  | "PRIMARY_TURN_ACTION"
+  | "OPTIONAL_CARD_PLAY"
+  | "COMBAT_WINNING"
+  | "COMBAT_LOSING"
+  | "BLOCKING_RESPONSE"
+  | "HAND_LIMIT"
+  | "ECONOMY";
+
+interface AvailableIntentBase {
+  readonly id: string;
+  readonly reasonCode: IntentReasonCode;
+}
+
+interface CombatIntentAddress {
+  readonly combatId: string;
+  readonly combatRevision: number;
+}
+
+export type AvailableIntentView =
+  | (AvailableIntentBase & {
+      readonly kind: "KICK_DOOR" | "LOOT_ROOM" | "SCAVENGE" | "END_TURN";
+    })
+  | (AvailableIntentBase & {
+      readonly kind:
+        | "LOOK_FOR_TROUBLE"
+        | "EQUIP_ITEM"
+        | "UNEQUIP_ITEM"
+        | "PLAY_ROLE"
+        | "PLAY_ROLE_PERMISSION"
+        | "DISCARD_ROLE_PERMISSION";
+      readonly cardId: string;
+      readonly replaceCardId?: string;
+    })
+  | (AvailableIntentBase &
+      CombatIntentAddress & {
+        readonly kind: "PLAY_CARD";
+        readonly cardId: string;
+        readonly target:
+          | { readonly type: "PLAYERS" }
+          | { readonly type: "MONSTER"; readonly encounterId: string }
+          | { readonly type: "HAND_MONSTER"; readonly monsterCardId: string }
+          | { readonly type: "PLAYER"; readonly playerId: string };
+        readonly reactionWindowId?: number;
+      })
+  | (AvailableIntentBase & {
+      readonly kind: "PLAY_CARD";
+      readonly cardId: string;
+      readonly target:
+        | { readonly type: "SELF" }
+        | { readonly type: "PLAYER"; readonly playerId: string }
+        | { readonly type: "EQUIPMENT"; readonly cardId: string };
+    })
+  | (AvailableIntentBase &
+      CombatIntentAddress & {
+        readonly kind: "DECLARE_COMBAT_VICTORY" | "RUN_AWAY";
+      })
+  | (AvailableIntentBase &
+      CombatIntentAddress & {
+        readonly kind: "PASS_COMBAT_REACTION";
+        readonly reactionWindowId: number;
+        readonly expiresAtEpochMs: number;
+      })
+  | (AvailableIntentBase &
+      CombatIntentAddress & {
+        readonly kind: "PROPOSE_HELP";
+        readonly helperIds: readonly string[];
+        readonly minTreasures: number;
+        readonly maxTreasures: number;
+      })
+  | (AvailableIntentBase &
+      CombatIntentAddress & {
+        readonly kind:
+          | "COUNTER_HELP"
+          | "ACCEPT_HELP_OFFER"
+          | "REJECT_HELP_OFFER"
+          | "CANCEL_HELP_OFFER";
+        readonly offerId: string;
+        readonly minTreasures?: number;
+        readonly maxTreasures?: number;
+        readonly expiresAtEpochMs: number;
+      })
+  | (AvailableIntentBase & {
+      readonly kind: "SELL_CARDS";
+      readonly cardIds: readonly string[];
+      readonly minimumValue: number;
+    })
+  | (AvailableIntentBase & {
+      readonly kind: "TRADE_CARD";
+      readonly cardId: string;
+      readonly recipientIds: readonly string[];
+    })
+  | (AvailableIntentBase & {
+      readonly kind: "GIVE_CHARITY";
+      readonly cardIds: readonly string[];
+      readonly count: number;
+      readonly recipientIds: readonly string[];
+      readonly randomDefault: boolean;
+    })
+  | (AvailableIntentBase & {
+      readonly kind: "RESOLVE_CARD_DISCARD";
+      readonly decisionId: string;
+      readonly cardIds: readonly string[];
+      readonly count: number;
+      readonly expiresAtEpochMs: number;
+      readonly combatId?: string;
+      readonly combatRevision?: number;
+    })
+  | (AvailableIntentBase & {
+      readonly kind: "RESOLVE_ROLE_RETENTION";
+      readonly decisionId: string;
+      readonly cardIds: readonly string[];
+      readonly expiresAtEpochMs: number;
+    })
+  | (AvailableIntentBase & {
+      readonly kind: "RESPOND_TO_CURSE";
+      readonly responseId: string;
+      readonly expiresAtEpochMs: number;
+      readonly responses: readonly (
+        | { readonly type: "DECLINE" }
+        | { readonly type: "CANCEL"; readonly cardId: string }
+        | {
+            readonly type: "PROTECT_ONE_ITEM";
+            readonly cardId: string;
+            readonly protectedCardIds: readonly string[];
+          }
+      )[];
+    });
 
 export type CombatHistoryView =
   | {
@@ -220,9 +415,11 @@ export type CombatHistoryView =
       readonly monster: GameCardView;
     }
   | {
-      readonly type: "HELP_REQUESTED" | "HELP_ACCEPTED";
+      readonly type: "HELP_OFFERED" | "HELP_COUNTERED" | "HELP_OFFER_ACCEPTED";
       readonly playerId: string;
       readonly helperId: string;
+      readonly offerId: string;
+      readonly treasureCount: number;
     }
   | {
       readonly type: "CARD_PLAYED";
@@ -262,6 +459,10 @@ export type GameLogEventType =
   | "CARDS_DISCARDED_SUMMARY"
   | "CARD_DISCARD_REQUIRED"
   | "CURSE_RESOLVED"
+  | "CURSE_RESPONSE_REQUIRED"
+  | "CURSE_RESPONSE_RESOLVED"
+  | "CURSE_PROTECTION_USED"
+  | "DECISION_AUTO_RESOLVED"
   | "COMBAT_STARTED"
   | "MONSTER_ADDED"
   | "MONSTER_CLONED"
@@ -273,17 +474,27 @@ export type GameLogEventType =
   | "COMBAT_WON"
   | "RUN_AWAY_ATTEMPTED"
   | "BAD_STUFF_APPLIED"
-  | "HELP_REQUESTED"
-  | "HELP_ACCEPTED"
+  | "HELP_OFFERED"
+  | "HELP_COUNTERED"
+  | "HELP_OFFER_ACCEPTED"
+  | "HELP_OFFER_REJECTED"
+  | "HELP_OFFER_CANCELLED"
   | "LEVEL_GAINED"
   | "LEVEL_LOST"
   | "TREASURE_GAINED"
+  | "COMBAT_REWARD_CARDS"
+  | "SCAVENGED"
+  | "SCAVENGED_CARD"
   | "ROOM_LOOTED"
   | "CARD_PLAYED"
   | "ITEM_EQUIPPED"
   | "ITEM_UNEQUIPPED"
   | "ROLE_PLAYED"
-  | "ITEMS_SOLD"
+  | "CARDS_SOLD"
+  | "ROLE_PERMISSION_PLAYED"
+  | "ROLE_PERMISSION_DISCARDED"
+  | "ROLE_RETENTION_REQUIRED"
+  | "ROLE_RETAINED"
   | "ITEM_TRADED"
   | "CHARITY_RESOLVED"
   | "CHARITY_CARDS_REVEALED"
@@ -300,6 +511,7 @@ export interface GameLogEntryView {
   readonly visibility: "PUBLIC" | "PRIVATE";
   readonly playerId?: string;
   readonly targetPlayerId?: string;
+  readonly protectedCardId?: string;
   readonly card?: GameCardView;
   readonly cards?: readonly GameCardView[];
   readonly count?: number;
@@ -312,11 +524,24 @@ export interface GameLogEntryView {
   readonly escaped?: boolean;
   readonly encounterId?: string;
   readonly reactionWindowId?: number;
+  readonly combatId?: string;
+  readonly combatRevision?: number;
+  readonly offerId?: string;
+  readonly decisionId?: string;
+  readonly responseId?: string;
+  readonly expiresAtEpochMs?: number;
+  readonly outcome?: string;
   readonly sourceEncounterId?: string;
   readonly deck?: GameDeckType;
   readonly side?: "PLAYERS" | "MONSTER";
   readonly role?: "CLASS" | "RACE";
   readonly zone?: "HAND" | "EQUIPMENT";
+}
+
+export interface PresentedGameEventView extends GameLogEntryView {
+  readonly priority: "BLOCKING" | "IMPORTANT" | "ROUTINE";
+  readonly summaryCode: string;
+  readonly requiresViewerAction: boolean;
 }
 
 export type GameCardUnavailableReason =
@@ -335,7 +560,9 @@ export type GameCardUnavailableReason =
   | "NO_AVAILABLE_ACTION";
 
 export type ExpectedGameActionView =
+  | { readonly type: "CURSE_RESPONSE"; readonly playerId: string }
   | { readonly type: "DISCARD_CARDS"; readonly playerId: string }
+  | { readonly type: "RESOLVE_ROLE_RETENTION"; readonly playerId: string }
   | { readonly type: "RESPOND_TO_HELP"; readonly playerId: string }
   | { readonly type: "COMBAT_DECISION"; readonly playerId: string }
   | {
@@ -350,12 +577,17 @@ export interface GameView {
   readonly viewerPlayerId: string;
   readonly status: GameStatus;
   readonly phase: GamePhase;
+  readonly config?: {
+    readonly mode: GameMode;
+    readonly enabledSetIds: readonly CardSetId[];
+  };
   readonly activePlayerId: string;
   readonly turnNumber: number;
   readonly winnerId: string | null;
   readonly players: readonly GamePlayerView[];
   readonly self: OwnPlayerView;
   readonly combat: {
+    readonly combatId: string;
     readonly playerId: string;
     readonly revision: number;
     readonly monsters: readonly {
@@ -382,14 +614,39 @@ export interface GameView {
     readonly monsterPower: number;
     readonly requestedHelperId: string | null;
     readonly helperId: string | null;
+    readonly helpOffer?: {
+      readonly offerId: string;
+      readonly helperId: string;
+      readonly proposedBy: "ACTIVE" | "HELPER";
+      readonly treasureCount: number;
+      readonly expiresAtEpochMs: number;
+    } | null;
+    readonly helpAgreement?: {
+      readonly helperId: string;
+      readonly promisedTreasures: number;
+      readonly acceptedOfferId: string;
+      readonly agreedAtCombatRevision: number;
+    } | null;
     readonly helperContribution: number;
     readonly reactionWindow: {
       readonly windowId: number;
       readonly claimantId: string;
       readonly confirmedPlayerIds: readonly string[];
       readonly waitingPlayerIds: readonly string[];
+      readonly expiresAtEpochMs: number;
     } | null;
     readonly history: readonly CombatHistoryView[];
+    readonly runAway?: {
+      readonly currentCombatantId: string | null;
+      readonly currentEncounterId: string | null;
+      readonly attempts: readonly {
+        readonly combatantId: string;
+        readonly encounterId: string;
+        readonly roll: number | null;
+        readonly outcome: "ESCAPED" | "FAILED" | "SKIPPED_DEAD";
+        readonly badStuffApplied: boolean;
+      }[];
+    } | null;
   } | null;
   readonly lastRunAwayResult: {
     readonly playerId: string;
@@ -401,48 +658,44 @@ export interface GameView {
       readonly badStuffApplied: boolean;
     }[];
   } | null;
-  readonly pendingDecision: {
-    readonly type: "DISCARD_CARDS";
+  readonly pendingDecision:
+    | {
+        readonly decisionId: string;
+        readonly type: "DISCARD_CARDS";
+        readonly playerId: string;
+        readonly zone: "HAND" | "EQUIPMENT";
+        readonly count: number;
+        readonly sourceCard: GameCardView;
+        readonly selectableCardIds: readonly string[];
+        readonly expiresAtEpochMs: number;
+      }
+    | {
+        readonly decisionId: string;
+        readonly type: "CHOOSE_ROLE_TO_KEEP";
+        readonly playerId: string;
+        readonly role: "CLASS" | "RACE";
+        readonly selectableCardIds: readonly string[];
+        readonly expiresAtEpochMs: number;
+      }
+    | null;
+  readonly curseResponse: {
+    readonly responseId: string;
     readonly playerId: string;
-    readonly zone: "HAND" | "EQUIPMENT";
-    readonly count: number;
-    readonly sourceCard: GameCardView;
-    readonly selectableCardIds: readonly string[];
+    readonly curseCard: GameCardView;
+    readonly expiresAtEpochMs: number;
+    readonly cancelCardIds: readonly string[];
+    readonly itemGuardCardIds: readonly string[];
+    readonly protectableItemIds: readonly string[];
   } | null;
   readonly gameLog: readonly GameLogEntryView[];
+  readonly presentation: {
+    readonly blocking: PresentedGameEventView | null;
+    readonly important: readonly PresentedGameEventView[];
+    readonly routine: readonly PresentedGameEventView[];
+  };
   readonly expectedAction: ExpectedGameActionView;
   readonly deckCounts: { readonly door: number; readonly treasure: number };
-  readonly availableActions: readonly AvailableGameAction[];
-  readonly lookForTroubleCardIds: readonly string[];
-  readonly availableEquipmentActions: {
-    readonly equipCardIds: readonly string[];
-    readonly unequipCardIds: readonly string[];
-  };
-  readonly requestableHelperIds: readonly string[];
-  readonly playableCombatCards: {
-    readonly playersSideCardIds: readonly string[];
-    readonly monsterSideCardIds: readonly string[];
-    readonly monsterTargetActions: readonly {
-      readonly cardId: string;
-      readonly encounterIds: readonly string[];
-    }[];
-    readonly addMonsterActions: readonly {
-      readonly cardId: string;
-      readonly monsterCardIds: readonly string[];
-    }[];
-    readonly playerTargetActions: readonly {
-      readonly cardId: string;
-      readonly playerIds: readonly string[];
-    }[];
-  };
-  readonly expandedRuleActions: {
-    readonly playableRoleCardIds: readonly string[];
-    readonly playableCurseCardIds: readonly string[];
-    readonly sellableItemCardIds: readonly string[];
-    readonly tradeableItemCardIds: readonly string[];
-    readonly charityCardCount: number;
-    readonly charityRecipientIds: readonly string[];
-  };
+  readonly availableIntents: readonly AvailableIntentView[];
   readonly unavailableCardReasons: readonly {
     readonly cardId: string;
     readonly reason: GameCardUnavailableReason;
@@ -456,33 +709,72 @@ export type GameClientCommand =
   | { readonly type: "END_TURN" }
   | {
       readonly type: "DECLARE_COMBAT_VICTORY";
+      readonly combatId: string;
       readonly combatRevision: number;
     }
   | {
       readonly type: "PASS_COMBAT_REACTION";
+      readonly combatId: string;
+      readonly combatRevision: number;
       readonly reactionWindowId: number;
     }
-  | { readonly type: "RUN_AWAY" }
+  | {
+      readonly type: "RUN_AWAY";
+      readonly combatId: string;
+      readonly combatRevision: number;
+    }
   | {
       readonly type: "PLAY_CARD";
       readonly cardId: string;
       readonly target:
+        | { readonly type: "SELF" }
         | { readonly type: "PLAYERS" }
         | { readonly type: "MONSTER"; readonly encounterId: string }
-        | { readonly type: "HAND_MONSTER"; readonly monsterCardId: string };
+        | { readonly type: "HAND_MONSTER"; readonly monsterCardId: string }
+        | { readonly type: "EQUIPMENT"; readonly cardId: string };
       readonly reactionWindowId?: number;
+      readonly combatId?: string;
+      readonly combatRevision?: number;
     }
   | {
       readonly type: "PLAY_COMBAT_CURSE";
       readonly cardId: string;
       readonly targetPlayerId: string;
       readonly reactionWindowId: number;
+      readonly combatId: string;
+      readonly combatRevision: number;
     }
-  | { readonly type: "REQUEST_HELP"; readonly helperId: string }
-  | { readonly type: "ACCEPT_HELP" }
+  | {
+      readonly type: "PROPOSE_HELP";
+      readonly helperId: string;
+      readonly treasureCount: number;
+      readonly combatId: string;
+      readonly combatRevision: number;
+    }
+  | {
+      readonly type: "COUNTER_HELP";
+      readonly offerId: string;
+      readonly treasureCount: number;
+      readonly combatId: string;
+      readonly combatRevision: number;
+    }
+  | {
+      readonly type:
+        "ACCEPT_HELP_OFFER" | "REJECT_HELP_OFFER" | "CANCEL_HELP_OFFER";
+      readonly offerId: string;
+      readonly combatId: string;
+      readonly combatRevision: number;
+    }
+  | { readonly type: "SCAVENGE" }
   | { readonly type: "EQUIP_ITEM"; readonly cardId: string }
   | { readonly type: "UNEQUIP_ITEM"; readonly cardId: string }
-  | { readonly type: "PLAY_ROLE"; readonly cardId: string }
+  | {
+      readonly type: "PLAY_ROLE";
+      readonly cardId: string;
+      readonly replaceCardId?: string;
+    }
+  | { readonly type: "PLAY_ROLE_PERMISSION"; readonly cardId: string }
+  | { readonly type: "DISCARD_ROLE_PERMISSION"; readonly cardId: string }
   | {
       readonly type: "PLAY_CURSE";
       readonly cardId: string;
@@ -491,7 +783,15 @@ export type GameClientCommand =
   | { readonly type: "SELL_ITEMS"; readonly cardIds: readonly string[] }
   | {
       readonly type: "RESOLVE_CARD_DISCARD";
+      readonly decisionId: string;
       readonly cardIds: readonly string[];
+      readonly combatId?: string;
+      readonly combatRevision?: number;
+    }
+  | {
+      readonly type: "RESOLVE_ROLE_RETENTION";
+      readonly decisionId: string;
+      readonly keepCardId: string;
     }
   | {
       readonly type: "TRADE_ITEM";
@@ -503,7 +803,18 @@ export type GameClientCommand =
       readonly cardIds: readonly string[];
       readonly recipientId: string | null;
     }
-  | { readonly type: "GIVE_RANDOM_CHARITY" };
+  | { readonly type: "GIVE_RANDOM_CHARITY" }
+  | {
+      readonly type: "RESPOND_TO_CURSE";
+      readonly responseId: string;
+      readonly response:
+        | { readonly type: "DECLINE" }
+        | {
+            readonly type: "USE_PROTECTION";
+            readonly cardId: string;
+            readonly protectedCardId?: string;
+          };
+    };
 export interface GameCommandPayload {
   readonly roomCode: string;
   readonly command: GameClientCommand;
@@ -530,6 +841,14 @@ export interface ClientToServerEvents {
   ) => void;
   "game:start": (
     payload: StartLobbyPayload,
+    acknowledge: (response: LobbyActionAck) => void,
+  ) => void;
+  "lobby:set-sex": (
+    payload: SetPlayerSexPayload,
+    acknowledge: (response: LobbyActionAck) => void,
+  ) => void;
+  "lobby:set-settings": (
+    payload: SetLobbySettingsPayload,
     acknowledge: (response: LobbyActionAck) => void,
   ) => void;
   "lobby:create": (

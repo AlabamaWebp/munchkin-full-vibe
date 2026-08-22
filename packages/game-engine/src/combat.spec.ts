@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CardType, DeckType, type CardDefinition } from "./cards.js";
-import { executeCommand } from "./engine.js";
+import { executeCommand } from "./legacy-test-command.js";
 import { GamePhase, GameStatus, type GameState } from "./game-state.js";
 import {
   parseCardDefinitionId,
@@ -57,7 +57,7 @@ const definitions: readonly CardDefinition[] = [
     id: otherDefinitionId,
     name: "Other",
     description: "Not playable in combat.",
-    type: CardType.OTHER,
+    type: CardType.UTILITY,
     deck: DeckType.TREASURE,
     effects: [],
   },
@@ -65,7 +65,7 @@ const definitions: readonly CardDefinition[] = [
     id: treasureDefinitionId,
     name: "Reward",
     description: "Combat loot.",
-    type: CardType.OTHER,
+    type: CardType.UTILITY,
     deck: DeckType.TREASURE,
     effects: [],
   },
@@ -73,7 +73,8 @@ const definitions: readonly CardDefinition[] = [
 
 function combatState(): GameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("combat-test"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -81,10 +82,18 @@ function combatState(): GameState {
       {
         id: playerId,
         name: "Hero",
+        sex: "MALE",
         level: 1,
         hand: [bonus, other],
         equipment: [],
-        temporaryCombatBonus: 0,
+        equipmentAttachments: [],
+        classCards: [],
+        raceCards: [],
+        rolePermissionCards: [],
+        hirelingCard: null,
+        mountCard: null,
+        isDead: false,
+        activeEffects: [],
       },
     ],
     activePlayerId: playerId,
@@ -105,6 +114,8 @@ function combatState(): GameState {
           baseStrength: 4,
           baseLevelRewards: 1,
           baseTreasureRewards: 2,
+          tier: 1,
+          tags: [],
           badStuff: [],
           strengthModifier: 0,
           treasureModifier: 0,
@@ -112,10 +123,11 @@ function combatState(): GameState {
         },
       ],
       nextEncounterSequence: 2,
+      nextHelpOfferSequence: 1,
       nextReactionWindowSequence: 1,
       reactionWindow: null,
-      requestedHelperId: null,
-      helperId: null,
+      helpOffer: null,
+      helpAgreement: null,
       runAway: null,
       history: [
         {
@@ -128,6 +140,7 @@ function combatState(): GameState {
     },
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,
@@ -149,7 +162,9 @@ describe("basic combat", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error(result.error.message);
-    expect(result.state.players[0]).toMatchObject({ temporaryCombatBonus: 4 });
+    expect(result.state.players[0]?.activeEffects).toMatchObject([
+      { type: "COMBAT_POWER", amount: 4 },
+    ]);
     expect(result.state.players[0]?.hand).not.toContain(bonus);
     expect(result.state.treasureDiscard).toContain(bonus);
     expect(result.events).toMatchObject([
@@ -219,7 +234,18 @@ describe("basic combat", () => {
     const state = {
       ...combatState(),
       players: [
-        { ...combatState().players[0]!, level: 5, temporaryCombatBonus: 2 },
+        {
+          ...combatState().players[0]!,
+          level: 5,
+          activeEffects: [
+            {
+              type: "COMBAT_POWER",
+              sourceDefinitionId: bonusDefinitionId,
+              amount: 2,
+              expires: "END_OF_COMBAT",
+            },
+          ],
+        },
       ],
     };
     const result = executeCommand(
@@ -240,12 +266,11 @@ describe("basic combat", () => {
     });
     expect(result.state.players[0]).toMatchObject({
       level: 6,
-      temporaryCombatBonus: 0,
+      activeEffects: [],
     });
-    expect(result.state.players[0]?.hand).toEqual([
-      ...state.players[0]!.hand,
-      ...treasures,
-    ]);
+    expect(result.state.players[0]?.hand).toEqual(
+      expect.arrayContaining([...state.players[0]!.hand, ...treasures]),
+    );
     expect(result.state.doorDiscard).toContain(monster);
     expect(result.state.treasureDeck).toEqual([]);
     expect(result.events.map((event) => event.type)).toEqual([
@@ -253,8 +278,7 @@ describe("basic combat", () => {
       "COMBAT_WON",
       "LEVEL_GAINED",
       "TREASURE_GAINED",
-      "CARD_DRAWN",
-      "CARD_DRAWN",
+      "COMBAT_REWARD_CARDS",
     ]);
     expect(result.events.slice(4)).toEqual(
       expect.arrayContaining([

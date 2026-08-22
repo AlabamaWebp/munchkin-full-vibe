@@ -51,6 +51,21 @@ describe('LobbyGateway (e2e)', () => {
       players: [{ name: 'Ada', isHost: true }],
     });
     expect(initialState.players[0]).not.toHaveProperty('socketId');
+    if (!created.success)
+      throw new Error('Expected host creation acknowledgement.');
+    const hostSexState = nextLobbyState(host);
+    await new Promise<LobbyActionAck>((resolve) => {
+      host.emit(
+        'lobby:set-sex',
+        {
+          roomCode: initialState.roomCode,
+          playerId: created.playerId,
+          sex: 'FEMALE',
+        },
+        resolve,
+      );
+    });
+    await hostSexState;
 
     const guest = await connectClient();
     const hostJoinedState = nextLobbyState(host);
@@ -74,8 +89,23 @@ describe('LobbyGateway (e2e)', () => {
       'Grace',
     ]);
 
-    if (!created.success)
-      throw new Error('Expected host creation acknowledgement.');
+    if (!joined.success)
+      throw new Error('Expected guest join acknowledgement.');
+    const hostSexUpdated = nextLobbyState(host);
+    const guestSexUpdated = nextLobbyState(guest);
+    await new Promise<LobbyActionAck>((resolve) => {
+      guest.emit(
+        'lobby:set-sex',
+        {
+          roomCode: initialState.roomCode,
+          playerId: joined.playerId,
+          sex: 'MALE',
+        },
+        resolve,
+      );
+    });
+    await Promise.all([hostSexUpdated, guestSexUpdated]);
+
     const hostStartedState = nextLobbyState(host);
     const guestStartedState = nextLobbyState(guest);
     const hostGameState = nextGameState(host);
@@ -140,11 +170,25 @@ describe('LobbyGateway (e2e)', () => {
       host.emit('lobby:create', { playerName: 'Ada' }, resolve);
     });
     const initialState = await initialStatePromise;
+    if (!created.success) throw new Error('Expected room creation to succeed.');
+    const hostSexState = nextLobbyState(host);
+    await new Promise<LobbyActionAck>((resolve) => {
+      host.emit(
+        'lobby:set-sex',
+        {
+          roomCode: initialState.roomCode,
+          playerId: created.playerId,
+          sex: 'FEMALE',
+        },
+        resolve,
+      );
+    });
+    await hostSexState;
 
     const guest = await connectClient();
     const hostJoinState = nextLobbyState(host);
     const guestJoinState = nextLobbyState(guest);
-    await new Promise<LobbyActionAck>((resolve) => {
+    const joined = await new Promise<LobbyActionAck>((resolve) => {
       guest.emit(
         'lobby:join',
         { roomCode: initialState.roomCode, playerName: 'Grace' },
@@ -153,7 +197,22 @@ describe('LobbyGateway (e2e)', () => {
     });
     await Promise.all([hostJoinState, guestJoinState]);
 
-    if (!created.success) throw new Error('Expected room creation to succeed.');
+    if (!joined.success) throw new Error('Expected room join to succeed.');
+    const hostSexUpdated = nextLobbyState(host);
+    const guestSexUpdated = nextLobbyState(guest);
+    await new Promise<LobbyActionAck>((resolve) => {
+      guest.emit(
+        'lobby:set-sex',
+        {
+          roomCode: initialState.roomCode,
+          playerId: joined.playerId,
+          sex: 'MALE',
+        },
+        resolve,
+      );
+    });
+    await Promise.all([hostSexUpdated, guestSexUpdated]);
+
     const hostStartedState = nextLobbyState(host);
     const guestStartedState = nextLobbyState(guest);
     const hostGameState = nextGameState(host);

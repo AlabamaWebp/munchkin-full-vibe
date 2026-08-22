@@ -8,7 +8,11 @@ export type GameId = DomainId<"GameId">;
 export type PlayerId = DomainId<"PlayerId">;
 export type CardDefinitionId = DomainId<"CardDefinitionId">;
 export type CardInstanceId = DomainId<"CardInstanceId">;
+export type HelpOfferId = DomainId<"HelpOfferId">;
+export type PendingDecisionId = DomainId<"PendingDecisionId">;
 export type EncounterId = DomainId<"EncounterId">;
+export type CombatId = DomainId<"CombatId">;
+export type CurseResponseId = DomainId<"CurseResponseId">;
 
 function parseDomainId<Kind extends string>(
   value: string,
@@ -39,6 +43,22 @@ export function parseCardInstanceId(value: string): CardInstanceId {
   return parseDomainId(value, "CardInstanceId");
 }
 
+export function parseHelpOfferId(value: string): HelpOfferId {
+  return parseDomainId(value, "HelpOfferId");
+}
+
+export function parsePendingDecisionId(value: string): PendingDecisionId {
+  return parseDomainId(value, "PendingDecisionId");
+}
+
 export function parseEncounterId(value: string): EncounterId {
   return parseDomainId(value, "EncounterId");
+}
+
+export function parseCombatId(value: string): CombatId {
+  return parseDomainId(value, "CombatId");
+}
+
+export function parseCurseResponseId(value: string): CurseResponseId {
+  return parseDomainId(value, "CurseResponseId");
 }

@@ -346,18 +346,17 @@ codes for unavailable owned-card actions. Angular may arrange these provided
 totals and effects for presentation, but does not derive game legality or combat
 outcomes.
 
-The central public-card area is a transient view of public entries from the same
-authoritative game log rather than a second event model. A client stores only the
-highest displayed public-event sequence for the current game and viewer so an
-already seen notice is not replayed after refresh; the authoritative entry remains
-available in the player-specific game history.
+The game shell has one pure presentation mapper over the audience-filtered event
+log. It selects the recent Important/Blocking summaries while the complete log
+remains available in History. Angular does not persist seen-event sequences,
+maintain parallel public-card/feedback queues, or use semantic toast timeouts.
 
 Reason:
 
-Reusing `GameView`, its audience-filtered log, and public combat history keeps one
-privacy boundary and one source of truth while allowing the mobile UI to explain
-cards and actions without copying engine rules. The local acknowledgement affects
-only transient presentation and cannot hide or alter authoritative history.
+Reusing `GameView` and its audience-filtered log keeps one privacy boundary and
+one source of truth while allowing the mobile UI to explain cards and actions
+without copying engine rules. Reconnect reconstructs presentation from the
+current authoritative view instead of browser-local acknowledgement state.
 
 ---
 
@@ -467,3 +466,103 @@ Stable visual identity allows illustrations to be added later without coupling
 assets to shuffled physical copies. Explicit economy, equipment, timing, and
 target fields make content auditable and projectable without parsing prose,
 checking names, or duplicating domain assumptions in Angular.
+
+---
+
+## ADR-030 — Schema 5 configuration and extensible player containers
+
+`GameState` schema 5 owns an immutable `GameConfig` containing the mode and
+enabled card sets. `CORE` is mandatory, set ids are unique, and disabled-set
+definitions and physical cards are removed while the game is created. The lobby
+owns pre-start selection of public Sex and host-only settings; the game receives
+only the start snapshot.
+
+Player roles are arrays with derived capacity, temporary combat adjustments are
+typed active effects, and companion/permission containers are explicit even
+before their mechanics are enabled. Help and run-away state similarly use their
+V2 serialized containers rather than adding flags to the previous model.
+
+Reason:
+
+This keeps a reconnect-safe, JSON-serializable state shape stable for later V2
+rules without client-authoritative eligibility calculations or card-id logic.
+
+---
+
+## ADR-031 — Mode-aware draws and serialized V2 gameplay workflows
+
+Balanced draws use one physical Door pile and one physical Treasure pile. The
+engine snapshots the applicable tier profile, preflights the complete request,
+renormalizes across tiers actually present, then selects a tier and a physical
+instance through the injected `RandomSource`. Classic Chaos keeps shuffled
+top-of-pile draws. Balanced setup reserves one distinct legal starter item per
+player before dealing the remaining weighted hand.
+
+Recovery, economy, help, and escape remain server-authored workflows rather than
+client calculations. Makeshift Tools is a computed combat-power source, Scavenge
+is a bounded current-pile selection, sales derive eligibility/value and cannot
+grant the winning level, and an accepted help agreement immutably partitions the
+final shuffled Treasure reward. Run away serializes every encounter/combatant
+cursor, result, shared Bad Stuff step, and pending choice so reconnect cannot
+reroll or duplicate an effect.
+
+Typed condition/modifier data drives Sex, roles, tags, equipment families, and
+run-away changes. Role permission loss creates a serialized retention decision;
+only its resolution discards the excess role and revalidates equipment.
+
+Reason:
+
+These rules preserve physical-card uniqueness, deterministic tests, atomic
+failure, private identities, and reconnect safety while keeping all eligibility
+and outcomes inside the framework-independent game engine.
+
+---
+
+## ADR-032 — Explicit V2 catalog and development-only balance sampling
+
+Production content is one explicit catalog of definition/copy entries. Core and
+optional sets share the same typed primitives, while enabled-set filtering still
+removes disabled definitions and instances before play. Equipment may own the
+same single conditional modifier used by roles and companions; weapon enhancers
+use one typed Equipment target and attachment container.
+
+The balance harness imports the built game-engine catalog, uses an independent
+seeded random generator, and performs weighted scenario sampling only. It is not
+part of runtime state and does not replace production `RandomSource` or claim to
+model rational negotiation.
+
+Reason:
+
+Explicit copies make frequency and swing auditable. Reusing typed conditions
+keeps hunting gear, protection, and attachments server-authoritative without a
+card scripting subsystem. Isolating simulation preserves production randomness
+while keeping reports reproducible.
+
+---
+
+## ADR-033 — Combat addresses, authoritative deadlines, intents, and event priority
+
+Each combat receives a monotonically allocated, game-local `combatId` in
+addition to its mutable revision. Commands that address combat state carry both;
+reaction-window, encounter, help-offer, Curse-response, and pending-decision ids
+remain purpose-specific. A rejected stale address returns the original state and
+no gameplay events.
+
+Blocking workflows persist absolute `expiresAtEpochMs` values created from an
+engine-injected clock. The engine defines deterministic expiry transitions;
+NestJS timers are wake-ups that re-read current state and never capture it as
+truth. The same mechanism covers victory reactions, pending choices, blocking
+help offers, and target-only Curse responses.
+
+Player-specific `AvailableIntentView` values are the only projected permission
+model. They carry exact legal targets, stable workflow ids, combat addresses,
+deadlines, and domain reason codes without becoming a rule scripting language.
+The authoritative projection also maps every domain event to IMPORTANT or
+ROUTINE and promotes only a currently actionable event to BLOCKING.
+
+Reason:
+
+Delayed LAN packets and reconnects must be harmless without moving rule logic to
+Angular. Separate stable ids preserve workflow ownership, persisted deadlines
+make waits reconstructible, and one intent/importance source prevents client and
+server permission or notification behavior from drifting.

@@ -3,7 +3,11 @@ import type { DeckType } from "./cards.js";
 import type {
   CardDefinitionId,
   CardInstanceId,
+  CombatId,
+  CurseResponseId,
   EncounterId,
+  HelpOfferId,
+  PendingDecisionId,
   PlayerId,
 } from "./identifiers.js";
 
@@ -76,17 +80,58 @@ export type GameEvent =
     })
   | (PublicEvent & {
       readonly type: "CARD_DISCARD_REQUIRED";
+      readonly decisionId: PendingDecisionId;
       readonly playerId: PlayerId;
       readonly count: number;
       readonly zone: "HAND" | "EQUIPMENT";
       readonly sourceCardId: CardInstanceId;
       readonly sourceDefinitionId: CardDefinitionId;
+      readonly expiresAtEpochMs: number;
+    })
+  | (PublicEvent & {
+      readonly type: "ROLE_RETENTION_REQUIRED";
+      readonly playerId: PlayerId;
+      readonly decisionId: PendingDecisionId;
+      readonly role: "CLASS" | "RACE";
+      readonly expiresAtEpochMs: number;
+    })
+  | (PublicEvent & {
+      readonly type: "ROLE_RETAINED";
+      readonly playerId: PlayerId;
+      readonly role: "CLASS" | "RACE";
+      readonly keptCardId: CardInstanceId;
     })
   | (PublicEvent & {
       readonly type: "CURSE_RESOLVED";
       readonly playerId: PlayerId;
       readonly cardId: CardInstanceId;
       readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "CURSE_RESPONSE_REQUIRED";
+      readonly responseId: CurseResponseId;
+      readonly playerId: PlayerId;
+      readonly curseCardId: CardInstanceId;
+      readonly curseDefinitionId: CardDefinitionId;
+      readonly expiresAtEpochMs: number;
+    })
+  | (PublicEvent & {
+      readonly type: "CURSE_RESPONSE_RESOLVED";
+      readonly responseId: CurseResponseId;
+      readonly playerId: PlayerId;
+      readonly outcome: "DECLINED" | "CANCELLED" | "ITEM_PROTECTED";
+    })
+  | (PrivateEvent & {
+      readonly type: "CURSE_PROTECTION_USED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly protectedCardId?: CardInstanceId;
+    })
+  | (PublicEvent & {
+      readonly type: "DECISION_AUTO_RESOLVED";
+      readonly decisionId: PendingDecisionId;
+      readonly playerId: PlayerId;
+      readonly decisionType: "DISCARD_CARDS" | "CHOOSE_ROLE_TO_KEEP";
     })
   | (PublicEvent & {
       readonly type: "COMBAT_STARTED";
@@ -122,6 +167,9 @@ export type GameEvent =
       readonly type: "COMBAT_VICTORY_DECLARED";
       readonly playerId: PlayerId;
       readonly reactionWindowId: number;
+      readonly combatId: CombatId;
+      readonly combatRevision: number;
+      readonly expiresAtEpochMs: number;
     })
   | (PublicEvent & {
       readonly type: "COMBAT_REACTION_PASSED";
@@ -161,14 +209,25 @@ export type GameEvent =
       readonly monsterDefinitionId: CardDefinitionId;
     })
   | (PublicEvent & {
-      readonly type: "HELP_REQUESTED";
+      readonly type: "HELP_OFFERED" | "HELP_COUNTERED";
       readonly playerId: PlayerId;
       readonly helperId: PlayerId;
+      readonly offerId: HelpOfferId;
+      readonly treasureCount: number;
+      readonly expiresAtEpochMs: number;
     })
   | (PublicEvent & {
-      readonly type: "HELP_ACCEPTED";
+      readonly type: "HELP_OFFER_ACCEPTED";
       readonly playerId: PlayerId;
       readonly helperId: PlayerId;
+      readonly offerId: HelpOfferId;
+      readonly treasureCount: number;
+    })
+  | (PublicEvent & {
+      readonly type: "HELP_OFFER_REJECTED" | "HELP_OFFER_CANCELLED";
+      readonly playerId: PlayerId;
+      readonly helperId: PlayerId;
+      readonly offerId: HelpOfferId;
     })
   | (PublicEvent & {
       readonly type: "LEVEL_GAINED";
@@ -186,6 +245,22 @@ export type GameEvent =
       readonly type: "TREASURE_GAINED";
       readonly playerId: PlayerId;
       readonly count: number;
+    })
+  | (PrivateEvent & {
+      readonly type: "COMBAT_REWARD_CARDS";
+      readonly playerId: PlayerId;
+      readonly cardIds: readonly CardInstanceId[];
+    })
+  | (PublicEvent & {
+      readonly type: "SCAVENGED";
+      readonly playerId: PlayerId;
+      readonly count: 1;
+    })
+  | (PrivateEvent & {
+      readonly type: "SCAVENGED_CARD";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
     })
   | (PublicEvent & {
       readonly type: "ROOM_LOOTED";
@@ -217,7 +292,14 @@ export type GameEvent =
       readonly role: "CLASS" | "RACE";
     })
   | (PublicEvent & {
-      readonly type: "ITEMS_SOLD";
+      readonly type: "ROLE_PERMISSION_PLAYED" | "ROLE_PERMISSION_DISCARDED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+      readonly role: "CLASS" | "RACE";
+    })
+  | (PublicEvent & {
+      readonly type: "CARDS_SOLD";
       readonly playerId: PlayerId;
       readonly cardIds: readonly CardInstanceId[];
       readonly value: number;

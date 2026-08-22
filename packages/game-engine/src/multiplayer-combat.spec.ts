@@ -5,12 +5,13 @@ import {
   EquipmentSlot,
   type CardDefinition,
 } from "./cards.js";
-import { executeCommand } from "./engine.js";
+import { executeCommand } from "./legacy-test-command.js";
 import { GamePhase, GameStatus, type GameState } from "./game-state.js";
 import {
   parseCardDefinitionId,
   parseCardInstanceId,
   parseGameId,
+  parseHelpOfferId,
   parseEncounterId,
   parsePlayerId,
 } from "./identifiers.js";
@@ -55,7 +56,7 @@ const definitions: readonly CardDefinition[] = [
     type: CardType.MONSTER,
     deck: DeckType.DOOR,
     effects: [],
-    monster: { level: 8, levelRewards: 1, treasureRewards: 0, badStuff: [] },
+    monster: { strength: 8, levelRewards: 1, treasureRewards: 0, badStuff: [] },
   },
   {
     id: equipmentDefinitionId,
@@ -94,7 +95,8 @@ const definitions: readonly CardDefinition[] = [
 
 function state(): GameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("multiplayer-combat"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -102,26 +104,50 @@ function state(): GameState {
       {
         id: heroId,
         name: "Hero",
+        sex: "MALE",
         level: 3,
         hand: [],
         equipment: [],
-        temporaryCombatBonus: 0,
+        equipmentAttachments: [],
+        classCards: [],
+        raceCards: [],
+        rolePermissionCards: [],
+        hirelingCard: null,
+        mountCard: null,
+        isDead: false,
+        activeEffects: [],
       },
       {
         id: helperId,
         name: "Helper",
+        sex: "FEMALE",
         level: 4,
         hand: [],
         equipment: [equipment],
-        temporaryCombatBonus: 0,
+        equipmentAttachments: [],
+        classCards: [],
+        raceCards: [],
+        rolePermissionCards: [],
+        hirelingCard: null,
+        mountCard: null,
+        isDead: false,
+        activeEffects: [],
       },
       {
         id: outsiderId,
         name: "Outsider",
+        sex: "MALE",
         level: 1,
         hand: [bonus, modifier, monsterBonus],
         equipment: [],
-        temporaryCombatBonus: 0,
+        equipmentAttachments: [],
+        classCards: [],
+        raceCards: [],
+        rolePermissionCards: [],
+        hirelingCard: null,
+        mountCard: null,
+        isDead: false,
+        activeEffects: [],
       },
     ],
     activePlayerId: heroId,
@@ -142,6 +168,8 @@ function state(): GameState {
           baseStrength: 8,
           baseLevelRewards: 1,
           baseTreasureRewards: 0,
+          tier: 1,
+          tags: [],
           badStuff: [],
           strengthModifier: 0,
           treasureModifier: 0,
@@ -149,10 +177,11 @@ function state(): GameState {
         },
       ],
       nextEncounterSequence: 2,
+      nextHelpOfferSequence: 1,
       nextReactionWindowSequence: 1,
       reactionWindow: null,
-      requestedHelperId: null,
-      helperId: null,
+      helpOffer: null,
+      helpAgreement: null,
       runAway: null,
       history: [
         {
@@ -165,6 +194,7 @@ function state(): GameState {
     },
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,
@@ -175,21 +205,32 @@ describe("multiplayer combat", () => {
   it("requests and accepts help, then includes level and equipment contribution", () => {
     const requested = executeCommand(
       state(),
-      { type: "REQUEST_HELP", actorId: heroId, helperId },
+      {
+        type: "PROPOSE_HELP",
+        actorId: heroId,
+        helperId,
+        treasureCount: 0,
+        combatRevision: 1,
+      },
       { random },
     );
     if (!requested.success) throw new Error(requested.error.message);
-    expect(requested.state.combat?.requestedHelperId).toBe(helperId);
+    expect(requested.state.combat?.helpOffer?.helperId).toBe(helperId);
 
     const accepted = executeCommand(
       requested.state,
-      { type: "ACCEPT_HELP", actorId: helperId },
+      {
+        type: "ACCEPT_HELP_OFFER",
+        actorId: helperId,
+        offerId: requested.state.combat!.helpOffer!.offerId,
+        combatRevision: requested.state.combat!.revision,
+      },
       { random },
     );
     if (!accepted.success) throw new Error(accepted.error.message);
     expect(accepted.state.combat).toMatchObject({
-      requestedHelperId: null,
-      helperId,
+      helpOffer: null,
+      helpAgreement: { helperId },
     });
     expect(accepted.events.at(-1)).toMatchObject({
       type: "COMBAT_UPDATED",
@@ -234,14 +275,25 @@ describe("multiplayer combat", () => {
     expect(
       executeCommand(
         initial,
-        { type: "REQUEST_HELP", actorId: heroId, helperId: heroId },
+        {
+          type: "PROPOSE_HELP",
+          actorId: heroId,
+          helperId: heroId,
+          treasureCount: 0,
+          combatRevision: 1,
+        },
         { random },
       ),
     ).toMatchObject({ success: false, error: { code: "INVALID_HELPER" } });
     expect(
       executeCommand(
         initial,
-        { type: "ACCEPT_HELP", actorId: outsiderId },
+        {
+          type: "ACCEPT_HELP_OFFER",
+          actorId: outsiderId,
+          offerId: parseHelpOfferId("missing-offer"),
+          combatRevision: 1,
+        },
         { random },
       ),
     ).toMatchObject({

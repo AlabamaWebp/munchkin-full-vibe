@@ -3,28 +3,41 @@
 Current milestone:
 
 ```text
-Milestone 12.4 — Mobile-first card presentation (complete)
+V2 final audit complete; live-game blockers remain
 ```
+
+## Final audit (2026-08-22)
+
+- fixed conditional Monster strength/reward-tier resolution, attachment cleanup
+  and projection, raw-tier leakage, stable discard-decision validation, and
+  compact-card touch targets; added focused regression coverage;
+- repeated deterministic balance sampling with the documented 20,000-iteration
+  seeds and an additional 5,000-iteration seed batch; no tuning change was
+  justified;
+- manually verified the active game document at 360×640, 390×844, 430×932, and
+  desktop: no page scroll, primary action visible, and no sub-44 px buttons;
+- V2 is not yet ready for a real party because deadline/default transitions,
+  target-only Curse responses, unified server-projected intents/events, and
+  cross-combat stale-command isolation remain incomplete;
+- full findings and gate results: `docs/v2-final-audit.md`.
 
 ## Implemented
 
-- replaced all behaviorless production `OTHER` cards with original functional
-  content and expanded the set to 20 unique Door and 22 unique Treasure
-  definitions (56 Door and 66 Treasure physical cards for 3–6 players);
-- added eight varied Monsters, six ordinary and one combat Curse, two Classes,
-  two Races, ten equipment items, one-shot bonuses for both combat sides,
-  Monster strength/reward modifiers, weakening, adding, and cloning;
-- added a stable unique `artKey` to every production definition, explicit
-  `goldValue` to every Treasure, and typed play timing/target metadata for action
-  cards, all passed through player-specific `GameCardView` projections;
-- moved production equipment power and value to explicit typed metadata: slot,
-  occupied hands, combat bonus, gold value, and an explicit Class/Race
-  restrictions list; sales and combat power remain engine-derived;
-- completed original English source copy and Russian localization for every
-  catalog definition without changing the card-face layout;
-- added catalog completeness coverage for definition/art-key uniqueness, minimum
-  definition and copy counts, absence of fillers, empty-effect policy, Treasure
-  values, action policies, equipment fields, and complete RU translations;
+- replaced the development catalog with an explicit 80-definition / 192-card
+  Core and complete Companions 12/24, Arsenal 16/36, and Dual Identity 12/24
+  optional sets; all copies, tiers, sets, ids, and art keys are authored data;
+- authored the full 20-Monster curve, 12-Curse severity curve, 20-slot Equipment
+  economy, identity roles, combat resources, utilities, companions, weapon
+  enhancers, protection, hunting gear, and second-role permissions;
+- activated reusable companion replacement, Equipment attachment targets,
+  conditional Equipment power/Run Away modifiers, and automatic typed Curse
+  protection without card-name rules or client-calculated results;
+- added complete RU/EN catalog localization with stable fallback behavior and a
+  documented placeholder-art list; no artwork was generated;
+- added a seeded development-only balance harness, deterministic CI smoke test,
+  multi-seed report, catalog invariants, expansion filtering, restrictions,
+  timing/target, sellability, companion, attachment, protection, and permission
+  coverage; see `docs/v2-balance-report.md`;
 
 - direct `RESOLVE_COMBAT` removal in favor of a versioned
   `DECLARE_COMBAT_VICTORY` / `PASS_COMBAT_REACTION` protocol, with immediate
@@ -300,13 +313,14 @@ the browser supports the Fullscreen API. It tracks browser-driven fullscreen
 changes, including exiting with Escape, and remains available in the lobby and
 during play.
 
-Verified on 2026-08-20 after the mobile-first card presentation pass:
+Verified on 2026-08-22 after the V2 gameplay-mechanics pass:
 
-- `npm test` — succeeded; 24 test files/suites and 164 tests passed across all
+- `npm test` — succeeded; 26 test files/suites and 188 tests passed across all
   workspaces;
-- `npm run test:e2e --workspace @munchkin-lan/server -- --runInBand` — succeeded;
+- `npm run test:e2e --workspace @munchkin-lan/server` — succeeded;
   2 suites and 3 HTTP/Socket.IO end-to-end tests passed;
 - `npm run lint` — succeeded across all four workspaces with 0 errors;
+- `npm run typecheck` — succeeded for all shared packages and applications;
 - `npm run build` — succeeded for shared packages, Angular, and NestJS;
 - `npm run format:check` — succeeded across the repository.
 
@@ -326,10 +340,6 @@ Angular component fixtures.
 
 - Sessions and games remain in memory and are lost when the NestJS process
   restarts, as required for the initial LAN version.
-- Helper reward negotiation is intentionally deferred; all current combat
-  rewards go to the active player.
-- Helpers do not make escape rolls or receive bad stuff. The active player makes
-  one sequential escape attempt for each Monster encounter.
 - NestJS does not yet serve the Angular production files; development still uses
   Angular on port 4200 and NestJS on port 3000. The one-origin LAN package remains
   Milestone 13 work.
@@ -337,12 +347,132 @@ Angular component fixtures.
 ## Next
 
 ```text
-Milestone 13 — LAN production
+V2 Milestone 04 — card content and balance tuning
 ```
 
-Serve the Angular production build from NestJS on the same origin, listen on all
-LAN interfaces, and display the LAN URL for phone clients.
+Expand and tune the production Tier 1/2/3 catalog, role abilities, and permission
+cards, then validate the target distributions with seeded simulations. The
+previously planned one-origin LAN production packaging remains outstanding after
+the V2 gameplay/content sequence.
 
 # Card art prompt export
 
 - Added `npm run generate:card-art-csv` to export the development card catalog to `generated/card-art-prompts.csv`.
+
+## V2 gameplay core (schema 5, complete)
+
+- Introduced schema 5 game configuration, enabled-set filtering, PlayerSex,
+  role arrays/capacity primitives, typed active effects, companion slots, and
+  serialized V2 help/run-away containers.
+- Added catalog tier/set/tag metadata and typed condition/modifier primitives;
+  public game and lobby projections now carry V2 configuration, Sex, role, and
+  companion facts without exposing private cards.
+- Added host-controlled lobby settings and self-controlled Sex selection; room
+  start requires every player to choose Sex.
+- Added deterministic tier-aware Balanced draws, Classic Chaos top draws,
+  atomic recycling, per-player starter reservation, computed Makeshift Tools,
+  and authoritative Scavenge eligibility/recovery.
+- Updated sales to cover eligible Treasure cards while preventing a sale from
+  reaching level 10; added immutable offer/counter help agreements and private
+  helper reward partitioning.
+- Run away now processes every encounter in active/helper order with independent
+  server rolls, death skipping, shared Bad Stuff handling, and reconnect-safe
+  pending choices.
+- Activated typed Sex/Class/Race/tag conditions, multi-role permissions and
+  role-retention decisions with one equipment revalidation pass.
+- Added authoritative commands, events, privacy-safe projections, availability
+  reasons, and minimal Angular adapters without starting the planned UI redesign.
+- All schema-4 fixtures were migrated and the full quality gate is green.
+
+## Remaining V2 scope
+
+- Card-content distribution and tuning, including broader Tier 2/3 coverage,
+  production role abilities, permission cards, and seeded balance simulation,
+  remain the card-balance Milestone 04 work.
+- The remaining secondary UI work is listed under the mobile-shell section
+  below; the fixed-viewport interaction redesign is now implemented.
+
+## V2 mobile game shell
+
+- Replaced the page-growing in-game composition and separate brand header with
+  a safe-area-aware fixed `100dvh` shell containing standalone Player HUD,
+  authoritative recent-event strip, state-selected Stage/Combat Stage, compact
+  Hand Dock, and bounded Action Dock components.
+- Added explicit Stage mapping for turn-ready, Door result, post-Door choice,
+  combat, victory reaction, run away, blocking decision, cleanup, and finished
+  states. Combat now leads with both totals and a signed difference, focuses one
+  encounter while retaining multi-Monster tabs, and keeps rewards, modifiers,
+  helper agreement, and Bad Stuff visible.
+- Added direct playable-card interaction, automatic sole-target dispatch,
+  multiple-use/target pickers, compact type-specific facts, playable-first hand
+  preview, scrollable Full Hand/History/Details sheets, help negotiation, power
+  breakdown, character sheet, and reconnect-safe blocking choices.
+- Deleted the legacy full hand grid, long vertical character/combat/history
+  composition, fixed action bar, mandatory Details-before-action route,
+  duplicate public/feedback event signals, seen-sequence local storage, and
+  semantic toast timers.
+- Chromium overflow checks passed at `360x640`, `390x844`, `430x932`, and
+  `1024x768`: document and game root client/scroll dimensions were identical on
+  both axes. HUD, Stage, and Hand Dock had no internal overflow; the 8-card Full
+  Hand sheet scrolled internally while the document remained `360x640`.
+
+Secondary Milestone 06 UI work still remaining:
+
+- complete an English translation pass for the Russian-first game-shell copy;
+- add automated browser viewport/a11y coverage to CI (the current exact viewport
+  pass is a manual Chromium QA run).
+
+## V2 secondary interaction pass
+
+- Added host Lobby controls for Balanced / Classic Chaos and the three optional
+  sets before game start, while Core remains implicit and settings become
+  read-only after start.
+- Expanded the fixed shell with grouped Full Hand browsing, projected Sale and
+  Charity sheets, turn-grouped All / Combat / Me history, detailed card metadata,
+  compact Look For Trouble target facts, role/companion-aware character sheets,
+  persistent hand-limit warnings, and explicit death/revival copy.
+- Character sheets now use the compact equipment layout and expose only
+  server-projected own unequip actions; other player sheets remain read-only.
+- Added contextual command feedback, stale-sale/charity sheet closing, keyboard
+  focus traps with focus return, and human-readable presentation labels instead
+  of raw enums in the added sheets.
+
+Verified on 2026-08-22 after the V2 mobile-shell redesign:
+
+- `npm test` — succeeded; 29 test files/suites and 200 tests passed across all
+  workspaces;
+- `npm run test:e2e --workspace @munchkin-lan/server` — succeeded; 2 suites and
+  3 end-to-end tests passed;
+- `npm run lint` — succeeded across all workspaces with 0 errors;
+- `npm run typecheck` — succeeded for all packages and applications;
+- `npm run build` — succeeded for contracts, game engine, Angular, and NestJS;
+- `npm run format:check` — succeeded across the repository.
+
+## V2 final-audit blockers closed
+
+- Every combat has a game-unique serialized `combatId`; combat commands validate
+  it and the current mutable revision, while encounter, reaction, offer, and
+  decision ids retain their separate scopes. Stale rejection is atomic.
+- The engine owns absolute blocking deadlines through an injected clock and
+  authoritative expiry transitions. NestJS timers only wake the current game,
+  re-read state, publish the resulting view, and schedule the next deadline.
+- Target-only Curse Response supports decline, private cancel protection, and
+  protecting one affected Item through the existing pending-decision workflow.
+- `AvailableIntentView` is now the sole action projection. Angular no longer
+  reconstructs permissions from legacy action arrays, and event importance is
+  assigned exhaustively by the authoritative projection.
+- Focused regressions cover stale combat packets, fake-clock expiry and
+  idempotency, old timers, reconnect views, Curse response privacy/defaults,
+  intent ownership/states, and table-driven event importance.
+
+Verified on 2026-08-22 after closing the final-audit blockers:
+
+- `npm test` — succeeded; 30 test files/suites and 282 tests passed;
+- `npm run test:e2e --workspace @munchkin-lan/server` — succeeded; 2 suites and
+  3 end-to-end tests passed;
+- `npm run lint` — succeeded across all workspaces with 0 errors;
+- `npm run typecheck` — succeeded for all packages and applications;
+- `npm run build` — succeeded for contracts, game engine, Angular, and NestJS;
+- `npm run format:check` — succeeded across the repository;
+- `npm run balance:simulate` — succeeded with the unchanged 120-definition,
+  276-physical-card catalog and no notable balance shift.

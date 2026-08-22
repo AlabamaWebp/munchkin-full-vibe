@@ -6,7 +6,8 @@ import {
   type CardDefinition,
   type CardInstance,
 } from "./cards.js";
-import { executeCommand, HAND_LIMIT } from "./engine.js";
+import { HAND_LIMIT } from "./engine.js";
+import { executeCommand } from "./legacy-test-command.js";
 import {
   GamePhase,
   GameStatus,
@@ -69,12 +70,12 @@ const item = definition({
   description: "Restricted",
   type: CardType.EQUIPMENT,
   deck: DeckType.TREASURE,
+  goldValue: 1000,
   effects: [{ type: "COMBAT_BONUS", amount: 2 }],
   equipment: {
     slot: EquipmentSlot.HANDS,
     hands: 1,
-    value: 1000,
-    requiredClass: role.id,
+    restrictions: [{ type: "CLASS", definitionId: role.id }],
   },
 });
 const cheap = definition({
@@ -83,8 +84,9 @@ const cheap = definition({
   description: "Cheap",
   type: CardType.EQUIPMENT,
   deck: DeckType.TREASURE,
+  goldValue: 400,
   effects: [],
-  equipment: { slot: EquipmentSlot.HEAD, value: 400 },
+  equipment: { slot: EquipmentSlot.HEAD },
 });
 const classHelm = definition({
   id: "echo-helm",
@@ -92,11 +94,11 @@ const classHelm = definition({
   description: "Restricted",
   type: CardType.EQUIPMENT,
   deck: DeckType.TREASURE,
+  goldValue: 400,
   effects: [],
   equipment: {
     slot: EquipmentSlot.HEAD,
     hands: 0,
-    value: 400,
     restrictions: [{ type: "CLASS", definitionId: role.id }],
   },
 });
@@ -106,11 +108,11 @@ const raceBoots = definition({
   description: "Restricted",
   type: CardType.EQUIPMENT,
   deck: DeckType.TREASURE,
+  goldValue: 400,
   effects: [],
   equipment: {
     slot: EquipmentSlot.FEET,
     hands: 0,
-    value: 400,
     restrictions: [{ type: "RACE", definitionId: race.id }],
   },
 });
@@ -138,7 +140,7 @@ const fatalMonster = definition({
   deck: DeckType.DOOR,
   effects: [],
   monster: {
-    level: 20,
+    strength: 20,
     levelRewards: 1,
     treasureRewards: 1,
     badStuff: [{ type: "DEATH" }],
@@ -157,19 +159,25 @@ function player(
   return {
     id,
     name: id,
+    sex: "MALE",
     level,
     hand,
     equipment: [],
-    classCard: null,
-    raceCard: null,
+    equipmentAttachments: [],
+    classCards: [],
+    raceCards: [],
+    rolePermissionCards: [],
+    hirelingCard: null,
+    mountCard: null,
     isDead: false,
-    temporaryCombatBonus: 0,
+    activeEffects: [],
   };
 }
 
 function state(players: readonly PlayerState[]): GameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("expanded"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.TURN_START,
@@ -195,6 +203,7 @@ function state(players: readonly PlayerState[]): GameState {
     combat: null,
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,
@@ -205,7 +214,7 @@ describe("expanded rules", () => {
   it("plays a typed Curse from hand against a validated player target", () => {
     const curseCard = card("curse-1", curse.id);
     const roleCard = card("role-target", role.id);
-    const target = { ...player(bobId, 2, []), classCard: roleCard };
+    const target = { ...player(bobId, 2, []), classCards: [roleCard] };
     const initial = state([player(adaId, 1, [curseCard]), target]);
     const result = executeCommand(
       initial,
@@ -219,7 +228,7 @@ describe("expanded rules", () => {
     );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.state.players[1]?.classCard).toBeNull();
+      expect(result.state.players[1]?.classCards).toEqual([]);
       expect(result.state.doorDiscard).toEqual(
         expect.arrayContaining([curseCard, roleCard]),
       );
@@ -248,7 +257,7 @@ describe("expanded rules", () => {
     );
     expect(roleResult.success).toBe(true);
     if (!roleResult.success) return;
-    expect(roleResult.state.players[0]?.classCard).toEqual(roleCard);
+    expect(roleResult.state.players[0]?.classCards).toEqual([roleCard]);
     expect(
       executeCommand(
         roleResult.state,
@@ -265,13 +274,18 @@ describe("expanded rules", () => {
     const currentRole = card("current-class", role.id);
     const initialPlayer = {
       ...player(adaId, 2, [replacement]),
-      classCard: currentRole,
+      classCards: [currentRole],
       equipment: [blade, helm],
     };
 
     const result = executeCommand(
       state([initialPlayer, player(bobId, 1, [])]),
-      { type: "PLAY_ROLE", actorId: adaId, cardId: replacement.instanceId },
+      {
+        type: "PLAY_ROLE",
+        actorId: adaId,
+        cardId: replacement.instanceId,
+        replaceCardId: currentRole.instanceId,
+      },
       { random },
     );
 
@@ -299,7 +313,7 @@ describe("expanded rules", () => {
     const boots = card("equipped-boots", raceBoots.id);
     const target = {
       ...player(bobId, 2, []),
-      raceCard,
+      raceCards: [raceCard],
       equipment: [boots],
     };
 
@@ -317,7 +331,7 @@ describe("expanded rules", () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.state.players[1]).toMatchObject({
-      raceCard: null,
+      raceCards: [],
       equipment: [],
       hand: [boots],
     });
@@ -358,12 +372,12 @@ describe("expanded rules", () => {
       { random },
     );
     expect(winningSale).toMatchObject({
-      success: true,
-      state: {
-        status: GameStatus.FINISHED,
-        phase: GamePhase.FINISHED,
-        winnerId: adaId,
-      },
+      success: false,
+      state: expect.objectContaining({
+        status: GameStatus.IN_PROGRESS,
+        winnerId: null,
+      }),
+      error: { code: "SALE_LEVEL_LIMIT" },
     });
   });
 
@@ -585,7 +599,7 @@ describe("expanded rules", () => {
     const monsterCard = card("monster-death", fatalMonster.id);
     const initialPlayer = {
       ...player(adaId, 4, [card("cheap-death", cheap.id)]),
-      classCard: roleCard,
+      classCards: [roleCard],
     };
     const initial: GameState = {
       ...state([initialPlayer, player(bobId, 1, [])]),
@@ -602,6 +616,8 @@ describe("expanded rules", () => {
             baseStrength: 30,
             baseLevelRewards: 1,
             baseTreasureRewards: 0,
+            tier: 3,
+            tags: [],
             badStuff: fatalMonster.monster!.badStuff,
             strengthModifier: 0,
             treasureModifier: 0,
@@ -609,10 +625,11 @@ describe("expanded rules", () => {
           },
         ],
         nextEncounterSequence: 2,
+        nextHelpOfferSequence: 1,
         nextReactionWindowSequence: 1,
         reactionWindow: null,
-        requestedHelperId: null,
-        helperId: null,
+        helpOffer: null,
+        helpAgreement: null,
         runAway: null,
         history: [],
       },
@@ -628,7 +645,7 @@ describe("expanded rules", () => {
         isDead: true,
         hand: [],
         equipment: [],
-        classCard: null,
+        classCards: [],
         level: 4,
       });
       expect(result.events.some((event) => event.type === "PLAYER_DIED")).toBe(

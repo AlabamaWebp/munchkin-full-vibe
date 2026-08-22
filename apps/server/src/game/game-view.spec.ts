@@ -1,17 +1,227 @@
 import {
+  CardSetId,
   CardType,
   createGame,
   createSeededRandomSource,
   executeCommand,
   GamePhase,
   parseGameId,
+  parseHelpOfferId,
   parseEncounterId,
+  parseCardDefinitionId,
+  parseCardInstanceId,
+  parseCurseResponseId,
+  parseCombatId,
   parsePlayerId,
   type GameState,
 } from '@munchkin-lan/game-engine';
-import { createGameView } from './game-view';
+import { EVENT_IMPORTANCE, createGameView } from './game-view';
+
+describe('authoritative event importance', () => {
+  it.each(Object.entries(EVENT_IMPORTANCE))(
+    '%s is assigned %s',
+    (_type, importance) => {
+      expect(['IMPORTANT', 'ROUTINE']).toContain(importance);
+    },
+  );
+
+  it('keeps both important and routine domain events', () => {
+    expect(Object.values(EVENT_IMPORTANCE)).toContain('IMPORTANT');
+    expect(Object.values(EVENT_IMPORTANCE)).toContain('ROUTINE');
+  });
+});
 
 describe('createGameView', () => {
+  it('projects Curse Response choices only to the target without leaking defense identities', () => {
+    const sourceId = parsePlayerId('curse-source');
+    const targetId = parsePlayerId('curse-target');
+    const observerId = parsePlayerId('curse-observer');
+    const random = createSeededRandomSource(818);
+    let state = createGame({ id: parseGameId('CRES') });
+    for (const [actorId, name] of [
+      [sourceId, 'Source'],
+      [targetId, 'Target'],
+      [observerId, 'Observer'],
+    ] as const) {
+      const added = executeCommand(
+        state,
+        { type: 'ADD_PLAYER', actorId, name },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: sourceId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const curseDefinition = {
+      id: parseCardDefinitionId('private-curse'),
+      artKey: 'test.private-curse',
+      setId: CardSetId.CORE,
+      tier: 1 as const,
+      name: 'Private Curse',
+      description: 'Lose a level.',
+      type: CardType.CURSE,
+      deck: 'DOOR' as const,
+      tags: [],
+      effects: [{ type: 'LOSE_LEVEL' as const, amount: 1 }],
+    };
+    const defenseDefinition = {
+      id: parseCardDefinitionId('private-defense'),
+      artKey: 'test.private-defense',
+      setId: CardSetId.CORE,
+      tier: 1 as const,
+      name: 'Private Defense',
+      description: 'Cancel a Curse.',
+      type: CardType.UTILITY,
+      deck: 'TREASURE' as const,
+      tags: [],
+      effects: [],
+      curseProtection: { mode: 'CANCEL' as const },
+    };
+    const curseCard = {
+      instanceId: parseCardInstanceId('private-curse-card'),
+      definitionId: curseDefinition.id,
+    };
+    const defenseCard = {
+      instanceId: parseCardInstanceId('private-defense-card'),
+      definitionId: defenseDefinition.id,
+    };
+    const responseId = parseCurseResponseId('curse-response-1');
+    state = {
+      ...started.state,
+      cardDefinitions: [
+        ...started.state.cardDefinitions,
+        curseDefinition,
+        defenseDefinition,
+      ],
+      players: started.state.players.map((entry) =>
+        entry.id === targetId ? { ...entry, hand: [defenseCard] } : entry,
+      ),
+      curseResponse: {
+        responseId,
+        targetPlayerId: targetId,
+        sourcePlayerId: sourceId,
+        curseCard,
+        remainingEffects: curseDefinition.effects,
+        phaseAfterResolution: null,
+        cancelCardIds: [defenseCard.instanceId],
+        itemGuardCardIds: [],
+        protectableItemIds: [],
+        createdAtEpochMs: 1_000,
+        expiresAtEpochMs: 21_000,
+      },
+    };
+
+    const targetView = createGameView(state, targetId);
+    const observerView = createGameView(state, observerId);
+    expect(targetView.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'RESPOND_TO_CURSE',
+        responseId,
+        responses: expect.arrayContaining([
+          { type: 'CANCEL', cardId: defenseCard.instanceId },
+        ]),
+      }),
+    );
+    expect(observerView.availableIntents).toEqual([]);
+    expect(observerView.curseResponse).toMatchObject({
+      playerId: targetId,
+      cancelCardIds: [],
+      itemGuardCardIds: [],
+      protectableItemIds: [],
+    });
+    expect(JSON.stringify(observerView)).not.toContain(defenseCard.instanceId);
+  });
+
+  it('projects public attachments without exposing raw balance tiers', () => {
+    const actorId = parsePlayerId('attachment-viewer');
+    const random = createSeededRandomSource(913);
+    let state = createGame({
+      id: parseGameId('ATTV'),
+      config: {
+        mode: 'BALANCED',
+        enabledSetIds: [CardSetId.CORE, CardSetId.ARSENAL],
+      },
+    });
+    const added = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId, name: 'Ada', sex: 'FEMALE' },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const started = executeCommand(
+      added.state,
+      { type: 'START_GAME', actorId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    state = started.state;
+    const allTreasure = [
+      ...state.treasureDeck,
+      ...state.treasureDiscard,
+      ...state.players.flatMap((player) => player.hand),
+    ];
+    const host = allTreasure.find(
+      (card) => card.definitionId === 'spatula-of-resolve',
+    );
+    const attachment = allTreasure.find(
+      (card) => card.definitionId === 'sharpening-chorus',
+    );
+    if (host === undefined || attachment === undefined)
+      throw new Error('Attachment fixture cards are missing.');
+    const fixtureIds = new Set([host.instanceId, attachment.instanceId]);
+    state = {
+      ...state,
+      activePlayerId: actorId,
+      phase: GamePhase.TURN_START,
+      treasureDeck: state.treasureDeck.filter(
+        (card) => !fixtureIds.has(card.instanceId),
+      ),
+      treasureDiscard: state.treasureDiscard.filter(
+        (card) => !fixtureIds.has(card.instanceId),
+      ),
+      players: state.players.map((player) => ({
+        ...player,
+        hand: [
+          ...player.hand.filter((card) => !fixtureIds.has(card.instanceId)),
+          attachment,
+        ],
+        equipment: [host],
+      })),
+    };
+    const played = executeCommand(
+      state,
+      {
+        type: 'PLAY_CARD',
+        actorId,
+        cardId: attachment.instanceId,
+        target: { type: 'EQUIPMENT', cardId: host.instanceId },
+      },
+      { random },
+    );
+    if (!played.success) throw new Error(played.error.message);
+
+    const view = createGameView(played.state, actorId);
+    expect(view.players[0]?.equipmentAttachments).toEqual([
+      {
+        card: expect.objectContaining({ instanceId: attachment.instanceId }),
+        attachedToCardId: host.instanceId,
+      },
+    ]);
+    expect(
+      view.gameLog.find(
+        (entry) =>
+          entry.type === 'CARD_PLAYED' &&
+          entry.card?.instanceId === attachment.instanceId,
+      ),
+    ).toBeDefined();
+    expect(JSON.stringify(view)).not.toContain('"tier":');
+  });
+
   it('keeps charity card identities private to the sender and recipient after projection', () => {
     const adaId = parsePlayerId('charity-ada');
     const graceId = parsePlayerId('charity-grace');
@@ -141,7 +351,10 @@ describe('createGameView', () => {
     const adaId = parsePlayerId('public-ada');
     const graceId = parsePlayerId('public-grace');
     const random = createSeededRandomSource(142);
-    let state = createGame({ id: parseGameId('SHOW') });
+    let state = createGame({
+      id: parseGameId('SHOW'),
+      config: { mode: 'CLASSIC_CHAOS', enabledSetIds: ['CORE'] },
+    });
     for (const [actorId, name] of [
       [adaId, 'Ada'],
       [graceId, 'Grace'],
@@ -262,9 +475,74 @@ describe('createGameView', () => {
       { random },
     );
     if (!started.success) throw new Error(started.error.message);
-    expect(createGameView(started.state, playerId).availableActions).toEqual([
-      'KICK_DOOR',
-    ]);
+    expect(
+      createGameView(started.state, playerId).availableIntents,
+    ).toContainEqual(expect.objectContaining({ kind: 'KICK_DOOR' }));
+  });
+
+  it('projects sale and charity intents, but none for dead or finished viewers', () => {
+    const playerId = parsePlayerId('intent-states');
+    const random = createSeededRandomSource(77);
+    let state = createGame({ id: parseGameId('INTS') });
+    const added = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId: playerId, name: 'Intent Tester' },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const started = executeCommand(
+      added.state,
+      { type: 'START_GAME', actorId: playerId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const owned = started.state.players[0]!.hand;
+    const allCards = [
+      ...owned,
+      ...started.state.treasureDeck,
+      ...started.state.doorDeck,
+    ];
+    const sellable = allCards.find((card) => {
+      const entry = started.state.cardDefinitions.find(
+        (definition) => definition.id === card.definitionId,
+      );
+      return (
+        entry !== undefined &&
+        (entry.sellable ??
+          (entry.deck === 'TREASURE' && (entry.goldValue ?? 0) > 0))
+      );
+    });
+    if (sellable === undefined)
+      throw new Error('Missing sellable fixture card.');
+    const hand = [
+      sellable,
+      ...allCards
+        .filter((card) => card.instanceId !== sellable.instanceId)
+        .slice(0, 5),
+    ];
+    state = {
+      ...started.state,
+      phase: GamePhase.POST_DOOR,
+      players: started.state.players.map((entry) => ({ ...entry, hand })),
+    };
+    const intents = createGameView(state, playerId).availableIntents;
+    expect(intents).toContainEqual(
+      expect.objectContaining({ kind: 'SELL_CARDS' }),
+    );
+    expect(intents).toContainEqual(
+      expect.objectContaining({ kind: 'GIVE_CHARITY', count: 1 }),
+    );
+    const dead: GameState = {
+      ...state,
+      players: state.players.map((entry) => ({ ...entry, isDead: true })),
+    };
+    expect(createGameView(dead, playerId).availableIntents).toEqual([]);
+    expect(
+      createGameView(
+        { ...state, status: 'FINISHED', phase: 'FINISHED', winnerId: playerId },
+        playerId,
+      ).availableIntents,
+    ).toEqual([]);
   });
 
   it('projects the exact hand Monsters available for LOOK_FOR_TROUBLE and its public event', () => {
@@ -308,8 +586,12 @@ describe('createGameView', () => {
     };
 
     const before = createGameView(state, playerId);
-    expect(before.lookForTroubleCardIds).toEqual([monster.instanceId]);
-    expect(before.availableActions).toContain('LOOK_FOR_TROUBLE');
+    expect(before.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'LOOK_FOR_TROUBLE',
+        cardId: monster.instanceId,
+      }),
+    );
     expect(before.unavailableCardReasons).not.toContainEqual(
       expect.objectContaining({ cardId: monster.instanceId }),
     );
@@ -325,7 +607,9 @@ describe('createGameView', () => {
     );
     if (!result.success) throw new Error(result.error.message);
     const after = createGameView(result.state, playerId);
-    expect(after.lookForTroubleCardIds).toEqual([]);
+    expect(after.availableIntents).not.toContainEqual(
+      expect.objectContaining({ kind: 'LOOK_FOR_TROUBLE' }),
+    );
     expect(after.combat?.monsters[0]?.monster.instanceId).toBe(
       monster.instanceId,
     );
@@ -400,8 +684,10 @@ describe('createGameView', () => {
       count: 1,
       selectableCardIds: [],
     });
-    expect(adaView.availableActions).toEqual([]);
-    expect(bobView.availableActions).toEqual([]);
+    expect(adaView.availableIntents).toContainEqual(
+      expect.objectContaining({ kind: 'RESOLVE_CARD_DISCARD' }),
+    );
+    expect(bobView.availableIntents).toEqual([]);
     expect(bobView.expectedAction).toEqual({
       type: 'DISCARD_CARDS',
       playerId: adaId,
@@ -447,8 +733,11 @@ describe('createGameView', () => {
     };
 
     const before = createGameView(state, playerId);
-    expect(before.availableEquipmentActions.equipCardIds).toContain(
-      equipmentCard.instanceId,
+    expect(before.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'EQUIP_ITEM',
+        cardId: equipmentCard.instanceId,
+      }),
     );
     expect(before.self.combatPower).toBe(before.self.level);
 
@@ -463,9 +752,12 @@ describe('createGameView', () => {
     );
     if (!equipped.success) throw new Error(equipped.error.message);
     const after = createGameView(equipped.state, playerId);
-    expect(after.availableEquipmentActions.unequipCardIds).toEqual([
-      equipmentCard.instanceId,
-    ]);
+    expect(after.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'UNEQUIP_ITEM',
+        cardId: equipmentCard.instanceId,
+      }),
+    );
     expect(after.self.equipmentCombatBonus).toBeGreaterThan(0);
     expect(after.self.combatPower).toBe(
       after.self.level + after.self.equipmentCombatBonus,
@@ -526,7 +818,9 @@ describe('createGameView', () => {
     };
 
     const view = createGameView(state, inactiveId);
-    expect(view.expandedRuleActions.tradeableItemCardIds).toEqual([]);
+    expect(view.availableIntents).not.toContainEqual(
+      expect.objectContaining({ kind: 'TRADE_CARD' }),
+    );
     expect(view.unavailableCardReasons).toContainEqual({
       cardId: item.instanceId,
       reason: 'WAITING_FOR_TURN',
@@ -561,7 +855,14 @@ describe('createGameView', () => {
             definition.id === card.definitionId && definition.type === type,
         ),
       );
-    const monster = findCard(CardType.MONSTER);
+    const monster = allCards.find((card) =>
+      started.state.cardDefinitions.some(
+        (definition) =>
+          definition.id === card.definitionId &&
+          definition.type === CardType.MONSTER &&
+          definition.monster?.strength === 3,
+      ),
+    );
     const bonus = findCard(CardType.TEMPORARY_BONUS);
     if (monster === undefined || bonus === undefined)
       throw new Error('Missing development combat cards.');
@@ -573,6 +874,7 @@ describe('createGameView', () => {
       ...started.state,
       phase: 'DOOR_RESOLUTION',
       combat: {
+        combatId: parseCombatId('combat-view-1'),
         playerId,
         revision: 1,
         monsters: [
@@ -581,9 +883,11 @@ describe('createGameView', () => {
             monster,
             sourceCard: monster,
             clonedFromEncounterId: null,
-            baseStrength: monsterStats.level,
+            baseStrength: monsterStats.strength,
             baseLevelRewards: monsterStats.levelRewards,
             baseTreasureRewards: monsterStats.treasureRewards,
+            tier: 1,
+            tags: [],
             badStuff: monsterStats.badStuff,
             strengthModifier: 0,
             treasureModifier: 0,
@@ -591,10 +895,11 @@ describe('createGameView', () => {
           },
         ],
         nextEncounterSequence: 2,
+        nextHelpOfferSequence: 1,
         nextReactionWindowSequence: 1,
         reactionWindow: null,
-        requestedHelperId: null,
-        helperId: null,
+        helpOffer: null,
+        helpAgreement: null,
         runAway: null,
         history: [
           {
@@ -612,11 +917,16 @@ describe('createGameView', () => {
     };
 
     const view = createGameView(state, playerId);
-    expect(view.availableActions).toEqual(['RUN_AWAY']);
-    expect(view.playableCombatCards.playersSideCardIds).toEqual([
-      bonus.instanceId,
-    ]);
-    expect(view.playableCombatCards.monsterSideCardIds).toEqual([]);
+    expect(view.availableIntents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'RUN_AWAY' }),
+        expect.objectContaining({ kind: 'PROPOSE_HELP' }),
+        expect.objectContaining({
+          kind: 'PLAY_CARD',
+          cardId: bonus.instanceId,
+        }),
+      ]),
+    );
     expect(view.unavailableCardReasons).not.toContainEqual(
       expect.objectContaining({ cardId: bonus.instanceId }),
     );
@@ -625,16 +935,24 @@ describe('createGameView', () => {
       playerPower: view.self.combatPower,
       monsterPower: view.combat?.monsters[0]?.currentStrength,
     });
+    expect(view.self.combatPowerBreakdown).toContainEqual({
+      source: 'MAKESHIFT_TOOLS',
+      amount: 2,
+    });
 
     const escaped = executeCommand(
       state,
-      { type: 'RUN_AWAY', actorId: playerId },
+      {
+        type: 'RUN_AWAY',
+        actorId: playerId,
+        combatId: parseCombatId('combat-view-1'),
+        combatRevision: 1,
+      },
       { random: { nextInt: () => 4 } },
     );
     if (!escaped.success) throw new Error(escaped.error.message);
     expect(createGameView(escaped.state, playerId)).toMatchObject({
       combat: null,
-      availableActions: ['END_TURN'],
       lastRunAwayResult: {
         playerId,
         attempts: [
@@ -642,6 +960,9 @@ describe('createGameView', () => {
         ],
       },
     });
+    expect(
+      createGameView(escaped.state, playerId).availableIntents,
+    ).toContainEqual(expect.objectContaining({ kind: 'END_TURN' }));
   });
 
   it('projects help actions, all-player combat cards, modifiers, and public history', () => {
@@ -707,6 +1028,7 @@ describe('createGameView', () => {
           : player,
       ),
       combat: {
+        combatId: parseCombatId('combat-help-1'),
         playerId: activeId,
         revision: 1,
         monsters: [
@@ -715,9 +1037,11 @@ describe('createGameView', () => {
             monster,
             sourceCard: monster,
             clonedFromEncounterId: null,
-            baseStrength: monsterStats.level,
+            baseStrength: monsterStats.strength,
             baseLevelRewards: monsterStats.levelRewards,
             baseTreasureRewards: monsterStats.treasureRewards,
+            tier: 1,
+            tags: [],
             badStuff: monsterStats.badStuff,
             strengthModifier: 0,
             treasureModifier: 0,
@@ -725,10 +1049,17 @@ describe('createGameView', () => {
           },
         ],
         nextEncounterSequence: 2,
+        nextHelpOfferSequence: 2,
         nextReactionWindowSequence: 1,
         reactionWindow: null,
-        requestedHelperId: helperId,
-        helperId: null,
+        helpOffer: {
+          offerId: parseHelpOfferId('offer-1'),
+          helperId,
+          proposedBy: 'ACTIVE',
+          treasureCount: 0,
+          expiresAtEpochMs: 20_000,
+        },
+        helpAgreement: null,
         runAway: null,
         history: [
           {
@@ -737,27 +1068,33 @@ describe('createGameView', () => {
             encounterId,
             monsterDefinitionId: monster.definitionId,
           },
-          { type: 'HELP_REQUESTED', playerId: activeId, helperId },
+          {
+            type: 'HELP_OFFERED',
+            playerId: activeId,
+            helperId,
+            offerId: parseHelpOfferId('offer-1'),
+            treasureCount: 0,
+          },
         ],
       },
     };
 
     const helperView = createGameView(state, helperId);
-    expect(helperView.availableActions).toEqual(['ACCEPT_HELP']);
-    expect(helperView.playableCombatCards).toEqual({
-      playersSideCardIds: [bonus.instanceId],
-      monsterSideCardIds: [modifier.instanceId],
-      monsterTargetActions: [
-        { cardId: modifier.instanceId, encounterIds: [encounterId] },
-      ],
-      addMonsterActions: [],
-      playerTargetActions: [],
-    });
+    expect(helperView.availableIntents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'ACCEPT_HELP_OFFER' }),
+        expect.objectContaining({ kind: 'REJECT_HELP_OFFER' }),
+        expect.objectContaining({ kind: 'COUNTER_HELP' }),
+      ]),
+    );
     expect(helperView.combat?.history).toHaveLength(2);
 
     const activeView = createGameView(state, activeId);
-    expect(activeView.requestableHelperIds).toEqual([helperId]);
+    expect(activeView.availableIntents).not.toContainEqual(
+      expect.objectContaining({ kind: 'PROPOSE_HELP' }),
+    );
     expect(activeView.combat).toMatchObject({ requestedHelperId: helperId });
+    expect(activeView.combat?.helpOffer).toEqual(helperView.combat?.helpOffer);
 
     const reactionState: GameState = {
       ...state,
@@ -768,6 +1105,8 @@ describe('createGameView', () => {
           declaredAtRevision: state.combat!.revision,
           claimantId: activeId,
           confirmedPlayerIds: [activeId],
+          eligiblePlayerIds: [activeId, helperId],
+          expiresAtEpochMs: 20_000,
         },
         nextReactionWindowSequence: 2,
       },
@@ -778,19 +1117,108 @@ describe('createGameView', () => {
       playerId: activeId,
       waitingPlayerIds: [helperId],
     });
-    expect(reactionView.availableActions).toEqual(['PASS_COMBAT_REACTION']);
+    expect(reactionView.availableIntents).toContainEqual(
+      expect.objectContaining({ kind: 'PASS_COMBAT_REACTION' }),
+    );
     expect(reactionView.combat?.reactionWindow).toEqual({
       windowId: 1,
       claimantId: activeId,
       confirmedPlayerIds: [activeId],
       waitingPlayerIds: [helperId],
+      expiresAtEpochMs: 20_000,
     });
-    expect(reactionView.playableCombatCards.playerTargetActions).toEqual([
-      { cardId: combatCurse.instanceId, playerIds: [activeId] },
-    ]);
-    expect(createGameView(reactionState, activeId).availableActions).toEqual(
+    expect(reactionView.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'PLAY_CARD',
+        cardId: combatCurse.instanceId,
+        target: { type: 'PLAYER', playerId: activeId },
+      }),
+    );
+    expect(createGameView(reactionState, activeId).availableIntents).toEqual(
       [],
     );
+  });
+
+  it('projects combat reward identities only to their recipient', () => {
+    const ids = [
+      parsePlayerId('reward-active'),
+      parsePlayerId('reward-helper'),
+      parsePlayerId('reward-spectator'),
+    ] as const;
+    const random = createSeededRandomSource(91);
+    let state = createGame({ id: parseGameId('PRIV') });
+    for (const [index, actorId] of ids.entries()) {
+      const added = executeCommand(
+        state,
+        {
+          type: 'ADD_PLAYER',
+          actorId,
+          name: `P${index}`,
+          sex: index % 2 === 0 ? 'MALE' : 'FEMALE',
+        },
+        { random },
+      );
+      if (!added.success) throw new Error(added.error.message);
+      state = added.state;
+    }
+    const started = executeCommand(
+      state,
+      { type: 'START_GAME', actorId: ids[0] },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const activeCard = started.state.players[0]!.hand[0]!;
+    const helperCard = started.state.players[1]!.hand[0]!;
+    state = {
+      ...started.state,
+      eventLog: [
+        ...started.state.eventLog,
+        {
+          sequence: started.state.eventLog.length + 1,
+          turnNumber: started.state.turnNumber,
+          phase: started.state.phase,
+          event: {
+            type: 'COMBAT_REWARD_CARDS',
+            visibility: 'PRIVATE',
+            recipientPlayerId: ids[0],
+            playerId: ids[0],
+            cardIds: [activeCard.instanceId],
+          },
+        },
+        {
+          sequence: started.state.eventLog.length + 2,
+          turnNumber: started.state.turnNumber,
+          phase: started.state.phase,
+          event: {
+            type: 'COMBAT_REWARD_CARDS',
+            visibility: 'PRIVATE',
+            recipientPlayerId: ids[1],
+            playerId: ids[1],
+            cardIds: [helperCard.instanceId],
+          },
+        },
+      ],
+    };
+    const activeView = createGameView(state, ids[0]);
+    const helperView = createGameView(state, ids[1]);
+    const spectatorView = createGameView(state, ids[2]);
+    expect(
+      activeView.gameLog
+        .find((entry) => entry.type === 'COMBAT_REWARD_CARDS')
+        ?.cards?.map((card) => card.instanceId),
+    ).toEqual([activeCard.instanceId]);
+    expect(
+      helperView.gameLog
+        .find((entry) => entry.type === 'COMBAT_REWARD_CARDS')
+        ?.cards?.map((card) => card.instanceId),
+    ).toEqual([helperCard.instanceId]);
+    expect(
+      spectatorView.gameLog.some(
+        (entry) => entry.type === 'COMBAT_REWARD_CARDS',
+      ),
+    ).toBe(false);
+    expect(JSON.stringify(spectatorView)).not.toContain(activeCard.instanceId);
+    expect(JSON.stringify(spectatorView)).not.toContain(helperCard.instanceId);
   });
 
   it('projects added, modified, and cloned Monster encounters independently', () => {
@@ -845,6 +1273,7 @@ describe('createGameView', () => {
         hand: [secondMonster, addCard, cloneCard, modifier],
       })),
       combat: {
+        combatId: parseCombatId('combat-encounters-1'),
         playerId,
         revision: 1,
         monsters: [
@@ -853,9 +1282,11 @@ describe('createGameView', () => {
             monster: firstMonster,
             sourceCard: firstMonster,
             clonedFromEncounterId: null,
-            baseStrength: stats.level,
+            baseStrength: stats.strength,
             baseLevelRewards: stats.levelRewards,
             baseTreasureRewards: stats.treasureRewards,
+            tier: 1,
+            tags: [],
             badStuff: stats.badStuff,
             strengthModifier: 0,
             treasureModifier: 0,
@@ -863,10 +1294,11 @@ describe('createGameView', () => {
           },
         ],
         nextEncounterSequence: 2,
+        nextHelpOfferSequence: 1,
         nextReactionWindowSequence: 1,
         reactionWindow: null,
-        requestedHelperId: null,
-        helperId: null,
+        helpOffer: null,
+        helpAgreement: null,
         runAway: null,
         history: [
           {
@@ -886,6 +1318,8 @@ describe('createGameView', () => {
         actorId: playerId,
         cardId: addCard.instanceId,
         target: { type: 'HAND_MONSTER', cardId: secondMonster.instanceId },
+        combatId: parseCombatId('combat-encounters-1'),
+        combatRevision: 1,
       },
       { random },
     );
@@ -902,6 +1336,8 @@ describe('createGameView', () => {
           side: 'MONSTER',
           encounterId: secondEncounterId,
         },
+        combatId: parseCombatId('combat-encounters-1'),
+        combatRevision: added.state.combat!.revision,
       },
       { random },
     );
@@ -917,6 +1353,8 @@ describe('createGameView', () => {
           side: 'MONSTER',
           encounterId: secondEncounterId,
         },
+        combatId: parseCombatId('combat-encounters-1'),
+        combatRevision: modified.state.combat!.revision,
       },
       { random },
     );

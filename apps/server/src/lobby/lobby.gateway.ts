@@ -15,6 +15,8 @@ import type {
   JoinLobbyPayload,
   LobbyActionAck,
   ResumeSessionPayload,
+  SetLobbySettingsPayload,
+  SetPlayerSexPayload,
   ServerToClientEvents,
   StartLobbyPayload,
 } from '@munchkin-lan/contracts';
@@ -32,7 +34,11 @@ export class LobbyGateway implements OnGatewayDisconnect {
   constructor(
     private readonly lobbyService: LobbyService,
     private readonly gameService: GameService,
-  ) {}
+  ) {
+    this.gameService.setDeadlineListener((roomCode) =>
+      this.publishGame(roomCode),
+    );
+  }
 
   @SubscribeMessage('lobby:create')
   async createRoom(
@@ -91,6 +97,7 @@ export class LobbyGateway implements OnGatewayDisconnect {
     const started = this.gameService.startGame(
       result.state.roomCode,
       this.lobbyService.getGamePlayers(result.state.roomCode),
+      this.lobbyService.getGameConfig(result.state.roomCode) ?? undefined,
     );
     if (!started.success) {
       return {
@@ -100,6 +107,28 @@ export class LobbyGateway implements OnGatewayDisconnect {
     }
     this.server.to(result.state.roomCode).emit('lobby:state', result.state);
     this.publishGame(result.state.roomCode);
+    return result.acknowledgement;
+  }
+
+  @SubscribeMessage('lobby:set-sex')
+  setPlayerSex(
+    @ConnectedSocket() client: LobbySocket,
+    @MessageBody() payload: SetPlayerSexPayload,
+  ): LobbyActionAck {
+    const result = this.lobbyService.setPlayerSex(client.id, payload);
+    if (result.success)
+      this.server.to(result.state.roomCode).emit('lobby:state', result.state);
+    return result.acknowledgement;
+  }
+
+  @SubscribeMessage('lobby:set-settings')
+  setLobbySettings(
+    @ConnectedSocket() client: LobbySocket,
+    @MessageBody() payload: SetLobbySettingsPayload,
+  ): LobbyActionAck {
+    const result = this.lobbyService.setSettings(client.id, payload);
+    if (result.success)
+      this.server.to(result.state.roomCode).emit('lobby:state', result.state);
     return result.acknowledgement;
   }
 

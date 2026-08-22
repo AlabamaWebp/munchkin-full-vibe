@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import type { GameCardView } from '@munchkin-lan/contracts';
+import { createDevelopmentCardSet, type CardDefinition } from '@munchkin-lan/game-engine';
 import type { UserFacingError } from './lobby-client';
 
 export type AppLocale = 'ru' | 'en';
@@ -260,6 +261,7 @@ const ENGLISH = {
   targetCombatPlayer: 'one combat participant',
   targetMonsterEncounter: 'one Monster encounter',
   targetHandMonster: 'a Monster from your hand',
+  targetEquipment: 'equipped weapon',
   decisionRequired: 'Decision required',
   chooseCardsToDiscard: 'Choose exactly this many cards to discard',
   playerChoosingCards: 'is choosing cards to discard…',
@@ -281,7 +283,6 @@ const ENGLISH = {
   slotHands: 'Hands',
   yourHand: 'Your hand',
   closeCardDetails: 'Close card details',
-  availableActions: 'Available actions',
   combatInProgress: 'Combat in progress',
   waitingForTurn: 'Waiting for your turn…',
   roomCode: 'Room code',
@@ -631,6 +632,7 @@ const RUSSIAN: Record<TranslationKey, string> = {
   targetCombatPlayer: 'один участник боя',
   targetMonsterEncounter: 'один монстр в бою',
   targetHandMonster: 'монстр с вашей руки',
+  targetEquipment: 'надетое оружие',
   decisionRequired: 'Требуется решение',
   chooseCardsToDiscard: 'Выберите ровно столько карт для сброса',
   playerChoosingCards: 'выбирает карты для сброса…',
@@ -652,7 +654,6 @@ const RUSSIAN: Record<TranslationKey, string> = {
   slotHands: 'Руки',
   yourHand: 'Ваши карты',
   closeCardDetails: 'Закрыть описание карты',
-  availableActions: 'Доступные действия',
   combatInProgress: 'Идёт бой',
   waitingForTurn: 'Ожидание вашего хода…',
   roomCode: 'Код комнаты',
@@ -800,7 +801,7 @@ interface CardTranslation {
   readonly description: string;
 }
 
-export const RUSSIAN_CARDS: Readonly<Record<string, CardTranslation>> = {
+const RUSSIAN_CARD_OVERRIDES: Readonly<Record<string, CardTranslation>> = {
   'dust-bunny-brigade': {
     name: 'Бригада пылевых кроликов',
     description: 'Удивительно организованная угроза из-под дивана.',
@@ -970,6 +971,118 @@ export const RUSSIAN_CARDS: Readonly<Record<string, CardTranslation>> = {
     name: 'Бюрократическая копирка',
     description: 'Создайте независимый снимок одного монстра в бою.',
   },
+};
+
+const NEW_RUSSIAN_NAMES: Readonly<Record<string, string>> = {
+  'dust-parliament': 'Пылевой парламент',
+  'paper-mimic': 'Бумажный мимик',
+  'lost-sock-swarm': 'Стая потерянных носков',
+  'cupboard-specter': 'Шкафный призрак',
+  'hallway-minotaur': 'Коридорный минотавр',
+  'mirror-duelist-male': 'Зеркальный дуэлянт: Марс',
+  'mirror-duelist-female': 'Зеркальный дуэлянт: Венера',
+  'map-eater': 'Картоед',
+  'rust-choir': 'Хор ржавчины',
+  'grave-lantern': 'Могильный фонарь',
+  'midnight-auditor': 'Полуночный аудитор',
+  'library-colossus': 'Библиотечный колосс',
+  'curse-hollow-pockets': 'Проклятие! Пустые карманы',
+  'curse-wrong-turn': 'Проклятие! Не тот поворот',
+  'curse-echoing-doubt': 'Проклятие! Эхо сомнений',
+  'curse-total-recall': 'Проклятие! Полный отзыв',
+  'curse-collapsing-wardrobe': 'Проклятие! Рухнувший гардероб',
+  'scrap-knights': 'Рыцари металлолома',
+  'lantern-wardens': 'Фонарные стражи',
+  brassborn: 'Латуннорождённые',
+  nightglimmers: 'Ночесветы',
+  'tin-kettle-helm': 'Шлем-чайник',
+  'mapmakers-sandals': 'Сандалии картографа',
+  'pocket-cudgel': 'Карманная дубинка',
+  'folding-buckler': 'Складной баклер',
+  'echo-mail': 'Кольчуга эха',
+  'mossy-maul': 'Мшистая кувалда',
+  'cometglass-sabre': 'Сабля из кометного стекла',
+  'leviathan-hide-coat': 'Плащ из шкуры левиафана',
+  'oracular-stilts': 'Пророческие ходули',
+  'crown-of-last-words': 'Корона последних слов',
+  'emergency-drawbridge': 'Аварийный подъёмный мост',
+  'door-cache': 'Тайник у двери',
+  'treasure-rumor': 'Слух о сокровище',
+  'quiet-respite': 'Тихая передышка',
+  'spare-change-map': 'Карта на мелочь',
+  'two-pocket-plan': 'План на два кармана',
+  'grand-expedition-map': 'Карта великой экспедиции',
+  'eager-intern': 'Старательный стажёр',
+  'lantern-scout': 'Фонарный разведчик',
+  'scrap-squire': 'Оруженосец из металлолома',
+  'stubborn-pony': 'Упрямый пони',
+  'archive-apprentice': 'Архивный ученик',
+  'graveyard-guide': 'Кладбищенский проводник',
+  'clockwork-goat': 'Заводная коза',
+  'mossback-elk': 'Мшистый лось',
+  'deadline-ostrich': 'Дедлайновый страус',
+  'veteran-retainer': 'Опытный слуга',
+  'comet-stag': 'Кометный олень',
+  'leviathan-skipper': 'Шкипер левиафана',
+  'sharpening-chorus': 'Затачивающий хор',
+  'balanced-pommel': 'Сбалансированное навершие',
+  'hexproof-cap': 'Шапка от сглаза',
+  'beast-hunters-vest': 'Жилет охотника на зверей',
+  'construct-cracker': 'Взломщик конструктов',
+  'smoke-pellet': 'Дымовая капсула',
+  'moonsteel-edge': 'Лезвие лунной стали',
+  'thunder-weight': 'Громовой груз',
+  'undead-surveyors-goggles': 'Очки инспектора нежити',
+  'arcane-grounding-boots': 'Сапоги магического заземления',
+  'defensive-umbrella': 'Защитный зонт',
+  'escape-route-boots': 'Сапоги пути отхода',
+  'comet-core': 'Кометное ядро',
+  'wardens-aegis': 'Эгида стража',
+  'last-second-ramp': 'Трамплин последней секунды',
+  'monster-compass': 'Компас монстров',
+  'double-major': 'Двойная специализация',
+  'mixed-heritage': 'Смешанное наследие',
+  'mirror-sages': 'Зеркальные мудрецы',
+  'iron-chorus': 'Железный хор',
+  'night-school': 'Вечерняя школа',
+  'adopted-tradition': 'Принятая традиция',
+  'beast-barristers': 'Адвокаты зверей',
+  graveborn: 'Могилорождённые',
+  bladesingers: 'Певцы клинка',
+  'polymath-license': 'Лицензия эрудита',
+  'many-roots': 'Множество корней',
+  'two-world-walkers': 'Ходящие между мирами',
+};
+
+function generatedRussianDescription(definition: CardDefinition): string {
+  if (definition.monster !== undefined)
+    return `Сила ${definition.monster.strength}. Награда: ${definition.monster.levelRewards} ур. и ${definition.monster.treasureRewards} сокр.`;
+  if (definition.equipment !== undefined)
+    return `Бонус +${definition.equipment.combatBonus ?? 0}. Цена: ${definition.goldValue ?? 0} золотых.`;
+  if (definition.companion !== undefined)
+    return `Спутник даёт +${definition.companion.combatBonus} к боевой силе.`;
+  if (definition.rolePermission !== undefined)
+    return `Разрешает иметь вторую карту роли «${definition.rolePermission.role === 'CLASS' ? 'Класс' : 'Раса'}».`;
+  if (definition.attachment !== undefined)
+    return `Усилитель оружия: +${definition.attachment.combatBonus} к боевой силе.`;
+  if (definition.type === 'CLASS' || definition.type === 'RACE')
+    return 'Роль с одним простым условным эффектом.';
+  if (definition.type === 'CURSE' || definition.type === 'COMBAT_CURSE')
+    return 'Примените указанный эффект проклятия к допустимой цели.';
+  return 'Сыграйте карту в указанное время и примените её эффект.';
+}
+
+export const RUSSIAN_CARDS: Readonly<Record<string, CardTranslation>> = {
+  ...Object.fromEntries(
+    createDevelopmentCardSet().definitions.map((definition) => [
+      definition.id,
+      {
+        name: NEW_RUSSIAN_NAMES[definition.id] ?? definition.name,
+        description: generatedRussianDescription(definition),
+      },
+    ]),
+  ),
+  ...RUSSIAN_CARD_OVERRIDES,
 };
 
 @Injectable({ providedIn: 'root' })

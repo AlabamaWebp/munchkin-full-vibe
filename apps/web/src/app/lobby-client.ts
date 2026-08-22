@@ -3,6 +3,8 @@ import {
   LobbyStatus,
   type ClientToServerEvents,
   type GameClientCommand,
+  type CardSetId,
+  type GameMode,
   type GameView,
   type LobbyActionAck,
   type LobbyState,
@@ -123,6 +125,28 @@ export class LobbyClient {
     this.beginRequest();
     this.socket.emit('game:start', { roomCode: lobby.roomCode, playerId }, (response) =>
       this.handleAcknowledgement(response),
+    );
+  }
+
+  setSex(sex: 'MALE' | 'FEMALE'): void {
+    const lobby = this.currentLobby();
+    const playerId = this.currentPlayerId();
+    if (lobby === null || playerId === null) return;
+    this.beginRequest();
+    this.socket.emit('lobby:set-sex', { roomCode: lobby.roomCode, playerId, sex }, (response) =>
+      this.handleAcknowledgement(response),
+    );
+  }
+
+  setSettings(mode: GameMode, enabledSetIds: readonly CardSetId[]): void {
+    const lobby = this.currentLobby();
+    const playerId = this.currentPlayerId();
+    if (lobby === null || playerId === null) return;
+    this.beginRequest();
+    this.socket.emit(
+      'lobby:set-settings',
+      { roomCode: lobby.roomCode, playerId, mode, enabledSetIds: [...enabledSetIds] },
+      (response) => this.handleAcknowledgement(response),
     );
   }
 

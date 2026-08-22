@@ -5,7 +5,7 @@ import {
   calculateMonsterStrength,
   calculateMonsterTreasures,
 } from "./equipment.js";
-import { executeCommand } from "./engine.js";
+import { executeCommand } from "./legacy-test-command.js";
 import {
   GamePhase,
   GameStatus,
@@ -33,7 +33,7 @@ const firstMonsterDefinition: CardDefinition = {
   deck: DeckType.DOOR,
   effects: [],
   monster: {
-    level: 6,
+    strength: 6,
     levelRewards: 1,
     treasureRewards: 2,
     badStuff: [{ type: "DISCARD_CHOSEN_CARDS", zone: "HAND", count: 1 }],
@@ -47,7 +47,7 @@ const secondMonsterDefinition: CardDefinition = {
   deck: DeckType.DOOR,
   effects: [],
   monster: {
-    level: 4,
+    strength: 4,
     levelRewards: 2,
     treasureRewards: 1,
     badStuff: [{ type: "LOSE_LEVEL", amount: 1 }],
@@ -89,7 +89,7 @@ const rewardDefinition: CardDefinition = {
   id: parseCardDefinitionId("reward"),
   name: "Reward",
   description: "Test Treasure.",
-  type: CardType.OTHER,
+  type: CardType.UTILITY,
   deck: DeckType.TREASURE,
   effects: [],
 };
@@ -149,9 +149,11 @@ function combatMonster(
     monster,
     sourceCard: monster,
     clonedFromEncounterId: null,
-    baseStrength: definition.monster!.level,
+    baseStrength: definition.monster!.strength,
     baseLevelRewards: definition.monster!.levelRewards,
     baseTreasureRewards: definition.monster!.treasureRewards,
+    tier: 1,
+    tags: [],
     badStuff: definition.monster!.badStuff,
     strengthModifier: 0,
     treasureModifier: 0,
@@ -163,7 +165,8 @@ function state(
   monsters: readonly CombatMonsterState[] = [combatMonster(firstMonster)],
 ): GameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
+    config: { mode: "CLASSIC_CHAOS", enabledSetIds: ["CORE"] },
     id: parseGameId("multi-monster"),
     status: GameStatus.IN_PROGRESS,
     phase: GamePhase.DOOR_RESOLUTION,
@@ -171,13 +174,25 @@ function state(
       {
         id: heroId,
         name: "Hero",
+        sex: "MALE",
         level: 3,
         hand: [secondMonster, addCard, cloneCard, booster, weakening, spare],
         equipment: [],
-        classCard: null,
-        raceCard: null,
+        equipmentAttachments: [],
+        classCards: [],
+        raceCards: [],
+        rolePermissionCards: [],
+        hirelingCard: null,
+        mountCard: null,
         isDead: false,
-        temporaryCombatBonus: 20,
+        activeEffects: [
+          {
+            type: "COMBAT_POWER",
+            sourceDefinitionId: rewardDefinition.id,
+            amount: 20,
+            expires: "END_OF_COMBAT",
+          },
+        ],
       },
     ],
     activePlayerId: heroId,
@@ -191,10 +206,11 @@ function state(
       revision: 1,
       monsters,
       nextEncounterSequence: monsters.length + 1,
+      nextHelpOfferSequence: 1,
       nextReactionWindowSequence: 1,
       reactionWindow: null,
-      requestedHelperId: null,
-      helperId: null,
+      helpOffer: null,
+      helpAgreement: null,
       history: [
         {
           type: "COMBAT_STARTED",
@@ -207,6 +223,7 @@ function state(
     },
     lastRunAwayResult: null,
     pendingDecision: null,
+    nextPendingDecisionSequence: 1,
     eventLog: [],
     turnNumber: 1,
     winnerId: null,
@@ -402,9 +419,11 @@ describe("multi-Monster combat", () => {
     if (!won.success) throw new Error(won.error.message);
     expect(won.state.players[0]).toMatchObject({
       level: 6,
-      temporaryCombatBonus: 0,
+      activeEffects: [],
     });
-    expect(won.state.players[0]?.hand.slice(-5)).toEqual(rewards.slice(0, 5));
+    expect(won.state.players[0]?.hand.slice(-5)).toEqual(
+      expect.arrayContaining(rewards.slice(0, 5)),
+    );
     expect(won.state.doorDiscard).toEqual(
       expect.arrayContaining([firstMonster, secondMonster, addCard]),
     );
@@ -428,9 +447,7 @@ describe("multi-Monster combat", () => {
     const started = executeCommand(
       {
         ...initial,
-        players: [
-          { ...initial.players[0]!, level: 3, temporaryCombatBonus: 0 },
-        ],
+        players: [{ ...initial.players[0]!, level: 3, activeEffects: [] }],
       },
       { type: "RUN_AWAY", actorId: heroId },
       { random: { nextInt: () => 0 } },
@@ -443,8 +460,8 @@ describe("multi-Monster combat", () => {
       completion: { type: "RUN_AWAY", encounterId: firstEncounterId },
     });
     expect(started.state.combat?.runAway).toMatchObject({
-      nextMonsterIndex: 1,
-      attempts: [{ encounterId: firstEncounterId, roll: 1, escaped: false }],
+      cursor: { encounterIndex: 0, combatantIndex: 1 },
+      attempts: [{ encounterId: firstEncounterId, roll: 1, outcome: "FAILED" }],
     });
 
     const reconnected = JSON.parse(JSON.stringify(started.state)) as GameState;
@@ -453,6 +470,7 @@ describe("multi-Monster combat", () => {
       {
         type: "RESOLVE_CARD_DISCARD",
         actorId: heroId,
+        decisionId: reconnected.pendingDecision!.decisionId,
         cardIds: [spare.instanceId],
       },
       { random: { nextInt: () => 1 } },
@@ -465,8 +483,8 @@ describe("multi-Monster combat", () => {
       phase: GamePhase.END_TURN,
       lastRunAwayResult: {
         attempts: [
-          { encounterId: firstEncounterId, roll: 1, escaped: false },
-          { encounterId: secondEncounterId, roll: 2, escaped: false },
+          { encounterId: firstEncounterId, roll: 1, outcome: "FAILED" },
+          { encounterId: secondEncounterId, roll: 2, outcome: "FAILED" },
         ],
       },
     });
