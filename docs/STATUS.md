@@ -358,6 +358,7 @@ the V2 gameplay/content sequence.
 # Card art prompt export
 
 - Added `npm run generate:card-art-csv` to export the development card catalog to `generated/card-art-prompts.csv`.
+- Regenerated the export on 2026-08-22 from the current game-engine catalog: 120 card definitions with unique IDs.
 
 ## V2 gameplay core (schema 5, complete)
 
