@@ -6,13 +6,66 @@ Current milestone:
 V2 final audit complete; live-game blockers remain
 ```
 
+## Optional-set card interaction (2026-08-23)
+
+- connected the server-authorized optional-set intents to the card details UI:
+  Companions can be played into their own slots, Double Identity permissions can
+  be activated or discarded, and Arsenal attachments can select an eligible
+  equipped item;
+- added public character-sheet slots for a hireling, mount, active role
+  permissions, and every active Class/Race card, so a second role remains
+  inspectable and actionable;
+- added Angular coverage for the three previously unreachable actions and the
+  new public slots.
+
+## Sale card selection UI (2026-08-23)
+
+- item-sale rows now show each card's artwork on the left and an independent `i`
+  button that opens the same card-details dialog used by the hand;
+- selected sale cards have a clear amber highlight and expose their selected
+  state to assistive technology;
+- aligned the information button in a dedicated row column so it stays vertically
+  centered on mobile;
+- applied the same artwork, selection, and card-details interaction to charity
+  card choices;
+- added Angular coverage for sale and charity artwork, selection, and details.
+- removed the persistent unequip buttons from the current player's profile;
+  available `UNEQUIP_ITEM` actions now appear in the selected equipped card's
+  details menu, preserving server-authoritative availability.
+- added server-authoritative `DISCARD_ROLE` for active Class/Race cards, with
+  explicit `Сбросить класс` and `Сбросить расу` actions available from the role-card details menu; the selected role is removed from the public role zone and placed in the matching discard pile;
+- sale and charity rows now open card information by clicking the artwork and
+  use a full-height selection control without a separate information button.
+- sale rows now mark equipped items separately from cards held in hand.
+- the expanded hand menu now renders only compact card type, bonus, and price
+  facts alongside the artwork and name, while the dock keeps its short card view.
+- compact hand cards now let the artwork fill all remaining space above the
+  name and single facts row.
+- removed the unused `i` button from compact hand cards; clicking the card
+  itself remains the details entry point.
+- compact hand card names now use the active locale formatter, including the
+  Russian card catalog when Russian is selected.
+- compact card names are centered both horizontally and vertically within their
+  two-line title area.
+
 ## UI combat pass (2026-08-23)
 
-- added the development-only `/dev/ui/combat` screen with a fixed projected `GameView`; it renders the same `GameShellComponent` and child UI components as the game screen;
+- moved the approved combat UI from the development-only fixture into the live game flow: `LobbyClient`'s Socket.IO-fed `GameView` signal now renders the same `GameShellComponent`; the fixed `/dev/ui/combat` mock and its route override were removed;
 - completed the first mobile combat layout pass: fixed-height table shell, turn controls, horizontally scrollable public-player and hand rails, one event capsule, character summary, intent-complete action dock, and warm table design tokens;
 - no game-engine, server, or Socket.IO contracts were changed.
+- added Angular coverage for the live application signal, empty equipment/no-class state, empty and five-card hands, long names, two-player rendering, combat win/loss totals, and history open/filter/close behavior.
+- changed hand-card interaction so a card click always opens its details first; the server-authorized «Надеть» action is available only inside that detail sheet when its `EQUIP_ITEM` intent is projected.
+- game history now displays newest turns and events first; combat, player, hand, and overlay accents use the warm brown/amber palette of the tabletop background instead of green.
+- fixed stage prioritization: whenever a combat object is projected, the Monster card and combat panel stay visible even while escape resolution or a blocking decision is active; blocking choices remain their existing overlay.
+- cards blocked solely by an occupied Equipment slot or insufficient hands now offer «Переодеть» in their details: the client sends the server-authorized unequip commands for only the conflicting items, then equips the selected item in order.
+- «Переодеть» now includes the static Equipment combat-bonus change (for example, `+2 силы` or `-1 силы`) after replacing only the conflicting items.
+- server-projected card sale and charity actions now appear in the primary bottom action dock outside combat, rather than in the menu; an empty dock stays silent on the viewer's own turn.
+- game history now displays `ROLE_PLAYED` and `ROLE_DISCARDED` events, including the player, Class/Race kind, and card name.
+- help-offer and counter-offer controls now use the server-projected Treasure bounds: the
+  selected amount is clamped to the current reward, the increment control disables at its
+  maximum, and the UI shows the available `current / maximum` range.
 - integrated the supplied tabletop background and completed a mobile visual-alignment pass for
-  `/dev/ui/combat`: corrected the row allocation that collapsed the combat stage, then refined
+  the combat shell: corrected the row allocation that collapsed the combat stage, then refined
   the combat card, score hierarchy, player rail, character summary, hand cards, action dock,
   and warm brass/wood surface treatment against the mobile reference; no UX or game logic changed.
 - repeated the 390×844 comparison after product review: the combat focus is now a vertical card
@@ -510,7 +563,7 @@ Verified on 2026-08-22 after closing the final-audit blockers:
 
 ## Combat mobile visual QA pass
 
-- Compared `/dev/ui/combat` at the target `390 x 844` viewport with
+- Compared the combat shell at the target `390 x 844` viewport with
   `docs/ui/reference/combat-mobile.png` and completed two screenshot-based
   correction cycles.
 - Fixed the wide-layout grid allocation after the action and character rows
@@ -561,7 +614,7 @@ Verified on 2026-08-23 after the responsive adaptation:
 
 ## Combat hand mobile refinement
 
-- The `/dev/ui/combat` fixture now represents the eight-card starting hand.
+- The combat shell represents the eight-card starting hand.
 - The in-game hand uses a horizontally scrollable, snap-aligned card rail with
   readable card widths instead of squeezing five cards into the viewport.
 - The Full Hand dialog now fills the viewport; the hand button remains available
@@ -626,6 +679,9 @@ Verified on 2026-08-23 after the responsive adaptation:
   and hand count; equipment artwork is no longer shown there.
 ## Latest UI update
 
+- The general "Look for trouble" action now always opens the Monster picker,
+  including when exactly one legal Monster is in hand. Combat begins only after
+  the player explicitly chooses that card.
 - Menu action buttons now size to their content instead of stretching across the sheet.
 - Bottom hand cards now use a narrower image-oriented layout with a full-height contained illustration and one-line ellipsized name.
 - Small game-screen labels and controls now use more readable type sizes while retaining truncation and compact layout constraints.

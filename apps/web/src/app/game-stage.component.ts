@@ -192,10 +192,10 @@ import { latestRevealedCard } from './game-ui.model';
       place-content: center;
       gap: 0.35rem;
       overflow: hidden;
-      border: 1px solid #405448;
-      border-radius: 0.9rem;
-      background:
-        radial-gradient(circle at 50% 0%, rgba(90, 129, 99, 0.22), transparent 70%), #142019;
+      // border: 1px solid #405448;
+      // border-radius: 0.9rem;
+      // background:
+      //   radial-gradient(circle at 50% 0%, rgba(149, 97, 48, 0.22), transparent 70%), #21150d;
       text-align: center;
     }
     .message.blocking {

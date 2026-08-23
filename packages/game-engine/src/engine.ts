@@ -1890,6 +1890,54 @@ function playRole(
   ]);
 }
 
+function discardRole(
+  state: GameState,
+  actorId: PlayerId,
+  cardId: CardInstanceId,
+): CommandResult {
+  if (!canChangeEquipment(state, actorId))
+    return fail(
+      state,
+      "INVALID_PHASE",
+      "Roles can only be changed during your turn outside combat.",
+    );
+  const player = state.players.find((candidate) => candidate.id === actorId);
+  if (player === undefined)
+    return fail(state, "ACTOR_NOT_FOUND", `Player ${actorId} was not found.`);
+  const card = [...player.classCards, ...player.raceCards].find(
+    (candidate) => candidate.instanceId === cardId,
+  );
+  if (card === undefined)
+    return fail(
+      state,
+      "INVALID_CARD_SELECTION",
+      "The role is not active for the actor.",
+    );
+  const definition = findDefinition(state, card);
+  const role = definition.type === CardType.CLASS ? "CLASS" : definition.type === CardType.RACE ? "RACE" : null;
+  if (role === null)
+    return fail(state, "CARD_NOT_PLAYABLE", "Only a Class or Race can be discarded as a role.");
+  let nextState = updatePlayer(state, actorId, (current) => ({
+    ...current,
+    ...(role === "CLASS"
+      ? { classCards: current.classCards.filter((candidate) => candidate.instanceId !== cardId) }
+      : { raceCards: current.raceCards.filter((candidate) => candidate.instanceId !== cardId) }),
+  }));
+  nextState = addToDiscard(nextState, [card]);
+  const revalidated = revalidatePlayerEquipment(nextState, actorId);
+  return succeed(revalidated.state, [
+    {
+      type: "ROLE_DISCARDED",
+      visibility: "PUBLIC",
+      playerId: actorId,
+      cardId,
+      definitionId: definition.id,
+      role,
+    },
+    ...revalidated.events,
+  ]);
+}
+
 function playRolePermission(
   state: GameState,
   actorId: PlayerId,
@@ -4424,6 +4472,8 @@ function executePlayerCommand(
       return unequipItem(state, command.actorId, command.cardId);
     case "PLAY_ROLE":
       return playRole(state, command.actorId, command);
+    case "DISCARD_ROLE":
+      return discardRole(state, command.actorId, command.cardId);
     case "PLAY_ROLE_PERMISSION":
       return playRolePermission(state, command.actorId, command.cardId);
     case "DISCARD_ROLE_PERMISSION":

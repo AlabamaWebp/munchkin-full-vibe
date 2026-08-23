@@ -292,6 +292,13 @@ export type GameEvent =
       readonly role: "CLASS" | "RACE";
     })
   | (PublicEvent & {
+      readonly type: "ROLE_DISCARDED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+      readonly role: "CLASS" | "RACE";
+    })
+  | (PublicEvent & {
       readonly type: "ROLE_PERMISSION_PLAYED" | "ROLE_PERMISSION_DISCARDED";
       readonly playerId: PlayerId;
       readonly cardId: CardInstanceId;

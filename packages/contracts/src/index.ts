@@ -307,6 +307,7 @@ export type AvailableIntentView =
         | "EQUIP_ITEM"
         | "UNEQUIP_ITEM"
         | "PLAY_ROLE"
+        | "DISCARD_ROLE"
         | "PLAY_ROLE_PERMISSION"
         | "DISCARD_ROLE_PERMISSION";
       readonly cardId: string;
@@ -490,6 +491,7 @@ export type GameLogEventType =
   | "ITEM_EQUIPPED"
   | "ITEM_UNEQUIPPED"
   | "ROLE_PLAYED"
+  | "ROLE_DISCARDED"
   | "CARDS_SOLD"
   | "ROLE_PERMISSION_PLAYED"
   | "ROLE_PERMISSION_DISCARDED"
@@ -773,6 +775,7 @@ export type GameClientCommand =
       readonly cardId: string;
       readonly replaceCardId?: string;
     }
+  | { readonly type: "DISCARD_ROLE"; readonly cardId: string }
   | { readonly type: "PLAY_ROLE_PERMISSION"; readonly cardId: string }
   | { readonly type: "DISCARD_ROLE_PERMISSION"; readonly cardId: string }
   | {

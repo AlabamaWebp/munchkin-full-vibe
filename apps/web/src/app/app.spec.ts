@@ -25,6 +25,9 @@ class MockLobbyClient {
   readonly rematch = vi.fn();
   readonly returnToLobby = vi.fn();
   readonly sendGameCommand = vi.fn();
+  showGame(state: GameView): void {
+    this.gameState.set(state);
+  }
   showLobby(state: LobbyState, playerId: string): void {
     this.currentPlayerId.set(playerId);
     this.lobbyState.set(state);
@@ -103,5 +106,95 @@ describe('App lobby', () => {
       .find((button) => button.textContent?.includes('Спутники'))!
       .click();
     expect(client.setSettings).toHaveBeenCalledWith('BALANCED', ['CORE', 'COMPANIONS']);
+  });
+
+  it('renders live combat from the GameView signal through the approved game shell', () => {
+    const ada = {
+      playerId: 'p1',
+      name: 'Ada',
+      level: 1,
+      handCount: 0,
+      equipment: [],
+      temporaryCombatBonus: 0,
+      equipmentCombatBonus: 0,
+      combatPower: 1,
+      classCard: null,
+      raceCard: null,
+      isDead: false,
+    } as const;
+    const monster = {
+      instanceId: 'monster-1',
+      definitionId: 'monster',
+      artKey: 'test.monster',
+      name: 'Monster',
+      description: 'Test monster.',
+      type: 'MONSTER' as const,
+      deck: 'DOOR' as const,
+      effects: [],
+      monster: { strength: 2, levelRewards: 1, treasureRewards: 1, badStuff: [] },
+    };
+    client.showGame({
+      gameId: 'live-game',
+      viewerPlayerId: 'p1',
+      status: 'IN_PROGRESS',
+      phase: 'DOOR_RESOLUTION',
+      activePlayerId: 'p1',
+      turnNumber: 1,
+      winnerId: null,
+      players: [ada],
+      self: { ...ada, hand: [] },
+      combat: {
+        combatId: 'combat-1',
+        playerId: 'p1',
+        revision: 1,
+        monsters: [
+          {
+            encounterId: 'encounter-1',
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: null,
+            baseStrength: 2,
+            strengthModifier: 0,
+            currentStrength: 2,
+            baseLevelRewards: 1,
+            baseTreasureRewards: 1,
+            treasureModifier: 0,
+            currentTreasures: 1,
+            playedCards: [],
+          },
+        ],
+        playerPower: 1,
+        monsterPower: 2,
+        requestedHelperId: null,
+        helperId: null,
+        helperContribution: 0,
+        reactionWindow: null,
+        history: [],
+      },
+      lastRunAwayResult: null,
+      pendingDecision: null,
+      curseResponse: null,
+      gameLog: [],
+      presentation: { blocking: null, important: [], routine: [] },
+      expectedAction: { type: 'COMBAT_DECISION', playerId: 'p1' },
+      deckCounts: { door: 1, treasure: 1 },
+      availableIntents: [
+        {
+          id: 'run:1',
+          kind: 'RUN_AWAY',
+          reasonCode: 'COMBAT_LOSING',
+          combatId: 'combat-1',
+          combatRevision: 1,
+        },
+      ],
+      unavailableCardReasons: [],
+    });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-game-shell')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-combat-stage .combat')).not.toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Не хватает 1 силы');
   });
 });

@@ -159,13 +159,29 @@ export class LobbyClient {
   }
 
   sendGameCommand(command: GameClientCommand): void {
+    this.sendGameCommands([command]);
+  }
+
+  sendGameCommands(commands: readonly GameClientCommand[]): void {
     const lobby = this.currentLobby();
-    if (lobby === null) return;
+    if (lobby === null || commands.length === 0) return;
     this.beginRequest();
-    this.socket.emit('game:command', { roomCode: lobby.roomCode, command }, (response) => {
-      this.requestPending.set(false);
-      if (!response.success) this.currentError.set(response.error);
-    });
+    const sendNext = (index: number): void => {
+      const command = commands[index];
+      if (command === undefined) {
+        this.requestPending.set(false);
+        return;
+      }
+      this.socket.emit('game:command', { roomCode: lobby.roomCode, command }, (response) => {
+        if (!response.success) {
+          this.requestPending.set(false);
+          this.currentError.set(response.error);
+          return;
+        }
+        sendNext(index + 1);
+      });
+    };
+    sendNext(0);
   }
 
   private resume(session: SavedSession): void {

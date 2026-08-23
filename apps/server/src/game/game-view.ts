@@ -366,6 +366,7 @@ function projectLogEntry(
           : {}),
       };
     case 'ROLE_PLAYED':
+    case 'ROLE_DISCARDED':
       return {
         ...base,
         playerId: event.playerId,
@@ -483,6 +484,7 @@ export const EVENT_IMPORTANCE = {
   ITEM_EQUIPPED: 'ROUTINE',
   ITEM_UNEQUIPPED: 'ROUTINE',
   ROLE_PLAYED: 'IMPORTANT',
+  ROLE_DISCARDED: 'IMPORTANT',
   CARDS_SOLD: 'IMPORTANT',
   ROLE_PERMISSION_PLAYED: 'IMPORTANT',
   ROLE_PERMISSION_DISCARDED: 'IMPORTANT',
@@ -1094,6 +1096,13 @@ function availableIntents(
           cardId: card.instanceId,
         });
     }
+    for (const card of [...self.classCards, ...self.raceCards])
+      intents.push({
+        id: `discard-role:${card.instanceId}`,
+        kind: 'DISCARD_ROLE',
+        reasonCode: 'OPTIONAL_CARD_PLAY',
+        cardId: card.instanceId,
+      });
     for (const card of self.rolePermissionCards)
       intents.push({
         id: `discard-role-permission:${card.instanceId}`,

@@ -10,6 +10,9 @@ export interface EquipmentLayoutLabels {
   readonly rightHand: string;
   readonly class: string;
   readonly race: string;
+  readonly hireling: string;
+  readonly mount: string;
+  readonly permissions: string;
   readonly empty: string;
   readonly twoHanded: string;
 }
@@ -33,11 +36,25 @@ export interface EquipmentLayoutLabels {
       </div>
       <div class="slot role class">
         <small>{{ labels().class }}</small>
-        <ng-container *ngTemplateOutlet="roleSlot; context: { card: player().classCard }" />
+        <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: roleCards('CLASS') }" />
       </div>
       <div class="slot role race">
         <small>{{ labels().race }}</small>
-        <ng-container *ngTemplateOutlet="roleSlot; context: { card: player().raceCard }" />
+        <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: roleCards('RACE') }" />
+      </div>
+      <div class="slot companion hireling">
+        <small>{{ labels().hireling }}</small>
+        <ng-container *ngTemplateOutlet="slot; context: { card: player().hirelingCard ?? null }" />
+      </div>
+      <div class="slot companion mount">
+        <small>{{ labels().mount }}</small>
+        <ng-container *ngTemplateOutlet="slot; context: { card: player().mountCard ?? null }" />
+      </div>
+      <div class="slot permissions">
+        <small>{{ labels().permissions }}</small>
+        <ng-container
+          *ngTemplateOutlet="cardsSlot; context: { cards: player().rolePermissionCards ?? [] }"
+        />
       </div>
       @if (twoHandedCard(); as card) {
         <div class="slot hands two-handed">
@@ -68,11 +85,13 @@ export interface EquipmentLayoutLabels {
         <span class="empty">{{ labels().empty }}</span>
       }
     </ng-template>
-    <ng-template #roleSlot let-card="card">
-      @if (card) {
-        <button type="button" (click)="cardOpened.emit(card)">
-          <strong>{{ cardName()(card) }}</strong>
-        </button>
+    <ng-template #cardsSlot let-cards="cards">
+      @if (cards.length > 0) {
+        @for (card of cards; track card.instanceId) {
+          <button type="button" (click)="cardOpened.emit(card)">
+            <strong>{{ cardName()(card) }}</strong>
+          </button>
+        }
       } @else {
         <span class="empty">{{ labels().empty }}</span>
       }
@@ -83,7 +102,7 @@ export interface EquipmentLayoutLabels {
     .equipment-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-areas: 'head head' 'body body' 'feet feet' 'left right' 'class race';
+      grid-template-areas: 'head head' 'body body' 'feet feet' 'left right' 'class race' 'hireling mount' 'permissions permissions';
       gap: 0.5rem;
     }
     .slot {
@@ -117,6 +136,15 @@ export interface EquipmentLayoutLabels {
     }
     .slot.race {
       grid-area: race;
+    }
+    .slot.hireling {
+      grid-area: hireling;
+    }
+    .slot.mount {
+      grid-area: mount;
+    }
+    .slot.permissions {
+      grid-area: permissions;
     }
     .slot.two-handed {
       grid-area: left;
@@ -163,7 +191,7 @@ export interface EquipmentLayoutLabels {
     @media (min-width: 42rem) {
       .equipment-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-template-areas: 'head body feet feet' 'left right class race';
+        grid-template-areas: 'head body feet feet' 'left right class race' 'hireling mount permissions permissions';
       }
     }
   `,
@@ -184,5 +212,11 @@ export class EquipmentLayoutComponent {
 
   twoHandedCard(): GameCardView | null {
     return this.handCards().find((card) => card.equipment?.hands === 2) ?? null;
+  }
+
+  roleCards(role: 'CLASS' | 'RACE'): readonly GameCardView[] {
+    const cards = role === 'CLASS' ? this.player().classCards : this.player().raceCards;
+    const fallback = role === 'CLASS' ? this.player().classCard : this.player().raceCard;
+    return cards ?? (fallback === null ? [] : [fallback]);
   }
 }

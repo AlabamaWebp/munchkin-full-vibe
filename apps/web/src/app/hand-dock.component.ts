@@ -13,10 +13,10 @@ import { unavailableReason } from './game-ui.model';
         @for (card of preview(); track card.instanceId) {
           <app-compact-game-card
             [card]="card"
+            [cardName]="cardName()"
             [playable]="playableIds().includes(card.instanceId)"
             [reason]="reason(card)"
             (activated)="cardActivated.emit($event)"
-            (detailsOpened)="cardDetails.emit($event)"
           />
         }
       </div>
@@ -107,8 +107,8 @@ import { unavailableReason } from './game-ui.model';
 export class HandDockComponent {
   readonly game = input.required<GameView>();
   readonly playableIds = input.required<readonly string[]>();
+  readonly cardName = input.required<(card: GameCardView) => string>();
   readonly cardActivated = output<GameCardView>();
-  readonly cardDetails = output<GameCardView>();
   readonly fullHandOpened = output<void>();
   protected readonly preview = computed(() =>
     [...this.game().self.hand].sort(

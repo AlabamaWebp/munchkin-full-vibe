@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import type { AvailableGameAction } from '@munchkin-lan/contracts';
 
+export interface ActionDockUtilityAction {
+  readonly id: 'SELL_CARDS' | 'GIVE_CHARITY';
+  readonly label: string;
+  readonly hint: string;
+}
+
 const PRIORITY: readonly AvailableGameAction[] = [
   'PASS_COMBAT_REACTION',
   'DECLARE_COMBAT_VICTORY',
@@ -33,12 +39,17 @@ const PRIORITY: readonly AvailableGameAction[] = [
           ><small>{{ hint(action) }}</small>
         </button>
       }
+      @for (action of utilityActions(); track action.id) {
+        <button type="button" class="utility" (click)="utilityActionSelected.emit(action.id)">
+          <strong>{{ action.label }}</strong><small>{{ action.hint }}</small>
+        </button>
+      }
       @if (overflow().length > 0) {
         <button type="button" class="more" (click)="allOpen.set(true)">
           Все действия · {{ overflow().length }}
         </button>
       }
-      @if (visible().length === 0) {
+      @if (visible().length === 0 && utilityActions().length === 0 && !hasPlayableCombatCards() && !isOwnTurn()) {
         <p>Ожидаем действие другого игрока</p>
       }
     </nav>
@@ -136,6 +147,11 @@ const PRIORITY: readonly AvailableGameAction[] = [
       border-color: #8d632e;
       background: #2b2117;
     }
+    .utility {
+      border-color: #bd8645;
+      color: #ffebbd;
+      background: linear-gradient(145deg, #5a351a, #2b190d);
+    }
     .action-sheet-backdrop {
       position: fixed;
       z-index: 55;
@@ -194,8 +210,11 @@ const PRIORITY: readonly AvailableGameAction[] = [
 export class ActionDockComponent {
   readonly actions = input.required<readonly AvailableGameAction[]>();
   readonly hasPlayableCombatCards = input(false);
+  readonly utilityActions = input<readonly ActionDockUtilityAction[]>([]);
+  readonly isOwnTurn = input(false);
   readonly actionSelected = output<AvailableGameAction>();
   readonly playCardOpened = output<void>();
+  readonly utilityActionSelected = output<ActionDockUtilityAction['id']>();
   protected readonly allOpen = signal(false);
   protected readonly ordered = computed(() =>
     PRIORITY.filter((action) => this.actions().includes(action)),

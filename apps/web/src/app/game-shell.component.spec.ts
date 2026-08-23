@@ -7,6 +7,7 @@ import { LobbyClient, type ConnectionState } from './lobby-client';
 class MockLobbyClient {
   readonly connection = signal<ConnectionState>('CONNECTED').asReadonly();
   readonly sendGameCommand = vi.fn();
+  readonly sendGameCommands = vi.fn();
   readonly rematch = vi.fn();
   readonly returnToLobby = vi.fn();
 }
@@ -143,6 +144,53 @@ describe('GameShellComponent', () => {
     expect((other.nativeElement as HTMLElement).textContent).toContain('Ходит Grace');
   });
 
+  it('keeps an empty action dock silent on the viewer’s turn', () => {
+    const own = render(base({ availableIntents: [] })).nativeElement as HTMLElement;
+    expect(own.querySelector('app-action-dock p')).toBeNull();
+
+    const grace = player({ playerId: 'p2', name: 'Grace' });
+    const other = render(
+      base({
+        activePlayerId: 'p2',
+        players: [base().self, grace],
+        expectedAction: { type: 'TAKE_TURN_ACTION', playerId: 'p2' },
+        availableIntents: [],
+      }),
+    ).nativeElement as HTMLElement;
+    expect(other.querySelector('app-action-dock p')?.textContent).toContain(
+      'Ожидаем действие другого игрока',
+    );
+  });
+
+  it('requires an explicit Monster selection before looking for trouble', () => {
+    const fixture = render(
+      base({
+        phase: 'POST_DOOR',
+        self: { ...player({ handCount: 1 }), hand: [monster] },
+        availableIntents: [
+          {
+            id: 'look-for-trouble:m1',
+            kind: 'LOOK_FOR_TROUBLE',
+            reasonCode: 'PRIMARY_TURN_ACTION',
+            cardId: 'm1',
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+
+    Array.from(root.querySelectorAll<HTMLButtonElement>('app-action-dock button'))
+      .find((button) => button.textContent?.includes('Искать неприятности'))!
+      .click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('#target-title')?.textContent).toContain('Выберите монстра');
+    expect(client.sendGameCommand).not.toHaveBeenCalled();
+
+    root.querySelector<HTMLButtonElement>('.option-list button')!.click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'LOOK_FOR_TROUBLE', cardId: 'm1' });
+  });
+
   it('shows the character sex below the nickname', () => {
     const fixture = render(base({ self: { ...player({ sex: 'FEMALE' }), hand: [] } }));
 
@@ -157,6 +205,31 @@ describe('GameShellComponent', () => {
       .nativeElement as HTMLElement;
     expect(root.querySelectorAll('.player')).toHaveLength(6);
     expect(root.querySelector('.players')?.classList.contains('players')).toBe(true);
+  });
+
+  it('renders empty equipment, no class, and empty or full hands from the projected player view', () => {
+    const empty = render(base()).nativeElement as HTMLElement;
+    expect(empty.textContent).toContain('Рука пуста');
+
+    const fiveCards = Array.from({ length: 5 }, (_, index) =>
+      card({ instanceId: `card-${index}`, name: `Very long card name ${index}` }),
+    );
+    const self = player({
+      name: 'Extremely long player name that must remain contained',
+      handCount: 5,
+    });
+    const fixture = render(
+      base({
+        players: [self, player({ playerId: 'p2', name: 'Another very long player name' })],
+        self: { ...self, hand: fiveCards },
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 5/5 · открыть');
+    root.querySelector<HTMLButtonElement>('.character-summary')!.click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Классы: нет · Расы: нет');
+    expect(root.querySelectorAll('.equipment-grid .empty')).toHaveLength(10);
   });
 
   it('shows Door reveal and immediate Curse consequence from the event log', () => {
@@ -231,6 +304,49 @@ describe('GameShellComponent', () => {
     expect(root.querySelector('.score')?.textContent).toContain('НАГРАДА: +4 уровня · 10 сокровищ');
   });
 
+  it('limits a help offer to the authoritative current Treasure reward', () => {
+    const grace = player({ playerId: 'p2', name: 'Grace', combatPower: 7 });
+    const fixture = render(
+      base({
+        players: [base().self, grace],
+        combat: combat(),
+        availableIntents: [
+          {
+            id: 'help-propose:combat-1:4',
+            kind: 'PROPOSE_HELP',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            combatId: 'combat-1',
+            combatRevision: 4,
+            helperIds: ['p2'],
+            minTreasures: 0,
+            maxTreasures: 2,
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    Array.from(root.querySelectorAll<HTMLButtonElement>('app-action-dock button'))
+      .find((button) => button.textContent?.includes('Просить помощь'))!
+      .click();
+    fixture.detectChanges();
+
+    const increase = root.querySelectorAll<HTMLButtonElement>('.help-sheet .counter button')[1]!;
+    increase.click();
+    increase.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.help-sheet .counter b')?.textContent).toContain('2 / 2');
+    expect(increase.disabled).toBe(true);
+    root.querySelector<HTMLButtonElement>('.help-sheet .primary')!.click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PROPOSE_HELP',
+      helperId: 'p2',
+      treasureCount: 2,
+      combatId: 'combat-1',
+      combatRevision: 4,
+    });
+  });
+
   it('restores help agreement and reaction-required/answered states', () => {
     const grace = player({ playerId: 'p2', name: 'Grace', combatPower: 7 });
     const agreement = {
@@ -278,7 +394,7 @@ describe('GameShellComponent', () => {
     });
   });
 
-  it('shows active/helper run-away matrix and applied Bad Stuff result', () => {
+  it('keeps the monster and combat layout visible while a run-away result is resolving', () => {
     const root = render(
       base({
         combat: combat({
@@ -298,8 +414,10 @@ describe('GameShellComponent', () => {
         }),
       }),
     ).nativeElement as HTMLElement;
-    expect(root.querySelector('[data-stage="RUN_AWAY_SEQUENCE"]')?.textContent).toContain('d6 2');
-    expect(root.textContent).toContain('неудача');
+    expect(
+      root.querySelector('[data-stage="COMBAT_OPEN"] app-combat-stage .monster'),
+    ).not.toBeNull();
+    expect(root.querySelector('.monster')?.textContent).toContain('Archive Dragon');
   });
 
   it('opens a reconnect-safe blocking discard picker and confirms exact cards', () => {
@@ -397,19 +515,24 @@ describe('GameShellComponent', () => {
       card({ instanceId: `c${index}`, name: `Card ${index}` }),
     );
     const self = player({ handCount: 7 });
-    const root = render(
+    const fixture = render(
       base({
         players: [self],
         self: { ...self, hand },
         unavailableCardReasons: [{ cardId: 'c0', reason: 'WAITING_FOR_TURN' }],
       }),
-    ).nativeElement as HTMLElement;
+    );
+    const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(7);
     expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/5 · отдать 2');
     expect(root.textContent).toContain('Card 0');
+    root.querySelector<HTMLButtonElement>('.full-hand')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.full-hand-grid .with-details .description')).toBeNull();
+    expect(root.querySelector('.full-hand-grid .with-details .facts')?.textContent).toContain('+3');
   });
 
-  it('dispatches a direct zero-target card action and opens a multiple-target picker', () => {
+  it('requires card details before dispatching an equip action or opening a target picker', () => {
     const equipment = card({
       instanceId: 'eq',
       type: 'EQUIPMENT',
@@ -448,10 +571,76 @@ describe('GameShellComponent', () => {
     );
     const root = fixture.nativeElement as HTMLElement;
     root.querySelectorAll<HTMLButtonElement>('.card-action')[0]!.click();
+    fixture.detectChanges();
+    expect(client.sendGameCommand).not.toHaveBeenCalled();
+    expect(root.querySelector('#details-title')?.textContent).toContain('Useful Card');
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Надеть'))!
+      .click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'EQUIP_ITEM', cardId: 'eq' });
     root.querySelectorAll<HTMLButtonElement>('.card-action')[1]!.click();
     fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Наложить проклятие'))!
+      .click();
+    fixture.detectChanges();
     expect(root.querySelector('#target-title')?.textContent).toContain('Выберите цель');
+  });
+
+  it('offers replacement for occupied equipment slots and sends ordered unequip/equip commands', () => {
+    const twoHanded = card({
+      instanceId: 'two-handed',
+      name: 'Two-handed axe',
+      type: 'EQUIPMENT',
+      equipment: { slot: 'HANDS', hands: 2, combatBonus: 5, restrictions: [], value: 500 },
+    });
+    const left = card({
+      instanceId: 'left',
+      name: 'Left weapon',
+      type: 'EQUIPMENT',
+      equipment: { slot: 'HANDS', hands: 1, combatBonus: 1, restrictions: [], value: 100 },
+    });
+    const right = card({
+      instanceId: 'right',
+      name: 'Right weapon',
+      type: 'EQUIPMENT',
+      equipment: { slot: 'HANDS', hands: 1, combatBonus: 1, restrictions: [], value: 100 },
+    });
+    const self = player({ handCount: 1, equipment: [left, right] });
+    const fixture = render(
+      base({
+        players: [self],
+        self: { ...self, hand: [twoHanded] },
+        availableIntents: [
+          {
+            id: 'unequip:left',
+            kind: 'UNEQUIP_ITEM',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'left',
+          },
+          {
+            id: 'unequip:right',
+            kind: 'UNEQUIP_ITEM',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'right',
+          },
+        ],
+        unavailableCardReasons: [{ cardId: 'two-handed', reason: 'NOT_ENOUGH_FREE_HANDS' }],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.card-action')!.click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Переодеть · +3 силы');
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Переодеть'))!
+      .click();
+
+    expect(client.sendGameCommands).toHaveBeenCalledWith([
+      { type: 'UNEQUIP_ITEM', cardId: 'left' },
+      { type: 'UNEQUIP_ITEM', cardId: 'right' },
+      { type: 'EQUIP_ITEM', cardId: 'two-handed' },
+    ]);
   });
 
   it('maps Scavenge to the single primary action', () => {
@@ -470,13 +659,19 @@ describe('GameShellComponent', () => {
   });
 
   it('groups the full hand and sells only server-projected sellable cards', () => {
-    const saleCard = card({ instanceId: 'sell', name: 'Golden helmet', goldValue: 1000 });
+    const saleCard = card({
+      instanceId: 'sell',
+      name: 'Golden helmet',
+      type: 'EQUIPMENT',
+      goldValue: 1000,
+      equipment: { slot: 'HEAD', hands: 0, combatBonus: 1, restrictions: [], value: 1000 },
+    });
     const otherCard = card({ instanceId: 'other', name: 'Not for sale' });
-    const self = player({ handCount: 2 });
+    const self = player({ handCount: 2, equipment: [saleCard] });
     const fixture = render(
       base({
         players: [self],
-        self: { ...self, hand: [saleCard, otherCard] },
+        self: { ...self, hand: [otherCard] },
         availableIntents: [
           {
             id: 'sell:1',
@@ -489,15 +684,21 @@ describe('GameShellComponent', () => {
       }),
     );
     const root = fixture.nativeElement as HTMLElement;
-    root.querySelector<HTMLButtonElement>('[aria-label="Открыть меню"]')!.click();
-    fixture.detectChanges();
-    Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
+    Array.from(root.querySelectorAll<HTMLButtonElement>('app-action-dock .utility'))
       .find((button) => button.textContent?.includes('Продать карты'))!
       .click();
     fixture.detectChanges();
     expect(root.textContent).toContain('0 / 1000');
     expect(root.querySelector('.sale-sheet')?.textContent).not.toContain('Not for sale');
-    Array.from(root.querySelectorAll<HTMLButtonElement>('.sale-sheet button'))[0]!.click();
+    expect(root.querySelector('.sale-card app-card-artwork')).not.toBeNull();
+    expect(root.querySelector('.sale-card.equipped .sale-card-badge')?.textContent).toContain(
+      'Надето',
+    );
+    root.querySelector<HTMLButtonElement>('.sale-card-artwork')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.card-details-backdrop')?.textContent).toContain('Golden helmet');
+    root.querySelector<HTMLButtonElement>('[aria-label="Закрыть описание карты"]')!.click();
+    root.querySelector<HTMLButtonElement>('.sale-card-select')!.click();
     fixture.detectChanges();
     Array.from(root.querySelectorAll<HTMLButtonElement>('.sale-sheet + footer button'))[0]!.click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'SELL_ITEMS', cardIds: ['sell'] });
@@ -511,11 +712,14 @@ describe('GameShellComponent', () => {
       equipment: { slot: 'HEAD', hands: 0, combatBonus: 2, restrictions: [], value: 300 },
     });
     const role = card({ instanceId: 'role', name: 'Scholar', type: 'CLASS' });
+    const race = card({ instanceId: 'race', name: 'Lantern Folk', type: 'RACE' });
     const hireling = card({ instanceId: 'hireling', name: 'Intern', type: 'HIRELING' });
     const self = player({
       handCount: 1,
       equipment: [helmet],
       classCards: [role],
+      classCard: role,
+      raceCard: race,
       hirelingCard: hireling,
     });
     const fixture = render(
@@ -529,6 +733,18 @@ describe('GameShellComponent', () => {
             reasonCode: 'OPTIONAL_CARD_PLAY',
             cardId: 'helmet',
           },
+          {
+            id: 'discard-role:race',
+            kind: 'DISCARD_ROLE',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'race',
+          },
+          {
+            id: 'discard-role:role',
+            kind: 'DISCARD_ROLE',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'role',
+          },
         ],
       }),
     );
@@ -537,8 +753,121 @@ describe('GameShellComponent', () => {
     fixture.detectChanges();
     expect(root.textContent).toContain('Scholar');
     expect(root.textContent).toContain('Intern');
-    Array.from(root.querySelectorAll<HTMLButtonElement>('.character-actions button'))[0]!.click();
+    expect(root.querySelector('.character-actions')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.equipment-grid .head button')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('#details-title')?.textContent).toContain('Helmet');
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Снять'))!
+      .click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'UNEQUIP_ITEM', cardId: 'helmet' });
+    root.querySelector<HTMLButtonElement>('.equipment-grid .race button')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Сбросить расу'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'DISCARD_ROLE', cardId: 'race' });
+    root.querySelector<HTMLButtonElement>('.equipment-grid .class button')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Сбросить класс'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'DISCARD_ROLE', cardId: 'role' });
+  });
+
+  it('makes optional-set cards actionable and displays their public slots', () => {
+    const weapon = card({
+      instanceId: 'weapon',
+      name: 'Rapier',
+      type: 'EQUIPMENT',
+      equipment: { slot: 'HANDS', hands: 1, combatBonus: 2, restrictions: [], value: 300 },
+    });
+    const companion = card({ instanceId: 'companion', name: 'Scout', type: 'HIRELING' });
+    const permission = card({
+      instanceId: 'permission',
+      name: 'Double Major',
+      type: 'ROLE_PERMISSION',
+    });
+    const attachment = card({ instanceId: 'attachment', name: 'Pommel', type: 'ATTACHMENT' });
+    const mount = card({ instanceId: 'mount', name: 'Pony', type: 'MOUNT' });
+    const activePermission = card({
+      instanceId: 'active-permission',
+      name: 'Mixed Heritage',
+      type: 'ROLE_PERMISSION',
+    });
+    const self = player({
+      handCount: 3,
+      equipment: [weapon],
+      hirelingCard: companion,
+      mountCard: mount,
+      rolePermissionCards: [activePermission],
+    });
+    const fixture = render(
+      base({
+        players: [self],
+        self: { ...self, hand: [companion, permission, attachment] },
+        availableIntents: [
+          {
+            id: 'companion:companion',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'companion',
+            target: { type: 'SELF' },
+          },
+          {
+            id: 'permission:permission',
+            kind: 'PLAY_ROLE_PERMISSION',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'permission',
+          },
+          {
+            id: 'attachment:attachment:weapon',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'attachment',
+            target: { type: 'EQUIPMENT', cardId: 'weapon' },
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.player')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.equipment-grid .hireling')?.textContent).toContain('Scout');
+    expect(root.querySelector('.equipment-grid .mount')?.textContent).toContain('Pony');
+    expect(root.querySelector('.equipment-grid .permissions')?.textContent).toContain(
+      'Mixed Heritage',
+    );
+    root.querySelector<HTMLButtonElement>('[aria-label="Закрыть персонажа"]')!.click();
+    root.querySelectorAll<HTMLButtonElement>('.card-action')[0]!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Призвать спутника'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PLAY_CARD',
+      cardId: 'companion',
+      target: { type: 'SELF' },
+    });
+    root.querySelectorAll<HTMLButtonElement>('.card-action')[1]!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Разрешить вторую роль'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PLAY_ROLE_PERMISSION',
+      cardId: 'permission',
+    });
+    root.querySelectorAll<HTMLButtonElement>('.card-action')[2]!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Улучшить снаряжение'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PLAY_CARD',
+      cardId: 'attachment',
+      target: { type: 'EQUIPMENT', cardId: 'weapon' },
+    });
   });
 
   it('filters authoritative history and completes the exact charity selection', () => {
@@ -582,7 +911,19 @@ describe('GameShellComponent', () => {
               requiresViewerAction: false,
             },
           ],
-          routine: [],
+          routine: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'TURN_START',
+              type: 'TURN_STARTED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              priority: 'ROUTINE',
+              summaryCode: 'TURN_STARTED',
+              requiresViewerAction: false,
+            },
+          ],
         },
         availableIntents: [
           {
@@ -600,19 +941,25 @@ describe('GameShellComponent', () => {
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('[aria-label="Открыть историю игры"]')!.click();
     fixture.detectChanges();
+    expect(root.querySelector<HTMLButtonElement>('.history-turn button')?.textContent).toContain(
+      'вступил в бой',
+    );
     Array.from(root.querySelectorAll<HTMLButtonElement>('.history-filters button'))
       .find((button) => button.textContent?.trim() === 'Бой')!
       .click();
     fixture.detectChanges();
     expect(root.textContent).toContain('вступил в бой');
     root.querySelector<HTMLButtonElement>('[aria-label="Закрыть историю"]')!.click();
-    root.querySelector<HTMLButtonElement>('[aria-label="Открыть меню"]')!.click();
-    fixture.detectChanges();
-    Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
+    Array.from(root.querySelectorAll<HTMLButtonElement>('app-action-dock .utility'))
       .find((button) => button.textContent?.includes('Раздать милостыню'))!
       .click();
     fixture.detectChanges();
-    root.querySelector<HTMLButtonElement>('.sale-sheet button')!.click();
+    expect(root.querySelector('.charity-card app-card-artwork')).not.toBeNull();
+    root.querySelector<HTMLButtonElement>('.charity-card .sale-card-artwork')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.card-details-backdrop')?.textContent).toContain('A');
+    root.querySelector<HTMLButtonElement>('[aria-label="Закрыть описание карты"]')!.click();
+    root.querySelector<HTMLButtonElement>('.charity-card .sale-card-select')!.click();
     fixture.detectChanges();
     Array.from(root.querySelectorAll<HTMLButtonElement>('.sale-sheet + footer button'))[0]!.click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({

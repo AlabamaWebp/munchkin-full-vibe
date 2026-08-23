@@ -16,7 +16,7 @@ import type {
   GameClientCommand,
   GameView,
 } from '@munchkin-lan/contracts';
-import { ActionDockComponent } from './action-dock.component';
+import { ActionDockComponent, type ActionDockUtilityAction } from './action-dock.component';
 import { AutoFocusDirective } from './auto-focus.directive';
 import { CardArtworkComponent } from './card-artwork.component';
 import { CompactGameCardComponent } from './compact-game-card.component';
@@ -39,7 +39,7 @@ interface PickerOption {
 interface TargetPickerState {
   readonly title: string;
   readonly card: GameCardView;
-  readonly kind: 'CURSE' | 'COMBAT_CURSE' | 'MONSTER' | 'HAND_MONSTER' | 'TRADE';
+  readonly kind: 'CURSE' | 'COMBAT_CURSE' | 'MONSTER' | 'HAND_MONSTER' | 'EQUIPMENT' | 'TRADE';
   readonly options: readonly PickerOption[];
 }
 
@@ -87,8 +87,11 @@ interface CardUse {
       <app-action-dock
         [actions]="primaryActions()"
         [hasPlayableCombatCards]="hasPlayableCombatCards()"
+        [utilityActions]="utilityActions()"
+        [isOwnTurn]="game().activePlayerId === game().viewerPlayerId"
         (actionSelected)="sendAction($event)"
         (playCardOpened)="openCombatHand()"
+        (utilityActionSelected)="openUtilityAction($event)"
       />
       <button
         type="button"
@@ -112,8 +115,8 @@ interface CardUse {
       <app-hand-dock
         [game]="game()"
         [playableIds]="playableIds()"
+        [cardName]="displayCardName"
         (cardActivated)="activateCard($event)"
-        (cardDetails)="selectedCard.set($event)"
         (fullHandOpened)="openFullHand()"
       />
       @if (error(); as commandError) {
@@ -255,10 +258,12 @@ interface CardUse {
                 @for (card of filteredHand(); track card.instanceId) {
                   <app-compact-game-card
                     [card]="card"
+                    [cardName]="displayCardName"
                     [playable]="playableIds().includes(card.instanceId)"
                     [reason]="cardReason(card)"
+                    [showDetails]="true"
+                    [details]="compactHandFacts(card)"
                     (activated)="activateCard($event)"
-                    (detailsOpened)="selectedCard.set($event)"
                   />
                 } @empty {
                   <p>В этой группе нет карт.</p>
@@ -376,8 +381,12 @@ interface CardUse {
                   </button>
                   <div class="counter">
                     <button type="button" (click)="decreaseHelpTreasure()">−</button
-                    ><b>{{ helpTreasure() }}</b
-                    ><button type="button" (click)="helpTreasure.update((value) => value + 1)">
+                    ><b>{{ helpTreasure() }} / {{ helpTreasureLimits().max }}</b
+                    ><button
+                      type="button"
+                      [disabled]="helpTreasure() >= helpTreasureLimits().max"
+                      (click)="increaseHelpTreasure()"
+                    >
                       +</button
                     ><button type="button" (click)="counterHelp()">Ответить</button>
                   </div>
@@ -400,8 +409,12 @@ interface CardUse {
                 <div class="counter">
                   <span>Сокровищ</span
                   ><button type="button" (click)="decreaseHelpTreasure()">−</button
-                  ><b>{{ helpTreasure() }}</b
-                  ><button type="button" (click)="helpTreasure.update((value) => value + 1)">
+                  ><b>{{ helpTreasure() }} / {{ helpTreasureLimits().max }}</b
+                  ><button
+                    type="button"
+                    [disabled]="helpTreasure() >= helpTreasureLimits().max"
+                    (click)="increaseHelpTreasure()"
+                  >
                     +
                   </button>
                 </div>
@@ -449,6 +462,20 @@ interface CardUse {
                 <span>{{ fact }}</span>
               }
             </div>
+            @if (cardActions(card).length > 0 || replacementCardIds(card).length > 0) {
+              <footer class="card-detail-actions" aria-label="Действия с картой">
+                @for (use of cardActions(card); track use.label) {
+                  <button type="button" class="primary" (click)="chooseCardDetailUse(use)">
+                    {{ use.label }}
+                  </button>
+                }
+                @if (replacementCardIds(card).length > 0) {
+                  <button type="button" class="primary" (click)="replaceEquipment(card)">
+                    Переодеть · {{ signed(replacementPowerDelta(card)) }} силы
+                  </button>
+                }
+              </footer>
+            }
           </section>
         </div>
       }
@@ -549,9 +576,15 @@ interface CardUse {
                     />
                     <div class="breakdown-monster-details">
                       <strong>{{ monster.monster.name }}</strong>
-                      <span>Сила <b>{{ monster.currentStrength }}</b></span>
-                      <span>Уровни <b>{{ monster.baseLevelRewards }}</b></span>
-                      <span>Сокровища <b>{{ monster.currentTreasures }}</b></span>
+                      <span
+                        >Сила <b>{{ monster.currentStrength }}</b></span
+                      >
+                      <span
+                        >Уровни <b>{{ monster.baseLevelRewards }}</b></span
+                      >
+                      <span
+                        >Сокровища <b>{{ monster.currentTreasures }}</b></span
+                      >
                       @for (played of monster.playedCards; track played.card.instanceId) {
                         <button
                           type="button"
@@ -623,20 +656,6 @@ interface CardUse {
                   [cardName]="displayCardName"
                   (cardOpened)="selectedCard.set($event)"
                 />
-                @if (id === game().viewerPlayerId && unequipIds().length > 0) {
-                  <div class="character-actions">
-                    @for (card of value.equipment; track card.instanceId) {
-                      @if (unequipIds().includes(card.instanceId)) {
-                        <button
-                          type="button"
-                          (click)="send({ type: 'UNEQUIP_ITEM', cardId: card.instanceId })"
-                        >
-                          Снять {{ cardName(card) }}
-                        </button>
-                      }
-                    }
-                  </div>
-                }
               </div>
             }
           </section>
@@ -664,16 +683,6 @@ interface CardUse {
               </button>
             </header>
             <div class="sheet-scroll option-list">
-              @if (saleCards().length > 0 && game().self.level < 9) {
-                <button type="button" (click)="saleOpen.set(true); menuOpen.set(false)">
-                  Продать карты
-                </button>
-              }
-              @if (charityIntent(); as charity) {
-                <button type="button" (click)="charityOpen.set(true); menuOpen.set(false)">
-                  Раздать милостыню · {{ charity.count }}
-                </button>
-              }
               <button type="button" (click)="toggleLocale()">
                 Язык: {{ locale() === 'ru' ? 'Русский' : 'English' }}
               </button>
@@ -718,14 +727,38 @@ interface CardUse {
                 <p class="warning-copy">Продажа не может дать 10-й победный уровень.</p>
               }
               @for (card of saleCards(); track card.instanceId) {
-                <button
-                  type="button"
+                <article
+                  class="sale-card"
                   [class.selected]="saleSelection().includes(card.instanceId)"
-                  (click)="toggleSale(card.instanceId)"
+                  [class.equipped]="isEquipped(card)"
                 >
-                  <span>{{ cardName(card) }}</span
-                  ><b>{{ card.goldValue ?? card.equipment?.value ?? 0 }}</b>
-                </button>
+                  <div class="sale-card-main">
+                    <button
+                      type="button"
+                      class="sale-card-artwork"
+                      [attr.aria-label]="'Подробнее: ' + cardName(card)"
+                      (click)="openSaleCard($event, card)"
+                    >
+                      <app-card-artwork
+                        [artKey]="card.artKey"
+                        [label]="cardName(card)"
+                        [compact]="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="sale-card-select"
+                      [attr.aria-pressed]="saleSelection().includes(card.instanceId)"
+                      (click)="toggleSale(card.instanceId)"
+                    >
+                      <span>{{ cardName(card) }}</span>
+                      @if (isEquipped(card)) {
+                        <small class="sale-card-badge">Надето</small>
+                      }
+                      <b>{{ card.goldValue ?? card.equipment?.value ?? 0 }}</b>
+                    </button>
+                  </div>
+                </article>
               }
             </div>
             <footer>
@@ -768,13 +801,33 @@ interface CardUse {
             <div class="sheet-scroll sale-sheet">
               <p>{{ charityRecipientCopy() }}</p>
               @for (card of game().self.hand; track card.instanceId) {
-                <button
-                  type="button"
+                <article
+                  class="sale-card charity-card"
                   [class.selected]="charitySelection().includes(card.instanceId)"
-                  (click)="toggleCharity(card.instanceId)"
                 >
-                  {{ cardName(card) }}
-                </button>
+                  <div class="sale-card-main">
+                    <button
+                      type="button"
+                      class="sale-card-artwork"
+                      [attr.aria-label]="'Подробнее: ' + cardName(card)"
+                      (click)="openSaleCard($event, card)"
+                    >
+                      <app-card-artwork
+                        [artKey]="card.artKey"
+                        [label]="cardName(card)"
+                        [compact]="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="sale-card-select"
+                      [attr.aria-pressed]="charitySelection().includes(card.instanceId)"
+                      (click)="toggleCharity(card.instanceId)"
+                    >
+                      <span>{{ cardName(card) }}</span>
+                    </button>
+                  </div>
+                </article>
               }
               @if ((charityIntent()?.recipientIds?.length ?? 0) > 1) {
                 <label
@@ -886,15 +939,33 @@ export class GameShellComponent {
       (intent) => intent.kind === 'PLAY_CARD' && 'combatId' in intent,
     ),
   );
+  protected readonly utilityActions = computed<readonly ActionDockUtilityAction[]>(() => [
+    ...(this.saleCards().length > 0 && this.game().self.level < 9
+      ? [{ id: 'SELL_CARDS' as const, label: 'Продать карты', hint: 'Получить уровни' }]
+      : []),
+    ...(this.charityIntent() === undefined
+      ? []
+      : [
+          {
+            id: 'GIVE_CHARITY' as const,
+            label: 'Раздать милостыню',
+            hint: `Отдать ${this.charityIntent()!.count} карт`,
+          },
+        ]),
+  ]);
   protected readonly helperIds = computed(() => {
     const intent = this.intent('PROPOSE_HELP');
     return intent?.kind === 'PROPOSE_HELP' ? intent.helperIds : [];
   });
-  protected readonly unequipIds = computed(() =>
-    this.game().availableIntents.flatMap((intent) =>
-      intent.kind === 'UNEQUIP_ITEM' ? [intent.cardId] : [],
-    ),
-  );
+  protected readonly helpTreasureLimits = computed(() => {
+    const proposal = this.intent('PROPOSE_HELP');
+    if (proposal?.kind === 'PROPOSE_HELP')
+      return { min: proposal.minTreasures, max: proposal.maxTreasures };
+    const counter = this.intent('COUNTER_HELP');
+    if (counter?.kind === 'COUNTER_HELP')
+      return { min: counter.minTreasures ?? 0, max: counter.maxTreasures ?? 0 };
+    return { min: 0, max: 0 };
+  });
   protected readonly charityIntent = computed(() =>
     this.game().availableIntents.find(
       (intent): intent is Extract<AvailableIntentView, { kind: 'GIVE_CHARITY' }> =>
@@ -950,10 +1021,12 @@ export class GameShellComponent {
     const grouped = new Map<number, typeof events>();
     for (const event of events)
       grouped.set(event.entry.turnNumber, [...(grouped.get(event.entry.turnNumber) ?? []), event]);
-    return [...grouped.entries()].map(([turnNumber, turnEvents]) => ({
-      turnNumber,
-      events: turnEvents,
-    }));
+    return [...grouped.entries()]
+      .sort(([leftTurn], [rightTurn]) => rightTurn - leftTurn)
+      .map(([turnNumber, turnEvents]) => ({
+        turnNumber,
+        events: [...turnEvents].reverse(),
+      }));
   });
   protected readonly handFilters = [
     { id: 'ALL', label: 'Все' },
@@ -979,6 +1052,9 @@ export class GameShellComponent {
     rightHand: 'Правая рука',
     class: 'Класс',
     race: 'Раса',
+    hireling: 'Спутник',
+    mount: 'Маунт',
+    permissions: 'Разрешения',
     empty: 'Свободно',
     twoHanded: 'две руки',
   };
@@ -1041,16 +1117,62 @@ export class GameShellComponent {
       this.send(command);
     }
   }
+  protected openUtilityAction(action: ActionDockUtilityAction['id']): void {
+    if (action === 'SELL_CARDS') this.saleOpen.set(true);
+    else this.charityOpen.set(true);
+  }
 
   protected activateCard(card: GameCardView): void {
-    if (!this.playableIds().includes(card.instanceId)) {
-      this.selectedCard.set(card);
-      return;
-    }
-    const uses = this.cardActions(card);
-    if (uses.length === 1) this.chooseUse(uses[0]!);
-    else if (uses.length > 1) this.cardUses.set(uses);
-    else this.selectedCard.set(card);
+    this.selectedCard.set(card);
+  }
+
+  protected chooseCardDetailUse(use: CardUse): void {
+    this.selectedCard.set(null);
+    this.chooseUse(use);
+  }
+
+  protected replacementCardIds(card: GameCardView): readonly string[] {
+    if (
+      card.type !== 'EQUIPMENT' ||
+      card.equipment === undefined ||
+      !this.hasEquipmentConflict(card.instanceId)
+    )
+      return [];
+
+    const equipped = this.game().self.equipment;
+    const conflicts =
+      card.equipment.slot === 'HANDS'
+        ? this.handEquipmentToReplace(card, equipped)
+        : equipped.filter((item) => item.equipment?.slot === card.equipment!.slot);
+    const unequipIds = new Set<string>();
+    for (const intent of this.game().availableIntents)
+      if (intent.kind === 'UNEQUIP_ITEM' && 'cardId' in intent) unequipIds.add(intent.cardId);
+    return conflicts.length > 0 && conflicts.every((item) => unequipIds.has(item.instanceId))
+      ? conflicts.map((item) => item.instanceId)
+      : [];
+  }
+
+  protected replaceEquipment(card: GameCardView): void {
+    const cardIds = this.replacementCardIds(card);
+    if (cardIds.length === 0) return;
+    this.selectedCard.set(null);
+    this.lobbyClient.sendGameCommands([
+      ...cardIds.map((cardId) => ({ type: 'UNEQUIP_ITEM' as const, cardId })),
+      { type: 'EQUIP_ITEM', cardId: card.instanceId },
+    ]);
+  }
+
+  protected replacementPowerDelta(card: GameCardView): number {
+    return (
+      (card.equipment?.combatBonus ?? 0) -
+      this.replacementCardIds(card).reduce(
+        (total, cardId) =>
+          total +
+          (this.game().self.equipment.find((item) => item.instanceId === cardId)?.equipment
+            ?.combatBonus ?? 0),
+        0,
+      )
+    );
   }
 
   protected chooseUse(use: CardUse): void {
@@ -1097,7 +1219,13 @@ export class GameShellComponent {
           combatId: this.game().combat?.combatId,
           combatRevision: this.game().combat?.revision,
         });
-    } else if (picker.kind === 'TRADE')
+    } else if (picker.kind === 'EQUIPMENT')
+      this.send({
+        type: 'PLAY_CARD',
+        cardId: picker.card.instanceId,
+        target: { type: 'EQUIPMENT', cardId: id },
+      });
+    else if (picker.kind === 'TRADE')
       this.send({ type: 'TRADE_ITEM', cardId: picker.card.instanceId, recipientId: id });
   }
 
@@ -1105,7 +1233,9 @@ export class GameShellComponent {
     this.selectedHelperId.set(
       this.helperIds()[0] ?? this.game().combat?.helpOffer?.helperId ?? null,
     );
-    this.helpTreasure.set(this.game().combat?.helpOffer?.treasureCount ?? 0);
+    this.helpTreasure.set(
+      this.clampHelpTreasure(this.game().combat?.helpOffer?.treasureCount ?? 0),
+    );
     this.helpOpen.set(true);
   }
   protected openCombatHand(): void {
@@ -1123,7 +1253,7 @@ export class GameShellComponent {
       this.send({
         type: 'PROPOSE_HELP',
         helperId: id,
-        treasureCount: this.helpTreasure(),
+        treasureCount: this.clampHelpTreasure(this.helpTreasure()),
         combatId: combat.combatId,
         combatRevision: combat.revision,
       });
@@ -1137,7 +1267,7 @@ export class GameShellComponent {
       this.send({
         type: 'COUNTER_HELP',
         offerId: offer.offerId,
-        treasureCount: this.helpTreasure(),
+        treasureCount: this.clampHelpTreasure(this.helpTreasure()),
         combatId: combat.combatId,
         combatRevision: combat.revision,
       });
@@ -1145,7 +1275,14 @@ export class GameShellComponent {
     }
   }
   protected decreaseHelpTreasure(): void {
-    this.helpTreasure.update((value) => Math.max(0, value - 1));
+    this.helpTreasure.update((value) => this.clampHelpTreasure(value - 1));
+  }
+  protected increaseHelpTreasure(): void {
+    this.helpTreasure.update((value) => this.clampHelpTreasure(value + 1));
+  }
+  private clampHelpTreasure(value: number): number {
+    const { min, max } = this.helpTreasureLimits();
+    return Math.max(min, Math.min(max, value));
   }
   protected activeCombatPower(): number {
     return (
@@ -1272,6 +1409,13 @@ export class GameShellComponent {
     this.saleSelection.update((ids) =>
       ids.includes(cardId) ? ids.filter((id) => id !== cardId) : [...ids, cardId],
     );
+  }
+  protected isEquipped(card: GameCardView): boolean {
+    return this.game().self.equipment.some((equipped) => equipped.instanceId === card.instanceId);
+  }
+  protected openSaleCard(event: Event, card: GameCardView): void {
+    event.stopPropagation();
+    this.selectedCard.set(card);
   }
   protected confirmSale(): void {
     if (this.saleTotal() < 1000 || this.saleLevels() === 0) return;
@@ -1433,6 +1577,31 @@ export class GameShellComponent {
         `Ограничения: ${card.equipment.restrictions.map((restriction) => `${restriction.type === 'CLASS' ? 'класс' : 'раса'} ${this.localization.definitionName(restriction.definitionId)}`).join(', ')}`,
       );
     return facts;
+  }
+  protected compactHandFacts(card: GameCardView): readonly string[] {
+    const bonusEffect = card.effects.find((effect) => effect.type === 'COMBAT_BONUS');
+    const bonus =
+      card.equipment?.combatBonus ??
+      (bonusEffect?.type === 'COMBAT_BONUS' ? bonusEffect.amount : undefined);
+    const price = card.goldValue ?? card.equipment?.value;
+    return [
+      this.compactCardType(card),
+      bonus === undefined ? '—' : `+${bonus}`,
+      price === undefined ? '—' : `${price}`,
+    ];
+  }
+  private compactCardType(card: GameCardView): string {
+    const labels: Partial<Record<GameCardView['type'], string>> = {
+      EQUIPMENT: 'Снар.',
+      TEMPORARY_BONUS: 'Бонус',
+      MONSTER: 'Монстр',
+      CURSE: 'Прокл.',
+      COMBAT_CURSE: 'Бой. прокл.',
+      CLASS: 'Класс',
+      RACE: 'Раса',
+      ROLE_PERMISSION: 'Роль',
+    };
+    return labels[card.type] ?? 'Карта';
   }
   private slotLabel(slot: NonNullable<GameCardView['equipment']>['slot']): string {
     return ({ HEAD: 'голова', BODY: 'тело', FEET: 'ноги', HANDS: 'руки' } as const)[slot];
@@ -1634,7 +1803,29 @@ export class GameShellComponent {
       ),
     ];
   }
-  private cardActions(card: GameCardView): readonly CardUse[] {
+  private hasEquipmentConflict(cardId: string): boolean {
+    return this.game().unavailableCardReasons.some(
+      (entry) =>
+        entry.cardId === cardId &&
+        (entry.reason === 'SLOT_OCCUPIED' || entry.reason === 'NOT_ENOUGH_FREE_HANDS'),
+    );
+  }
+  private handEquipmentToReplace(
+    candidate: GameCardView,
+    equipped: readonly GameCardView[],
+  ): readonly GameCardView[] {
+    const requiredHands = candidate.equipment?.hands ?? 1;
+    const handItems = equipped.filter((item) => item.equipment?.slot === 'HANDS');
+    let usedHands = handItems.reduce((total, item) => total + (item.equipment?.hands ?? 1), 0);
+    const conflicts: GameCardView[] = [];
+    for (const item of handItems) {
+      if (usedHands + requiredHands <= 2) break;
+      conflicts.push(item);
+      usedHands -= item.equipment?.hands ?? 1;
+    }
+    return conflicts;
+  }
+  protected cardActions(card: GameCardView): readonly CardUse[] {
     const game = this.game(),
       uses: CardUse[] = [];
     const intents = game.availableIntents.filter(
@@ -1642,7 +1833,21 @@ export class GameShellComponent {
     );
     const lookIntent = intents.find((intent) => intent.kind === 'LOOK_FOR_TROUBLE');
     const equipIntent = intents.find((intent) => intent.kind === 'EQUIP_ITEM');
+    const unequipIntent = intents.find((intent) => intent.kind === 'UNEQUIP_ITEM');
     const roleIntent = intents.find((intent) => intent.kind === 'PLAY_ROLE');
+    const discardRoleIntent = intents.find((intent) => intent.kind === 'DISCARD_ROLE');
+    const rolePermissionIntent = intents.find((intent) => intent.kind === 'PLAY_ROLE_PERMISSION');
+    const discardRolePermissionIntent = intents.find(
+      (intent) => intent.kind === 'DISCARD_ROLE_PERMISSION',
+    );
+    const selfIntent = intents.find(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'SELF',
+    );
+    const equipmentIntents = intents.filter(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'EQUIPMENT',
+    );
     const curseIntents = intents.filter(
       (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
         intent.kind === 'PLAY_CARD' && intent.target.type === 'PLAYER' && !('combatId' in intent),
@@ -1670,6 +1875,13 @@ export class GameShellComponent {
       });
     if (equipIntent)
       uses.push({ label: 'Надеть', command: { type: 'EQUIP_ITEM', cardId: card.instanceId } });
+    if (unequipIntent)
+      uses.push({ label: 'Снять', command: { type: 'UNEQUIP_ITEM', cardId: card.instanceId } });
+    if (discardRoleIntent)
+      uses.push({
+        label: card.type === 'CLASS' ? 'Сбросить класс' : 'Сбросить расу',
+        command: { type: 'DISCARD_ROLE', cardId: card.instanceId },
+      });
     if (roleIntent?.kind === 'PLAY_ROLE')
       uses.push({
         label: 'Сыграть роль',
@@ -1681,6 +1893,40 @@ export class GameShellComponent {
             : { replaceCardId: roleIntent.replaceCardId }),
         },
       });
+    if (rolePermissionIntent)
+      uses.push({
+        label: 'Разрешить вторую роль',
+        command: { type: 'PLAY_ROLE_PERMISSION', cardId: card.instanceId },
+      });
+    if (discardRolePermissionIntent)
+      uses.push({
+        label: 'Сбросить разрешение роли',
+        command: { type: 'DISCARD_ROLE_PERMISSION', cardId: card.instanceId },
+      });
+    if (selfIntent)
+      uses.push({
+        label:
+          card.type === 'HIRELING' || card.type === 'MOUNT' ? 'Призвать спутника' : 'Сыграть карту',
+        command: { type: 'PLAY_CARD', cardId: card.instanceId, target: { type: 'SELF' } },
+      });
+    if (equipmentIntents.length > 0)
+      uses.push(
+        this.useWithTargets(
+          'Улучшить снаряжение',
+          'Выберите снаряжение',
+          card,
+          'EQUIPMENT',
+          equipmentIntents.map((intent) => {
+            const targetId = intent.target.type === 'EQUIPMENT' ? intent.target.cardId : '';
+            const target = game.self.equipment.find((item) => item.instanceId === targetId);
+            return {
+              id: targetId,
+              label: target?.name ?? 'Снаряжение',
+              facts: target === undefined ? '' : this.cardFacts(target).join(' · '),
+            };
+          }),
+        ),
+      );
     if (curseIntents.length > 0) {
       const options = curseIntents.map((intent) => ({
         id: intent.target.type === 'PLAYER' ? intent.target.playerId : '',
@@ -1819,6 +2065,15 @@ export class GameShellComponent {
             combatRevision: this.game().combat?.revision,
           },
         };
+      if (kind === 'EQUIPMENT')
+        return {
+          label,
+          command: {
+            type: 'PLAY_CARD',
+            cardId: card.instanceId,
+            target: { type: 'EQUIPMENT', cardId: option.id },
+          },
+        };
     }
     return { label, picker: { title, card, kind, options } };
   }
@@ -1827,10 +2082,6 @@ export class GameShellComponent {
     cards: readonly GameCardView[],
     kind: TargetPickerState['kind'],
   ): void {
-    if (cards.length === 1) {
-      this.send({ type: 'LOOK_FOR_TROUBLE', cardId: cards[0]!.instanceId });
-      return;
-    }
     this.targetPicker.set({
       title,
       card:

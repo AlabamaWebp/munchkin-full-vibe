@@ -77,7 +77,7 @@ import type { ConnectionState } from './lobby-client';
       flex: 1;
       border: 1px solid #a77a35;
       border-radius: 0.75rem 0.75rem 1.1rem 1.1rem;
-      background: linear-gradient(100deg, rgba(28, 78, 39, 0.97), rgba(10, 43, 23, 0.97));
+      background: linear-gradient(100deg, rgba(91, 57, 27, 0.97), rgba(42, 25, 14, 0.97));
       box-shadow:
         inset 0 1px rgba(255, 223, 135, 0.22),
         0 0.25rem 0.65rem rgba(0, 0, 0, 0.45);
@@ -154,7 +154,7 @@ import type { ConnectionState } from './lobby-client';
         0 0.15rem 0.5rem rgba(0, 0, 0, 0.4);
     }
     .player.self {
-      background: linear-gradient(105deg, #273924, #172318);
+      background: linear-gradient(105deg, #51351f, #25170e);
     }
     .player.dead {
       opacity: 0.65;
@@ -166,7 +166,7 @@ import type { ConnectionState } from './lobby-client';
       grid-row: 1 / -1;
       place-items: center;
       border-radius: 50%;
-      color: #142019;
+      color: #2b1b0d;
       background: radial-gradient(circle at 35% 30%, #e0b660, #66411d 60%, #21140c);
       font-size: 1rem;
       font-weight: 900;

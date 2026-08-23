@@ -1,4 +1,4 @@
-import { Component, HostListener, effect, inject, isDevMode, signal } from '@angular/core';
+import { Component, HostListener, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   APPLICATION_NAME,
@@ -7,13 +7,12 @@ import {
   type PlayerSex,
 } from '@munchkin-lan/contracts';
 import { GameShellComponent } from './game-shell.component';
-import { DevCombatComponent } from './dev-combat.component';
 import { LobbyClient } from './lobby-client';
 import { LocalizationService, type AppLocale } from './localization';
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule, GameShellComponent, DevCombatComponent],
+  imports: [FormsModule, GameShellComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -38,13 +37,12 @@ export class App {
   protected readonly isHost = this.lobbyClient.isHost;
   protected readonly hasStarted = this.lobbyClient.hasStarted;
   protected readonly optionalSets = ['COMPANIONS', 'ARSENAL', 'DUAL_IDENTITY'] as const;
-  protected readonly isDevCombatRoute = isDevMode() && window.location.pathname === '/dev/ui/combat';
 
   constructor() {
     effect((onCleanup) => {
       document.documentElement.classList.toggle(
         'game-active',
-        this.game() !== null || this.isDevCombatRoute,
+        this.game() !== null,
       );
       onCleanup(() => document.documentElement.classList.remove('game-active'));
     });

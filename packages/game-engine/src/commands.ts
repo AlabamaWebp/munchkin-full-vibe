@@ -74,6 +74,10 @@ export type GameCommand =
       readonly replaceCardId?: CardInstanceId;
     })
   | (PlayerCommand & {
+      readonly type: "DISCARD_ROLE";
+      readonly cardId: CardInstanceId;
+    })
+  | (PlayerCommand & {
       readonly type: "PLAY_ROLE_PERMISSION";
       readonly cardId: CardInstanceId;
     })

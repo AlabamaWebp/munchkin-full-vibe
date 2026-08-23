@@ -121,9 +121,9 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-width: 0;
     }
     .game-card.playable {
-      border-color: #8bd49e;
+      border-color: #e2b965;
       box-shadow:
-        inset 0 0.25rem 0 #8bd49e,
+        inset 0 0.25rem 0 #e2b965,
         0 0 0 2px rgba(139, 212, 158, 0.18);
     }
     .game-card.unavailable {
@@ -181,7 +181,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       position: absolute;
       right: 0.55rem;
       bottom: 0.45rem;
-      color: #8bd49e;
+      color: #e2b965;
       font-style: normal;
       font-weight: 900;
     }

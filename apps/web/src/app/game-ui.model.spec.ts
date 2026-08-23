@@ -100,7 +100,7 @@ describe('game UI state mapper', () => {
       ),
     ).toBe('COMBAT_OPEN');
   });
-  it('prioritizes reaction, run away, pending decision and finished states', () => {
+  it('keeps active combat visible during reactions, escape resolution, and blocking decisions', () => {
     expect(
       selectStage(
         view({
@@ -126,7 +126,24 @@ describe('game UI state mapper', () => {
           },
         }),
       ),
-    ).toBe('RUN_AWAY_SEQUENCE');
+    ).toBe('COMBAT_OPEN');
+    expect(
+      selectStage(
+        view({
+          combat,
+          pendingDecision: {
+            decisionId: 'decision-1',
+            type: 'DISCARD_CARDS',
+            playerId: 'p1',
+            zone: 'HAND',
+            count: 1,
+            sourceCard: monster,
+            selectableCardIds: [],
+            expiresAtEpochMs: 10_000,
+          },
+        }),
+      ),
+    ).toBe('COMBAT_OPEN');
     expect(
       selectStage(
         view({
@@ -180,6 +197,49 @@ describe('game UI state mapper', () => {
     const events = presentEvents(game);
     expect(events[0]?.summary).toContain('Clockwork Yak');
     expect(events[0]?.priority).toBe('IMPORTANT');
+  });
+  it('presents class and race changes in the game history', () => {
+    const events = presentEvents(
+      view({
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'TURN_START',
+              type: 'ROLE_PLAYED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              card: monster,
+              role: 'CLASS',
+              priority: 'IMPORTANT',
+              summaryCode: 'ROLE_PLAYED',
+              requiresViewerAction: false,
+            },
+            {
+              sequence: 2,
+              turnNumber: 1,
+              phase: 'TURN_START',
+              type: 'ROLE_DISCARDED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              card: monster,
+              role: 'RACE',
+              priority: 'IMPORTANT',
+              summaryCode: 'ROLE_DISCARDED',
+              requiresViewerAction: false,
+            },
+          ],
+          routine: [],
+        },
+      }),
+    );
+
+    expect(events.map((event) => event.summary)).toEqual([
+      'Ada выбрал класс: Clockwork Yak',
+      'Ada сбросил расу: Clockwork Yak',
+    ]);
   });
   it('exposes an unavailable card reason', () =>
     expect(

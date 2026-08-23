@@ -11,6 +11,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       [attr.data-type]="card().type"
       [class.playable]="playable()"
       [class.unavailable]="!playable()"
+      [class.with-details]="showDetails()"
     >
       <button
         type="button"
@@ -18,16 +19,17 @@ import { CardArtworkComponent } from './card-artwork.component';
         [attr.aria-label]="ariaLabel()"
         (click)="activated.emit(card())"
       >
-        <app-card-artwork [artKey]="card().artKey" [label]="card().name" [compact]="true" />
-        <strong>{{ card().name }}</strong>
-      </button>
-      <button
-        type="button"
-        class="info"
-        [attr.aria-label]="'Подробнее: ' + card().name"
-        (click)="detailsOpened.emit(card())"
-      >
-        i
+        <app-card-artwork [artKey]="card().artKey" [label]="displayName()" [compact]="true" />
+        <strong>{{ displayName() }}</strong>
+        @if (showDetails()) {
+          @if (details().length > 0) {
+            <div class="facts">
+              @for (fact of details(); track fact) {
+                <span>{{ fact }}</span>
+              }
+            </div>
+          }
+        }
       </button>
     </article>
   `,
@@ -41,9 +43,9 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-width: 0;
       height: 100%;
       overflow: hidden;
-      border: 2px solid #719679;
+      border: 2px solid #a67d4b;
       border-radius: 0.75rem;
-      background: linear-gradient(155deg, #26382d, #121d16 72%);
+      background: linear-gradient(155deg, #3a2818, #17100b 72%);
       box-shadow:
         inset 0 0 0 1px rgba(0, 0, 0, 0.76),
         0 0.28rem 0.6rem rgba(0, 0, 0, 0.5);
@@ -62,8 +64,8 @@ import { CardArtworkComponent } from './card-artwork.component';
       background: linear-gradient(155deg, #29475b, #142027 72%);
     }
     article.playable {
-      border-color: #8bd49e;
-      box-shadow: inset 0 0 0 1px rgba(139, 212, 158, 0.3);
+      border-color: #e2b965;
+      box-shadow: inset 0 0 0 1px rgba(226, 185, 101, 0.3);
     }
     .card-action {
       display: grid;
@@ -78,40 +80,46 @@ import { CardArtworkComponent } from './card-artwork.component';
       background: transparent;
       text-align: left;
     }
+    article.with-details .card-action {
+      min-height: 12rem;
+      grid-template-rows: minmax(0, 1fr) auto auto;
+    }
     app-card-artwork {
       width: 100%;
       height: 100%;
       min-height: 0;
     }
     strong {
-      display: -webkit-box;
+      display: grid;
       width: 100%;
       min-height: 2.1em;
+      max-height: 2.1em;
       overflow: hidden;
+      align-items: center;
       font:
         800 0.76rem/1.05 Georgia,
         serif;
-      text-overflow: ellipsis;
+      text-align: center;
       white-space: normal;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
+    }
+    .facts {
+      display: grid;
+      min-width: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: hidden;
+    }
+    .facts span {
+      min-width: 0;
+      padding: 0.14rem 0.05rem;
+      overflow: hidden;
+      color: #efcb78;
+      font-size: 0.6rem;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .unavailable {
       filter: saturate(0.75);
-    }
-    .info {
-      position: absolute;
-      top: 0.18rem;
-      right: 0.18rem;
-      width: 1.45rem;
-      min-width: 1.45rem;
-      height: 1.45rem;
-      border: 1px solid #708078;
-      border-radius: 50%;
-      color: #e9efeb;
-      background: rgba(23, 19, 13, 0.86);
-      font-size: 0.65rem;
-      font-weight: 900;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
@@ -126,12 +134,17 @@ import { CardArtworkComponent } from './card-artwork.component';
 })
 export class CompactGameCardComponent {
   readonly card = input.required<GameCardView>();
+  readonly cardName = input<(card: GameCardView) => string>((card) => card.name);
   readonly playable = input(false);
   readonly reason = input('Можно позже');
+  readonly showDetails = input(false);
+  readonly details = input<readonly string[]>([]);
   readonly activated = output<GameCardView>();
-  readonly detailsOpened = output<GameCardView>();
 
   protected ariaLabel(): string {
-    return `${this.card().name}. ${this.playable() ? 'Доступно сейчас' : this.reason()}`;
+    return `${this.displayName()}. ${this.playable() ? 'Доступно сейчас' : this.reason()}`;
+  }
+  protected displayName(): string {
+    return this.cardName()(this.card());
   }
 }

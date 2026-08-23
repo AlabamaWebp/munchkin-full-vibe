@@ -267,6 +267,40 @@ describe("expanded rules", () => {
     ).toBe(true);
   });
 
+  it("discards an active race through the authoritative role command", () => {
+    const raceCard = card("race-1", race.id);
+    const initial = state([
+      player(adaId, 1, [raceCard]),
+      player(bobId, 1, []),
+    ]);
+    const played = executeCommand(
+      initial,
+      { type: "PLAY_ROLE", actorId: adaId, cardId: raceCard.instanceId },
+      { random },
+    );
+    expect(played.success).toBe(true);
+    if (!played.success) return;
+
+    const discarded = executeCommand(
+      played.state,
+      { type: "DISCARD_ROLE", actorId: adaId, cardId: raceCard.instanceId },
+      { random },
+    );
+    expect(discarded.success).toBe(true);
+    if (!discarded.success) return;
+    expect(discarded.state.players[0]?.raceCards).toEqual([]);
+    expect(discarded.state.doorDiscard).toEqual(
+      expect.arrayContaining([raceCard]),
+    );
+    expect(discarded.events).toContainEqual(
+      expect.objectContaining({
+        type: "ROLE_DISCARDED",
+        role: "RACE",
+        cardId: raceCard.instanceId,
+      }),
+    );
+  });
+
   it("revalidates and publicly unequips every incompatible item after a class replacement", () => {
     const replacement = card("replacement-class", otherRole.id);
     const blade = card("equipped-blade", item.id);

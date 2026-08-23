@@ -186,7 +186,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       color: #fff;
       background: linear-gradient(
         100deg,
-        rgba(20, 27, 19, 0.97),
+        rgba(48, 31, 18, 0.97),
         rgba(20, 15, 10, 0.97) 48%,
         rgba(54, 25, 19, 0.97)
       );
@@ -230,8 +230,8 @@ import { CardArtworkComponent } from './card-artwork.component';
       height: 2rem;
       place-items: center;
       border-radius: 50%;
-      color: #102017;
-      background: #92c58b;
+      color: #2b1b0d;
+      background: #e0b85f;
       font-style: normal;
       font-weight: 950;
     }
@@ -260,18 +260,18 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: none;
     }
     .participants .agreement {
-      color: #15231a;
-      background: #aad4b5;
+      color: #2b1b0d;
+      background: #dfbd78;
     }
     .outcome {
       justify-self: center;
       margin: -0.5rem 0;
       z-index: 2;
       padding: 0.2rem 0.85rem;
-      border: 1px solid #4f8358;
+      border: 1px solid #b77b3d;
       border-radius: 999px;
-      color: #dff0df;
-      background: #173b29;
+      color: #ffe6b0;
+      background: #4b2d18;
       box-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.4);
       font-size: 0.72rem;
       font-weight: 800;

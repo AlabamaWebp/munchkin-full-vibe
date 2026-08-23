@@ -24,12 +24,10 @@ export interface PresentedEvent {
 
 export function selectStage(game: GameView): GameStageKind {
   if (game.status === 'FINISHED' || game.phase === 'FINISHED') return 'FINISHED';
-  if (game.pendingDecision !== null || game.curseResponse !== null) return 'BLOCKING_DECISION';
-  if (game.combat?.runAway?.currentCombatantId !== null && game.combat?.runAway !== undefined)
-    return 'RUN_AWAY_SEQUENCE';
   if (game.combat?.reactionWindow !== null && game.combat?.reactionWindow !== undefined)
     return 'COMBAT_REACTION';
   if (game.combat !== null) return 'COMBAT_OPEN';
+  if (game.pendingDecision !== null || game.curseResponse !== null) return 'BLOCKING_DECISION';
   if (game.lastRunAwayResult !== null) return 'RUN_AWAY_SEQUENCE';
   if (game.phase === 'TURN_START' || game.phase === 'KICK_DOOR') return 'TURN_READY';
   if (game.phase === 'DOOR_RESOLUTION') return 'DOOR_REVEAL';
@@ -120,6 +118,10 @@ function eventSummary(game: GameView, entry: PresentedGameEventView): string {
       return `${player} надел ${card ?? 'предмет'}`;
     case 'ITEM_UNEQUIPPED':
       return `${player} снял ${card ?? 'предмет'}`;
+    case 'ROLE_PLAYED':
+      return `${player} выбрал ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${card ?? 'роль'}`;
+    case 'ROLE_DISCARDED':
+      return `${player} сбросил ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${card ?? 'роль'}`;
     case 'CARDS_SOLD':
       return `${player} продал карты`;
     case 'CHARITY_RESOLVED':

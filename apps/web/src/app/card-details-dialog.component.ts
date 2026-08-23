@@ -249,7 +249,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       margin: 0;
       white-space: nowrap;
       color: #dce3de;
-      background: #223128;
+      background: #302014;
     }
     .card-picker button.active {
       border-color: #efc66d;
