@@ -26,12 +26,14 @@ import type { PresentedEvent } from './game-ui.model';
       min-width: 0;
     }
     .strip {
+      position: relative;
       display: flex;
+      flex-direction: column;
       width: 100%;
       min-height: 4rem;
       padding: 0.52rem 0.75rem;
       align-items: flex-start;
-      gap: 0.45rem;
+      gap: 0;
       overflow: hidden;
       border: 1px solid #876033;
       border-radius: 0.85rem;
@@ -57,7 +59,7 @@ import type { PresentedEvent } from './game-ui.model';
       letter-spacing: 0.08em;
     }
     span {
-      margin-top: 1rem;
+      width: 100%;
       min-width: 0;
       overflow: hidden;
       font-size: 0.78rem;
@@ -65,9 +67,13 @@ import type { PresentedEvent } from './game-ui.model';
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    span:first-of-type {
+      margin-top: 1rem;
+    }
     span + span {
-      padding-left: 0.45rem;
-      border-left: 1px solid #415347;
+      margin-top: 0.2rem;
+      padding-top: 0.2rem;
+      border-top: 1px solid rgba(190, 132, 55, 0.28);
     }
     .important {
       color: #ffe5a4;
@@ -78,6 +84,21 @@ import type { PresentedEvent } from './game-ui.model';
     button:focus-visible {
       outline: 3px solid #fff2a8;
       outline-offset: 2px;
+    }
+    @media (max-height: 42rem) {
+      .strip {
+        min-height: 3.5rem;
+        padding-block: 0.4rem;
+      }
+      .strip::before {
+        font-size: 0.56rem;
+      }
+      span {
+        font-size: 0.68rem;
+      }
+      span:first-of-type {
+        margin-top: 0.85rem;
+      }
     }
   `,
 })

@@ -398,7 +398,7 @@ describe('GameShellComponent', () => {
       }),
     ).nativeElement as HTMLElement;
     expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(7);
-    expect(root.textContent).toContain('Рука 7/5 · отдать 2');
+    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/5 · отдать 2');
     expect(root.textContent).toContain('ваш ход');
   });
 

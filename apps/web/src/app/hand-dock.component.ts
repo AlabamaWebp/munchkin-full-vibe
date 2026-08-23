@@ -20,16 +20,17 @@ import { unavailableReason } from './game-ui.model';
           />
         }
       </div>
-      @if (game().self.hand.length > 5) {
+      @if (game().self.hand.length > 0) {
         <button type="button" class="full-hand" (click)="fullHandOpened.emit()">
-          Рука {{ game().self.hand.length }}/5 · отдать {{ game().self.hand.length - 5 }}
+          Рука {{ game().self.hand.length }}/5
+          @if (game().self.hand.length > 5) {
+            · отдать {{ game().self.hand.length - 5 }}
+          } @else {
+            · открыть
+          }
         </button>
-        <span class="limit-warning" role="status"
-          >Перед концом хода нужно избавиться от лишних карт</span
-        >
-      } @else if (game().self.hand.length > 0) {
-        <span class="hand-count">Рука {{ game().self.hand.length }}/5</span>
-      } @else if (game().self.hand.length === 0) {
+      }
+      @if (game().self.hand.length === 0) {
         <span class="empty">Рука пуста</span>
       }
     </section>
@@ -51,11 +52,13 @@ import { unavailableReason } from './game-ui.model';
       height: 100%;
       min-width: 0;
       grid-auto-flow: column;
-      grid-auto-columns: calc((100% - 1.2rem) / 5);
-      gap: 0.3rem;
+      grid-auto-columns: clamp(7rem, 32vw, 8rem);
+      gap: 0.45rem;
       overflow-x: auto;
-      padding-right: 0.2rem;
-      scroll-snap-type: x proximity;
+      padding: 0 0.25rem 0.15rem 0;
+      scroll-padding-inline: 0.25rem;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: thin;
     }
     app-compact-game-card {
       min-width: 0;
@@ -76,27 +79,6 @@ import { unavailableReason } from './game-ui.model';
       font-weight: 900;
       box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.35);
     }
-    .hand-count,
-    .limit-warning {
-      position: absolute;
-      left: 0.25rem;
-      bottom: 0.25rem;
-      padding: 0.25rem 0.45rem;
-      border-radius: 999px;
-      color: #dce7df;
-      background: rgba(13, 23, 18, 0.88);
-      font-size: 0.6rem;
-      font-weight: 800;
-    }
-    .limit-warning {
-      right: 0.25rem;
-      bottom: 3.1rem;
-      left: auto;
-      max-width: 13rem;
-      color: #ffe0bd;
-      background: #6b3927;
-      text-align: right;
-    }
     .empty {
       display: grid;
       height: 100%;
@@ -107,6 +89,18 @@ import { unavailableReason } from './game-ui.model';
     button:focus-visible {
       outline: 3px solid #fff2a8;
       outline-offset: 2px;
+    }
+    @media (min-width: 48rem) {
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: row;
+        grid-auto-columns: auto;
+        grid-auto-rows: minmax(9rem, 1fr);
+        gap: 0.45rem;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding-right: 0.25rem;
+      }
     }
   `,
 })

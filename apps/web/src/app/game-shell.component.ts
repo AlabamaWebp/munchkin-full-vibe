@@ -122,7 +122,7 @@ interface CardUse {
         [playableIds]="playableIds()"
         (cardActivated)="activateCard($event)"
         (cardDetails)="selectedCard.set($event)"
-        (fullHandOpened)="fullHandOpen.set(true)"
+        (fullHandOpened)="openFullHand()"
       />
       @if (error(); as commandError) {
         <p class="command-error" role="alert">{{ errorMessage(commandError) }}</p>
@@ -227,9 +227,9 @@ interface CardUse {
       }
 
       @if (fullHandOpen()) {
-        <div class="backdrop">
+        <div class="backdrop full-hand-backdrop">
           <section
-            class="sheet"
+            class="sheet full-hand-sheet"
             appFocusTrap
             role="dialog"
             aria-modal="true"
@@ -428,7 +428,7 @@ interface CardUse {
       }
 
       @if (selectedCard(); as card) {
-        <div class="backdrop">
+        <div class="backdrop card-details-backdrop">
           <section
             class="sheet"
             appFocusTrap
@@ -823,6 +823,7 @@ export class GameShellComponent {
   protected readonly filteredHand = computed(() => {
     const filter = this.handFilter();
     return this.sortedHand().filter((card) => {
+      if (filter === 'ALL') return true;
       if (filter === 'PLAYABLE') return this.playableIds().includes(card.instanceId);
       if (filter === 'EQUIPMENT') return card.type === 'EQUIPMENT';
       if (filter === 'COMBAT')
@@ -939,6 +940,7 @@ export class GameShellComponent {
     }));
   });
   protected readonly handFilters = [
+    { id: 'ALL', label: 'Все' },
     { id: 'PLAYABLE', label: 'Сейчас' },
     { id: 'EQUIPMENT', label: 'Снаряжение' },
     { id: 'COMBAT', label: 'Бой' },
@@ -970,7 +972,7 @@ export class GameShellComponent {
   protected readonly menuOpen = signal(false);
   protected readonly saleOpen = signal(false);
   protected readonly charityOpen = signal(false);
-  protected readonly handFilter = signal<(typeof this.handFilters)[number]['id']>('PLAYABLE');
+  protected readonly handFilter = signal<(typeof this.handFilters)[number]['id']>('ALL');
   protected readonly historyFilter = signal<(typeof this.historyFilters)[number]['id']>('ALL');
   protected readonly saleSelection = signal<readonly string[]>([]);
   protected readonly charitySelection = signal<readonly string[]>([]);
@@ -1088,6 +1090,10 @@ export class GameShellComponent {
   }
   protected openCombatHand(): void {
     this.handFilter.set('COMBAT');
+    this.fullHandOpen.set(true);
+  }
+  protected openFullHand(): void {
+    this.handFilter.set('ALL');
     this.fullHandOpen.set(true);
   }
   protected proposeHelp(): void {

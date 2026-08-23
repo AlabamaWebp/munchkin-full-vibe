@@ -65,22 +65,22 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     .actions {
       display: grid;
-      min-height: 4.35rem;
+      min-height: 3.8rem;
       grid-auto-flow: column;
-      grid-auto-columns: minmax(7.25rem, 1fr);
+      grid-auto-columns: minmax(6.5rem, 1fr);
       gap: 0.35rem;
       align-items: stretch;
       overflow-x: auto;
     }
     button {
       min-width: 0;
-      min-height: 4.35rem;
-      padding: 0.45rem 0.55rem;
+      min-height: 3.8rem;
+      padding: 0.3rem 0.45rem;
       overflow: hidden;
-      border: 1px solid #5e7466;
+      border: 1px solid #806343;
       border-radius: 0.85rem;
       color: #e5ede7;
-      background: linear-gradient(145deg, #26342c, #111a15);
+      background: linear-gradient(145deg, #49301a, #21140c);
       font-size: 0.7rem;
       font-weight: 850;
       text-overflow: ellipsis;
@@ -95,13 +95,13 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     button strong {
       font:
-        900 0.7rem/1.05 Georgia,
+        900 0.66rem/1.05 Georgia,
         serif;
     }
     button small {
-      margin-top: 0.22rem;
+      margin-top: 0.12rem;
       color: #dccdae;
-      font-size: 0.58rem;
+      font-size: 0.55rem;
       font-weight: 600;
       text-transform: none;
     }
@@ -123,7 +123,7 @@ const PRIORITY: readonly AvailableGameAction[] = [
     .card-gateway {
       border-color: #d6bc69;
       color: #fff0bf;
-      background: linear-gradient(145deg, #285f31, #102619);
+      background: linear-gradient(145deg, #6b7a37, #29321a);
       box-shadow:
         inset 0 1px rgba(255, 255, 255, 0.22),
         0 0.25rem 0.55rem rgba(0, 0, 0, 0.36);
@@ -137,20 +137,21 @@ const PRIORITY: readonly AvailableGameAction[] = [
       z-index: 55;
       inset: 0;
       display: grid;
-      padding: 0.5rem;
-      place-items: end center;
-      background: rgba(0, 0, 0, 0.62);
+      padding: 0;
+      place-items: stretch;
+      background: rgba(22, 12, 6, 0.78);
     }
     .action-sheet {
       display: grid;
-      width: min(100%, 28rem);
-      max-height: 60dvh;
+      width: 100%;
+      height: 100%;
+      max-height: none;
       padding: 0.7rem;
       gap: 0.4rem;
       overflow: auto;
-      border: 1px solid #8d632e;
-      border-radius: 1rem 1rem 0.35rem 0.35rem;
-      background: #17130f;
+      border: 0;
+      border-radius: 0;
+      background: linear-gradient(180deg, #2f1e11, #140f0a);
     }
     .action-sheet header {
       display: flex;
@@ -174,6 +175,15 @@ const PRIORITY: readonly AvailableGameAction[] = [
     button:focus-visible {
       outline: 3px solid #fff2a8;
       outline-offset: 2px;
+    }
+    @media (max-height: 42rem) {
+      .actions,
+      button {
+        min-height: 3.5rem;
+      }
+      button small {
+        display: none;
+      }
     }
   `,
 })

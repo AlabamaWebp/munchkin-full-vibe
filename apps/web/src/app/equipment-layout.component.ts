@@ -93,9 +93,9 @@ export interface EquipmentLayoutLabels {
       padding: 0.55rem;
       flex-direction: column;
       gap: 0.35rem;
-      border: 1px dashed #526057;
+      border: 1px dashed #806343;
       border-radius: 0.75rem;
-      background: #0d1712;
+      background: rgba(30, 19, 11, 0.78);
     }
     .slot.head {
       grid-area: head;
@@ -125,7 +125,7 @@ export interface EquipmentLayoutLabels {
       border-color: #efc66d;
     }
     small {
-      color: #94a198;
+      color: #bda987;
       font-size: 0.62rem;
       font-weight: 800;
       letter-spacing: 0.08em;
@@ -140,8 +140,8 @@ export interface EquipmentLayoutLabels {
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      color: #edf2ee;
-      background: #1c2b22;
+      color: #f4e7ce;
+      background: #49301a;
       text-align: left;
     }
     button strong {
@@ -157,7 +157,7 @@ export interface EquipmentLayoutLabels {
       display: grid;
       min-height: 2.75rem;
       place-items: center;
-      color: #6f7d73;
+      color: #9e896b;
       font-size: 0.72rem;
     }
     @media (min-width: 42rem) {

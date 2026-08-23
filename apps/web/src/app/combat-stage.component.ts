@@ -258,14 +258,16 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .combat-hint {
       display: block;
-      padding: 0.16rem 0.6rem;
+      width: min(100%, 22rem);
+      justify-self: center;
+      padding: 0.42rem 0.8rem;
       border: 1px solid rgba(163, 117, 52, 0.55);
-      border-radius: 999px;
+      border-radius: 0.7rem;
       color: #e1ceb0;
       background: rgba(20, 15, 10, 0.86);
-      font-size: 0.68rem;
+      font-size: 0.76rem;
+      line-height: 1.3;
       text-align: center;
-      -webkit-line-clamp: 1;
     }
     .encounter-tabs {
       display: flex;
@@ -296,6 +298,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: grid;
       width: min(100%, 12.25rem);
       min-height: 13.15rem;
+      max-height: 15.5rem;
       padding: 0.38rem;
       grid-template-rows: auto minmax(0, 1fr) auto;
       justify-self: center;
@@ -407,6 +410,50 @@ import { CardArtworkComponent } from './card-artwork.component';
     button:focus-visible {
       outline: 3px solid #fff2a8;
       outline-offset: 2px;
+    }
+    @media (min-width: 48rem) {
+      .combat {
+        padding: 0.5rem 0;
+      }
+      .monster {
+        width: min(100%, 16rem);
+        min-height: 20rem;
+        max-height: min(26rem, 50dvh);
+      }
+      h3 {
+        font-size: 1rem;
+      }
+      .score {
+        min-height: 4.5rem;
+      }
+      .score small,
+      .combat-hint,
+      .outcome {
+        font-size: 0.75rem;
+      }
+    }
+    @media (max-height: 42rem) {
+      .combat {
+        gap: 0.2rem;
+      }
+      .monster {
+        width: 10rem;
+        min-height: 10.5rem;
+        max-height: 10.5rem;
+      }
+      .score {
+        min-height: 3.35rem;
+      }
+      .score b {
+        font-size: 1.7rem;
+      }
+      .combat-hint,
+      .participants {
+        display: none;
+      }
+      .outcome {
+        margin-top: -0.65rem;
+      }
     }
   `,
 })

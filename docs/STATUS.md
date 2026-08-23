@@ -532,3 +532,59 @@ Verified on 2026-08-23 after the combat mobile visual QA pass:
 - `npm run build` — succeeded for contracts, game engine, Angular, and NestJS;
   Angular retained the existing initial-bundle budget warning (`506.71 kB`
   versus the `500 kB` warning budget).
+
+## Combat responsive adaptation
+
+- Added a compact-height presentation for `360 x 640`: the Monster, score,
+  actions, profile, and hand stay inside the fixed viewport, secondary action
+  copy is reduced, and all primary action targets remain at least `56px` high.
+- Preserved the reference-aligned vertical composition through phone and small
+  tablet widths, including the intermediate `600 x 900` viewport.
+- Added a two-column table from `768px`: combat and contextual actions remain
+  the visual focus on the left, while the own-character summary and a two-column
+  private-hand rail remain visible on the right.
+- Constrained wide layouts to a centered `72rem` table and enlarged the Monster
+  proportionally without stretching cards or profile Equipment beyond their
+  frames.
+- Browser QA passed at `360 x 640`, `390 x 844`, `430 x 932`, `600 x 900`,
+  `768 x 1024`, `1024 x 768`, `1366 x 768`, and `1440 x 900`. The document,
+  stage, action dock, character summary, and hand reported no overflow on either
+  axis at every checkpoint.
+
+Verified on 2026-08-23 after the responsive adaptation:
+
+- `npm test` — succeeded; 30 test files/suites and 282 tests passed;
+- `npm run lint` — succeeded across all workspaces with 0 errors;
+- `npm run build` — succeeded for contracts, game engine, Angular, and NestJS;
+  the Angular initial bundle is `509.52 kB`, retaining the existing `500 kB`
+  warning budget.
+
+## Combat hand mobile refinement
+
+- The `/dev/ui/combat` fixture now represents the eight-card starting hand.
+- The in-game hand uses a horizontally scrollable, snap-aligned card rail with
+  readable card widths instead of squeezing five cards into the viewport.
+- The Full Hand dialog now fills the viewport; the hand button remains available
+  whenever the player has cards.
+- Expanded the losing-combat hint and changed card artwork to contain and center
+  the entire image rather than cropping it.
+- Removed the persistent hand-limit warning, increased the mobile card-rail
+  width in favor of horizontal scrolling, and added several recent-event
+  examples to the combat development fixture.
+
+## Combat overlays and palette refinement
+
+- Reduced the mobile action dock height so the losing-combat hint keeps its own
+  readable row at `390 x 844` without reducing action-label legibility.
+- Made profile, card details, history, menu, and action panels fill the viewport
+  on mobile and raised card details above the profile overlay when opened from
+  Equipment.
+- Reworked overlay, Equipment, and action surfaces toward the warm brown,
+  amber, and olive palette of the game background.
+
+## Recent actions presentation
+
+- Changed the recent-actions strip to a vertical, newest-first list.
+- Kept the source list capped at the latest three events and clipped overflow
+  without horizontal scrolling, so a tight viewport still shows the newest
+  visible entry first.

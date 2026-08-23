@@ -145,6 +145,21 @@ import { CardArtworkComponent } from './card-artwork.component';
       outline: 3px solid #fff2a8;
       outline-offset: -2px;
     }
+    @media (min-width: 48rem) {
+      .card-action {
+        grid-template-rows: minmax(5.5rem, 1fr) auto auto auto auto;
+      }
+      strong {
+        font-size: 0.78rem;
+      }
+      b {
+        font-size: 0.74rem;
+      }
+      small,
+      .state {
+        font-size: 0.6rem;
+      }
+    }
   `,
 })
 export class CompactGameCardComponent {
