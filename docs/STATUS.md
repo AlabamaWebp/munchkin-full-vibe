@@ -6,6 +6,11 @@ Current milestone:
 V2 final audit complete; live-game blockers remain
 ```
 
+## Game log targeting (2026-08-23)
+
+- targeted card plays now show the acting player and the player who was
+  targeted; this makes Curse entries explicitly identify who received them.
+
 ## Curse timing (2026-08-23)
 
 - ordinary hand Curses are now server-authorized throughout an in-progress game:
@@ -711,7 +716,17 @@ Verified on 2026-08-23 after the responsive adaptation:
   title.
 - Simplified and shortened the character summary to identity, level, power,
   and hand count; equipment artwork is no longer shown there.
+
 ## Latest UI update
+
+- В `app-hand-dock` сводка персонажа и компактная кнопка открытия меню руки
+  теперь находятся в одной строке; прежняя кнопка `.full-hand`, перекрывавшая
+  карточки руки, удалена.
+- Строка сводки и меню руки закреплена внизу hand dock, а список последних
+  действий выводит пять последних доступных игроку записей, включая обычные
+  действия. На мобильных устройствах карточки руки скрыты, чтобы освободить
+  высоту для игровой сцены и событий; на desktop они остаются в правой панели
+  над этой строкой.
 
 - Компактные окна выбора (продажа, поиск неприятностей и другие списки) и меню
   «Все действия» теперь подстраивают высоту под содержимое; прокрутка остаётся

@@ -109,11 +109,6 @@ import type { PresentedEvent } from './game-ui.model';
         font-size: 0.78rem;
       }
     }
-    @media (max-height: 42rem) {
-      .event-list span:nth-child(n + 2) {
-        display: none;
-      }
-    }
   `,
 })
 export class RecentEventsComponent {

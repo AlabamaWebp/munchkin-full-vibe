@@ -133,7 +133,7 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     case 'COMBAT_STARTED':
       return `${player} вступил в бой${card ? `: ${card}` : ''}`;
     case 'CARD_PLAYED':
-      return `${player} сыграл ${card ?? 'карту'}`;
+      return `${player} сыграл ${card ?? 'карту'}${target ? ` на игрока ${target}` : ''}`;
     case 'CARDS_DISCARDED':
       return `${player} сбросил ${entry.count ?? 0} карт`;
     case 'HELP_OFFERED':

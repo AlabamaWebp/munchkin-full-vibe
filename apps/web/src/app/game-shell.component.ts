@@ -93,30 +93,12 @@ interface CardUse {
         (playCardOpened)="openCombatHand()"
         (utilityActionSelected)="openUtilityAction($event)"
       />
-      <button
-        type="button"
-        class="character-summary"
-        (click)="selectedPlayerId.set(game().viewerPlayerId)"
-      >
-        <span class="summary-initial">{{ game().self.name.charAt(0) }}</span>
-        <span
-          ><small>ВАШ ГЕРОЙ · УР. {{ game().self.level }}</small
-          ><strong>{{ game().self.name }}</strong
-          ><small class="summary-sex">Пол: {{ sexLabel(game().self.sex) }}</small></span
-        >
-        <span class="summary-power"
-          ><small>СИЛА</small
-          ><b>{{ game().combat?.playerPower ?? game().self.combatPower }}</b></span
-        >
-        <span class="summary-hand"
-          >РУКА<br /><b>{{ game().self.hand.length }}/5</b></span
-        >
-      </button>
       <app-hand-dock
         [game]="game()"
         [playableIds]="playableIds()"
         [cardName]="displayCardName"
         (cardActivated)="activateCard($event)"
+        (characterOpened)="selectedPlayerId.set(game().viewerPlayerId)"
         (fullHandOpened)="openFullHand()"
       />
       @if (error(); as commandError) {
@@ -873,12 +855,7 @@ export class GameShellComponent {
   protected readonly locale = this.localization.locale;
   protected readonly stage = computed(() => selectStage(this.game()));
   protected readonly allEvents = computed(() => presentEvents(this.game()));
-  protected readonly recentEvents = computed(() =>
-    this.allEvents()
-      .filter((event) => event.priority !== 'ROUTINE')
-      .slice(-2)
-      .reverse(),
-  );
+  protected readonly recentEvents = computed(() => this.allEvents().slice(-5).reverse());
   protected readonly playableIds = computed(() => this.collectPlayableIds());
   protected readonly sortedHand = computed(() =>
     [...this.game().self.hand].sort(
@@ -895,21 +872,15 @@ export class GameShellComponent {
       if (filter === 'EQUIPMENT') return card.type === 'EQUIPMENT';
       if (filter === 'COMBAT')
         return (
-          card.type === 'TEMPORARY_BONUS' &&
-          (card.play?.timings.includes('ACTIVE_COMBAT') ?? false)
+          card.type === 'TEMPORARY_BONUS' && (card.play?.timings.includes('ACTIVE_COMBAT') ?? false)
         );
       if (filter === 'CURSES') return card.type === 'CURSE' || card.type === 'COMBAT_CURSE';
       if (filter === 'MONSTERS') return card.type === 'MONSTER';
       if (filter === 'RACES') return card.type === 'RACE';
       if (filter === 'CLASSES') return card.type === 'CLASS';
-      return ![
-        'EQUIPMENT',
-        'MONSTER',
-        'CURSE',
-        'COMBAT_CURSE',
-        'RACE',
-        'CLASS',
-      ].includes(card.type);
+      return !['EQUIPMENT', 'MONSTER', 'CURSE', 'COMBAT_CURSE', 'RACE', 'CLASS'].includes(
+        card.type,
+      );
     });
   });
   protected readonly primaryActions = computed(() =>

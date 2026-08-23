@@ -214,6 +214,34 @@ describe('game UI state mapper', () => {
     expect(events[0]?.summary).toContain('Clockwork Yak');
     expect(events[0]?.priority).toBe('IMPORTANT');
   });
+  it('shows who a targeted curse was played on', () => {
+    const events = presentEvents(
+      view({
+        players: [player(), player({ playerId: 'p2', name: 'Boris' })],
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'TURN_START',
+              type: 'CARD_PLAYED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              targetPlayerId: 'p2',
+              card: card({ name: 'Проклятие', type: 'CURSE', deck: 'DOOR' }),
+              priority: 'IMPORTANT',
+              summaryCode: 'CARD_PLAYED',
+              requiresViewerAction: false,
+            },
+          ],
+          routine: [],
+        },
+      }),
+    );
+
+    expect(events[0]?.summary).toBe('Ada сыграл Проклятие на игрока Boris');
+  });
   it('presents class and race changes in the game history', () => {
     const events = presentEvents(
       view({

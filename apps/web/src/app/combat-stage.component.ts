@@ -101,7 +101,7 @@ import { LocalizationService } from './localization';
           (click)="breakdownOpened.emit()"
         >
           <span
-            ><small>ВАША СИЛА</small><b>{{ combat.playerPower }}</b></span
+            ><small>СИЛА ИГРОКОВ</small><b>{{ combat.playerPower }}</b></span
           >
           <strong>⚔</strong>
           <span

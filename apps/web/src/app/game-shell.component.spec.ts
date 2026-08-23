@@ -225,7 +225,7 @@ describe('GameShellComponent', () => {
       }),
     );
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 5/5 · открыть');
+    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 5/5');
     root.querySelector<HTMLButtonElement>('.character-summary')!.click();
     fixture.detectChanges();
     expect(root.textContent).toContain('Классы: нет · Расы: нет');
@@ -285,6 +285,43 @@ describe('GameShellComponent', () => {
       'Curse: Pocket Gravity',
     );
     expect(root.textContent).toContain('Lose one item');
+  });
+
+  it('shows the five newest actions, including routine ones, in the recent-actions panel', () => {
+    const root = render(
+      base({
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'TURN_START' as const,
+              type: 'COMBAT_STARTED' as const,
+              visibility: 'PUBLIC' as const,
+              playerId: 'p1',
+              priority: 'IMPORTANT' as const,
+              summaryCode: 'COMBAT_STARTED' as const,
+              requiresViewerAction: false,
+            },
+          ],
+          routine: Array.from({ length: 5 }, (_, index) => ({
+            sequence: index + 2,
+            turnNumber: 1,
+            phase: 'TURN_START' as const,
+            type: 'COMBAT_STARTED' as const,
+            visibility: 'PUBLIC' as const,
+            playerId: 'p1',
+            priority: 'ROUTINE' as const,
+            summaryCode: 'COMBAT_STARTED' as const,
+            requiresViewerAction: false,
+          })),
+        },
+      }),
+    ).nativeElement as HTMLElement;
+
+    const events = root.querySelectorAll('app-recent-events .event-list span');
+    expect(events).toHaveLength(5);
   });
 
   it('shows winning/losing score difference, multi-monster focus, reward and visible Bad Stuff', () => {
@@ -524,9 +561,9 @@ describe('GameShellComponent', () => {
     );
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(7);
-    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/5 · отдать 2');
+    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/5');
     expect(root.textContent).toContain('Card 0');
-    root.querySelector<HTMLButtonElement>('.full-hand')!.click();
+    root.querySelector<HTMLButtonElement>('.hand-menu')!.click();
     fixture.detectChanges();
     expect(root.querySelector('.full-hand-grid .with-details .description')).toBeNull();
     expect(root.querySelector('.full-hand-grid .with-details .facts')?.textContent).toContain('+3');
@@ -553,7 +590,7 @@ describe('GameShellComponent', () => {
       }),
     );
     const root = fixture.nativeElement as HTMLElement;
-    root.querySelector<HTMLButtonElement>('.full-hand')!.click();
+    root.querySelector<HTMLButtonElement>('.hand-menu')!.click();
     fixture.detectChanges();
 
     const filter = (label: string): void => {
