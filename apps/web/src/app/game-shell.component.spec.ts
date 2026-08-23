@@ -863,14 +863,24 @@ describe('GameShellComponent', () => {
       type: 'EQUIPMENT',
       equipment: { slot: 'HANDS', hands: 1, combatBonus: 2, restrictions: [], value: 300 },
     });
-    const companion = card({ instanceId: 'companion', name: 'Scout', type: 'HIRELING' });
+    const companion = card({
+      instanceId: 'companion',
+      name: 'Scout',
+      type: 'HIRELING',
+      companion: { combatBonus: 1 },
+    });
     const permission = card({
       instanceId: 'permission',
       name: 'Double Major',
       type: 'ROLE_PERMISSION',
     });
     const attachment = card({ instanceId: 'attachment', name: 'Pommel', type: 'ATTACHMENT' });
-    const mount = card({ instanceId: 'mount', name: 'Pony', type: 'MOUNT' });
+    const mount = card({
+      instanceId: 'mount',
+      name: 'Pony',
+      type: 'MOUNT',
+      companion: { combatBonus: 2 },
+    });
     const activePermission = card({
       instanceId: 'active-permission',
       name: 'Mixed Heritage',
@@ -915,7 +925,9 @@ describe('GameShellComponent', () => {
     root.querySelector<HTMLButtonElement>('.player')!.click();
     fixture.detectChanges();
     expect(root.querySelector('.equipment-grid .hireling')?.textContent).toContain('Scout');
+    expect(root.querySelector('.equipment-grid .hireling')?.textContent).toContain('+1');
     expect(root.querySelector('.equipment-grid .mount')?.textContent).toContain('Pony');
+    expect(root.querySelector('.equipment-grid .mount')?.textContent).toContain('+2');
     expect(root.querySelector('.equipment-grid .permissions')?.textContent).toContain(
       'Mixed Heritage',
     );

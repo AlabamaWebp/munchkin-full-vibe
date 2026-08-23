@@ -138,13 +138,6 @@ export type GameCommand =
       readonly combatRevision: number;
     })
   | (PlayerCommand & {
-      readonly type: "COUNTER_HELP";
-      readonly offerId: HelpOfferId;
-      readonly treasureCount: number;
-      readonly combatId: CombatId;
-      readonly combatRevision: number;
-    })
-  | (PlayerCommand & {
       readonly type: "ACCEPT_HELP_OFFER";
       readonly offerId: HelpOfferId;
       readonly combatId: CombatId;

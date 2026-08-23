@@ -209,11 +209,12 @@ export type GameEvent =
       readonly monsterDefinitionId: CardDefinitionId;
     })
   | (PublicEvent & {
-      readonly type: "HELP_OFFERED" | "HELP_COUNTERED";
+      readonly type: "HELP_OFFERED";
       readonly playerId: PlayerId;
       readonly helperId: PlayerId;
       readonly offerId: HelpOfferId;
       readonly treasureCount: number;
+      readonly totalTreasureCount: number;
       readonly expiresAtEpochMs: number;
     })
   | (PublicEvent & {

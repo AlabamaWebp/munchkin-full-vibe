@@ -26,7 +26,6 @@ export function executeCommand(
     command.type === "PASS_COMBAT_REACTION" ||
     command.type === "RUN_AWAY" ||
     command.type === "PROPOSE_HELP" ||
-    command.type === "COUNTER_HELP" ||
     command.type === "ACCEPT_HELP_OFFER" ||
     command.type === "REJECT_HELP_OFFER" ||
     command.type === "CANCEL_HELP_OFFER" ||

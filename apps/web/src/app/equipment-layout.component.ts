@@ -79,7 +79,7 @@ export interface EquipmentLayoutLabels {
       @if (card) {
         <button type="button" (click)="cardOpened.emit(card)">
           <strong>{{ cardName()(card) }}</strong
-          ><span>+{{ card.equipment?.combatBonus ?? 0 }}</span>
+          ><span>+{{ cardCombatBonus(card) }}</span>
         </button>
       } @else {
         <span class="empty">{{ labels().empty }}</span>
@@ -212,6 +212,10 @@ export class EquipmentLayoutComponent {
 
   twoHandedCard(): GameCardView | null {
     return this.handCards().find((card) => card.equipment?.hands === 2) ?? null;
+  }
+
+  cardCombatBonus(card: GameCardView): number {
+    return card.equipment?.combatBonus ?? card.companion?.combatBonus ?? 0;
   }
 
   roleCards(role: 'CLASS' | 'RACE'): readonly GameCardView[] {

@@ -214,8 +214,7 @@ export class GameService {
       };
     }
     if (
-      ((command.type === 'COUNTER_HELP' ||
-        command.type === 'ACCEPT_HELP_OFFER' ||
+      ((command.type === 'ACCEPT_HELP_OFFER' ||
         command.type === 'REJECT_HELP_OFFER' ||
         command.type === 'CANCEL_HELP_OFFER') &&
         (typeof command.offerId !== 'string' ||
@@ -257,7 +256,7 @@ export class GameService {
       };
     }
     if (
-      (command.type === 'PROPOSE_HELP' || command.type === 'COUNTER_HELP') &&
+      command.type === 'PROPOSE_HELP' &&
       (!Number.isSafeInteger(command.treasureCount) ||
         command.treasureCount < 0)
     ) {
@@ -271,7 +270,6 @@ export class GameService {
     }
     if (
       (command.type === 'PROPOSE_HELP' ||
-        command.type === 'COUNTER_HELP' ||
         command.type === 'ACCEPT_HELP_OFFER' ||
         command.type === 'REJECT_HELP_OFFER' ||
         command.type === 'CANCEL_HELP_OFFER' ||
@@ -292,7 +290,6 @@ export class GameService {
     if (
       (command.type === 'PLAY_COMBAT_CURSE' ||
         command.type === 'PROPOSE_HELP' ||
-        command.type === 'COUNTER_HELP' ||
         command.type === 'ACCEPT_HELP_OFFER' ||
         command.type === 'REJECT_HELP_OFFER' ||
         command.type === 'CANCEL_HELP_OFFER' ||
@@ -481,154 +478,148 @@ export class GameService {
                   combatId: parseCombatId(command.combatId),
                   combatRevision: command.combatRevision,
                 }
-              : command.type === 'COUNTER_HELP'
+              : command.type === 'ACCEPT_HELP_OFFER' ||
+                  command.type === 'REJECT_HELP_OFFER' ||
+                  command.type === 'CANCEL_HELP_OFFER'
                 ? {
                     type: command.type,
                     actorId,
                     offerId: parseHelpOfferId(command.offerId),
-                    treasureCount: command.treasureCount,
                     combatId: parseCombatId(command.combatId),
                     combatRevision: command.combatRevision,
                   }
-                : command.type === 'ACCEPT_HELP_OFFER' ||
-                    command.type === 'REJECT_HELP_OFFER' ||
-                    command.type === 'CANCEL_HELP_OFFER'
+                : command.type === 'LOOK_FOR_TROUBLE'
                   ? {
                       type: command.type,
                       actorId,
-                      offerId: parseHelpOfferId(command.offerId),
-                      combatId: parseCombatId(command.combatId),
-                      combatRevision: command.combatRevision,
+                      cardId: parseCardInstanceId(command.cardId),
                     }
-                  : command.type === 'LOOK_FOR_TROUBLE'
+                  : command.type === 'EQUIP_ITEM' ||
+                      command.type === 'UNEQUIP_ITEM' ||
+                      command.type === 'PLAY_ROLE_PERMISSION' ||
+                      command.type === 'DISCARD_ROLE_PERMISSION'
                     ? {
                         type: command.type,
                         actorId,
                         cardId: parseCardInstanceId(command.cardId),
                       }
-                    : command.type === 'EQUIP_ITEM' ||
-                        command.type === 'UNEQUIP_ITEM' ||
-                        command.type === 'PLAY_ROLE_PERMISSION' ||
-                        command.type === 'DISCARD_ROLE_PERMISSION'
+                    : command.type === 'PLAY_ROLE'
                       ? {
                           type: command.type,
                           actorId,
                           cardId: parseCardInstanceId(command.cardId),
+                          ...(command.replaceCardId === undefined
+                            ? {}
+                            : {
+                                replaceCardId: parseCardInstanceId(
+                                  command.replaceCardId,
+                                ),
+                              }),
                         }
-                      : command.type === 'PLAY_ROLE'
+                      : command.type === 'DISCARD_ROLE'
                         ? {
                             type: command.type,
                             actorId,
                             cardId: parseCardInstanceId(command.cardId),
-                            ...(command.replaceCardId === undefined
-                              ? {}
-                              : {
-                                  replaceCardId: parseCardInstanceId(
-                                    command.replaceCardId,
-                                  ),
-                                }),
                           }
-                        : command.type === 'DISCARD_ROLE'
+                        : command.type === 'SELL_ITEMS'
                           ? {
                               type: command.type,
                               actorId,
-                              cardId: parseCardInstanceId(command.cardId),
+                              cardIds: command.cardIds.map(parseCardInstanceId),
                             }
-                          : command.type === 'SELL_ITEMS'
+                          : command.type === 'RESOLVE_CARD_DISCARD'
                             ? {
                                 type: command.type,
                                 actorId,
                                 cardIds:
                                   command.cardIds.map(parseCardInstanceId),
+                                decisionId: parsePendingDecisionId(
+                                  command.decisionId,
+                                ),
+                                ...(command.combatId === undefined
+                                  ? {}
+                                  : {
+                                      combatId: parseCombatId(command.combatId),
+                                      combatRevision: command.combatRevision,
+                                    }),
                               }
-                            : command.type === 'RESOLVE_CARD_DISCARD'
+                            : command.type === 'RESOLVE_ROLE_RETENTION'
                               ? {
                                   type: command.type,
                                   actorId,
-                                  cardIds:
-                                    command.cardIds.map(parseCardInstanceId),
                                   decisionId: parsePendingDecisionId(
                                     command.decisionId,
                                   ),
-                                  ...(command.combatId === undefined
-                                    ? {}
-                                    : {
-                                        combatId: parseCombatId(
-                                          command.combatId,
-                                        ),
-                                        combatRevision: command.combatRevision,
-                                      }),
+                                  keepCardId: parseCardInstanceId(
+                                    command.keepCardId,
+                                  ),
                                 }
-                              : command.type === 'RESOLVE_ROLE_RETENTION'
+                              : command.type === 'TRADE_ITEM'
                                 ? {
                                     type: command.type,
                                     actorId,
-                                    decisionId: parsePendingDecisionId(
-                                      command.decisionId,
-                                    ),
-                                    keepCardId: parseCardInstanceId(
-                                      command.keepCardId,
+                                    cardId: parseCardInstanceId(command.cardId),
+                                    recipientId: parsePlayerId(
+                                      command.recipientId,
                                     ),
                                   }
-                                : command.type === 'TRADE_ITEM'
+                                : command.type === 'GIVE_CHARITY'
                                   ? {
                                       type: command.type,
                                       actorId,
-                                      cardId: parseCardInstanceId(
-                                        command.cardId,
-                                      ),
-                                      recipientId: parsePlayerId(
-                                        command.recipientId,
-                                      ),
+                                      cardIds:
+                                        command.cardIds.map(
+                                          parseCardInstanceId,
+                                        ),
+                                      recipientId:
+                                        command.recipientId === null
+                                          ? null
+                                          : parsePlayerId(command.recipientId),
                                     }
-                                  : command.type === 'GIVE_CHARITY'
-                                    ? {
-                                        type: command.type,
-                                        actorId,
-                                        cardIds:
-                                          command.cardIds.map(
-                                            parseCardInstanceId,
+                                  : command.type === 'GIVE_RANDOM_CHARITY'
+                                    ? { type: command.type, actorId }
+                                    : command.type === 'RESPOND_TO_CURSE'
+                                      ? {
+                                          type: command.type,
+                                          actorId,
+                                          responseId: parseCurseResponseId(
+                                            command.responseId,
                                           ),
-                                        recipientId:
-                                          command.recipientId === null
-                                            ? null
-                                            : parsePlayerId(
-                                                command.recipientId,
-                                              ),
-                                      }
-                                    : command.type === 'GIVE_RANDOM_CHARITY'
-                                      ? { type: command.type, actorId }
-                                      : command.type === 'RESPOND_TO_CURSE'
+                                          response:
+                                            command.response.type === 'DECLINE'
+                                              ? command.response
+                                              : {
+                                                  type: 'USE_PROTECTION',
+                                                  cardId: parseCardInstanceId(
+                                                    command.response.cardId,
+                                                  ),
+                                                  ...(command.response
+                                                    .protectedCardId ===
+                                                  undefined
+                                                    ? {}
+                                                    : {
+                                                        protectedCardId:
+                                                          parseCardInstanceId(
+                                                            command.response
+                                                              .protectedCardId,
+                                                          ),
+                                                      }),
+                                                },
+                                        }
+                                      : command.type ===
+                                          'DECLARE_COMBAT_VICTORY'
                                         ? {
                                             type: command.type,
                                             actorId,
-                                            responseId: parseCurseResponseId(
-                                              command.responseId,
+                                            combatId: parseCombatId(
+                                              command.combatId,
                                             ),
-                                            response:
-                                              command.response.type ===
-                                              'DECLINE'
-                                                ? command.response
-                                                : {
-                                                    type: 'USE_PROTECTION',
-                                                    cardId: parseCardInstanceId(
-                                                      command.response.cardId,
-                                                    ),
-                                                    ...(command.response
-                                                      .protectedCardId ===
-                                                    undefined
-                                                      ? {}
-                                                      : {
-                                                          protectedCardId:
-                                                            parseCardInstanceId(
-                                                              command.response
-                                                                .protectedCardId,
-                                                            ),
-                                                        }),
-                                                  },
+                                            combatRevision:
+                                              command.combatRevision,
                                           }
                                         : command.type ===
-                                            'DECLARE_COMBAT_VICTORY'
+                                            'PASS_COMBAT_REACTION'
                                           ? {
                                               type: command.type,
                                               actorId,
@@ -637,9 +628,10 @@ export class GameService {
                                               ),
                                               combatRevision:
                                                 command.combatRevision,
+                                              reactionWindowId:
+                                                command.reactionWindowId,
                                             }
-                                          : command.type ===
-                                              'PASS_COMBAT_REACTION'
+                                          : command.type === 'RUN_AWAY'
                                             ? {
                                                 type: command.type,
                                                 actorId,
@@ -648,20 +640,8 @@ export class GameService {
                                                 ),
                                                 combatRevision:
                                                   command.combatRevision,
-                                                reactionWindowId:
-                                                  command.reactionWindowId,
                                               }
-                                            : command.type === 'RUN_AWAY'
-                                              ? {
-                                                  type: command.type,
-                                                  actorId,
-                                                  combatId: parseCombatId(
-                                                    command.combatId,
-                                                  ),
-                                                  combatRevision:
-                                                    command.combatRevision,
-                                                }
-                                              : { type: command.type, actorId };
+                                            : { type: command.type, actorId };
     const result = executeCommand(state, domainCommand, {
       random: createSeededRandomSource(randomInt(0x1_0000_0000)),
       clock: this.clock,

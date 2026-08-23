@@ -180,6 +180,9 @@ export interface GameCardView {
     readonly requiredClass?: string;
     readonly requiredRace?: string;
   };
+  readonly companion?: {
+    readonly combatBonus: number;
+  };
   readonly monster?: {
     readonly strength?: number;
     readonly level?: number;
@@ -268,7 +271,6 @@ export type AvailableGameAction =
   | "LOOK_FOR_TROUBLE"
   | "SCAVENGE"
   | "PROPOSE_HELP"
-  | "COUNTER_HELP"
   | "ACCEPT_HELP_OFFER"
   | "REJECT_HELP_OFFER"
   | "CANCEL_HELP_OFFER"
@@ -352,13 +354,8 @@ export type AvailableIntentView =
   | (AvailableIntentBase &
       CombatIntentAddress & {
         readonly kind:
-          | "COUNTER_HELP"
-          | "ACCEPT_HELP_OFFER"
-          | "REJECT_HELP_OFFER"
-          | "CANCEL_HELP_OFFER";
+          "ACCEPT_HELP_OFFER" | "REJECT_HELP_OFFER" | "CANCEL_HELP_OFFER";
         readonly offerId: string;
-        readonly minTreasures?: number;
-        readonly maxTreasures?: number;
         readonly expiresAtEpochMs: number;
       })
   | (AvailableIntentBase & {
@@ -416,7 +413,7 @@ export type CombatHistoryView =
       readonly monster: GameCardView;
     }
   | {
-      readonly type: "HELP_OFFERED" | "HELP_COUNTERED" | "HELP_OFFER_ACCEPTED";
+      readonly type: "HELP_OFFERED" | "HELP_OFFER_ACCEPTED";
       readonly playerId: string;
       readonly helperId: string;
       readonly offerId: string;
@@ -476,7 +473,6 @@ export type GameLogEventType =
   | "RUN_AWAY_ATTEMPTED"
   | "BAD_STUFF_APPLIED"
   | "HELP_OFFERED"
-  | "HELP_COUNTERED"
   | "HELP_OFFER_ACCEPTED"
   | "HELP_OFFER_REJECTED"
   | "HELP_OFFER_CANCELLED"
@@ -522,6 +518,7 @@ export interface GameLogEntryView {
     readonly count: number;
   };
   readonly count?: number;
+  readonly totalTreasureCount?: number;
   readonly amount?: number;
   readonly value?: number;
   readonly newLevel?: number;
@@ -754,13 +751,6 @@ export type GameClientCommand =
   | {
       readonly type: "PROPOSE_HELP";
       readonly helperId: string;
-      readonly treasureCount: number;
-      readonly combatId: string;
-      readonly combatRevision: number;
-    }
-  | {
-      readonly type: "COUNTER_HELP";
-      readonly offerId: string;
       readonly treasureCount: number;
       readonly combatId: string;
       readonly combatRevision: number;

@@ -80,6 +80,9 @@ function cardView(state: GameState, card: CardInstance): GameCardView {
               ),
           },
         }),
+    ...(definition.companion === undefined
+      ? {}
+      : { companion: { combatBonus: definition.companion.combatBonus } }),
     ...(definition.monster === undefined
       ? {}
       : { monster: definition.monster }),
@@ -188,6 +191,7 @@ function projectLogEntry(
         ...base,
         playerId: event.playerId,
         card: requiredLogCard(state, event.cardId),
+        deck: event.deck,
       };
     case 'CARDS_DISCARDED':
       return {
@@ -315,7 +319,6 @@ function projectLogEntry(
         encounterId: event.encounterId,
       };
     case 'HELP_OFFERED':
-    case 'HELP_COUNTERED':
     case 'HELP_OFFER_ACCEPTED':
     case 'HELP_OFFER_REJECTED':
     case 'HELP_OFFER_CANCELLED':
@@ -324,6 +327,10 @@ function projectLogEntry(
         playerId: event.playerId,
         targetPlayerId: event.helperId,
         offerId: event.offerId,
+        ...('treasureCount' in event ? { count: event.treasureCount } : {}),
+        ...('totalTreasureCount' in event
+          ? { totalTreasureCount: event.totalTreasureCount }
+          : {}),
         ...('expiresAtEpochMs' in event
           ? { expiresAtEpochMs: event.expiresAtEpochMs }
           : {}),
@@ -505,7 +512,6 @@ export const EVENT_IMPORTANCE = {
   RUN_AWAY_ATTEMPTED: 'IMPORTANT',
   BAD_STUFF_APPLIED: 'IMPORTANT',
   HELP_OFFERED: 'IMPORTANT',
-  HELP_COUNTERED: 'IMPORTANT',
   HELP_OFFER_ACCEPTED: 'IMPORTANT',
   HELP_OFFER_REJECTED: 'ROUTINE',
   HELP_OFFER_CANCELLED: 'ROUTINE',
@@ -568,7 +574,7 @@ function requiresViewerAction(
       !window.confirmedPlayerIds.includes(viewerPlayerId)
     );
   }
-  if (entry.type === 'HELP_OFFERED' || entry.type === 'HELP_COUNTERED') {
+  if (entry.type === 'HELP_OFFERED') {
     const offer = state.combat?.helpOffer;
     if (
       offer === null ||
@@ -576,11 +582,7 @@ function requiresViewerAction(
       offer.offerId !== entry.offerId
     )
       return false;
-    return (
-      (offer.proposedBy === 'ACTIVE' && offer.helperId === viewerPlayerId) ||
-      (offer.proposedBy === 'HELPER' &&
-        state.combat?.playerId === viewerPlayerId)
-    );
+    return offer.helperId === viewerPlayerId;
   }
   return false;
 }
@@ -931,8 +933,7 @@ function availableIntents(
       expiresAtEpochMs: offer.expiresAtEpochMs,
       reasonCode: 'BLOCKING_RESPONSE' as const,
     };
-    const responderId =
-      offer.proposedBy === 'ACTIVE' ? offer.helperId : combat.playerId;
+    const responderId = offer.helperId;
     if (viewerPlayerId === responderId) {
       intents.push(
         {
@@ -946,17 +947,6 @@ function availableIntents(
           kind: 'REJECT_HELP_OFFER',
         },
       );
-      if (offer.proposedBy === 'ACTIVE')
-        intents.push({
-          ...address,
-          id: `help-counter:${offer.offerId}`,
-          kind: 'COUNTER_HELP',
-          minTreasures: 0,
-          maxTreasures: combat.monsters.reduce(
-            (sum, monster) => sum + calculateMonsterTreasures(monster),
-            0,
-          ),
-        });
     }
     if (viewerPlayerId === combat.playerId)
       intents.push({

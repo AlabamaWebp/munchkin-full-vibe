@@ -767,7 +767,7 @@ function combatState(
 }
 
 describe("V2 help, rewards, and helper risk", () => {
-  it("supports offer, reject, counter, accept, actor checks, revisions, and JSON reconnect", () => {
+  it("supports offer, rejection, cancellation, acceptance, actor checks, revisions, and JSON reconnect", () => {
     const initial = combatState();
     const offered = executeCommand(
       initial,
@@ -785,6 +785,13 @@ describe("V2 help, rewards, and helper risk", () => {
       helperId,
       treasureCount: 2,
     });
+    expect(offered.events).toContainEqual(
+      expect.objectContaining({
+        type: "HELP_OFFERED",
+        treasureCount: 2,
+        totalTreasureCount: 3,
+      }),
+    );
     expect(
       executeCommand(
         offeredState,
@@ -813,27 +820,39 @@ describe("V2 help, rewards, and helper risk", () => {
       state: { combat: { helpOffer: null, helpAgreement: null } },
       events: [{ type: "HELP_OFFER_REJECTED", playerId: helperId }],
     });
-    const countered = requireSuccess(
+    const cancelled = requireSuccess(
       executeCommand(
         offeredState,
         {
-          type: "COUNTER_HELP",
-          actorId: helperId,
+          type: "CANCEL_HELP_OFFER",
+          actorId: heroId,
           offerId: offeredState.combat!.helpOffer!.offerId,
-          treasureCount: 1,
           combatRevision: offeredState.combat!.revision,
+        },
+        { random: sequenceRandom(0) },
+      ),
+    );
+    const reoffered = requireSuccess(
+      executeCommand(
+        cancelled,
+        {
+          type: "PROPOSE_HELP",
+          actorId: heroId,
+          helperId,
+          treasureCount: 1,
+          combatRevision: cancelled.combat!.revision,
         },
         { random: sequenceRandom(0) },
       ),
     );
     const accepted = requireSuccess(
       executeCommand(
-        countered,
+        reoffered,
         {
           type: "ACCEPT_HELP_OFFER",
-          actorId: heroId,
-          offerId: countered.combat!.helpOffer!.offerId,
-          combatRevision: countered.combat!.revision,
+          actorId: helperId,
+          offerId: reoffered.combat!.helpOffer!.offerId,
+          combatRevision: reoffered.combat!.revision,
         },
         { random: sequenceRandom(0) },
       ),

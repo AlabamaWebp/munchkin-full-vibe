@@ -492,7 +492,7 @@ export class GameStageComponent {
   protected stageSummary(summary: string, cards: readonly GameCardView[]): string {
     return cards.reduce(
       (translated, card) => translated.replaceAll(card.name, this.cardName(card)),
-      summary || 'Сыграна карта',
+      summary || 'Карточное действие',
     );
   }
   protected receiptLabel(receipt: StageCardReceipt): string {
@@ -502,6 +502,7 @@ export class GameStageComponent {
   protected hiddenCardSummary(receipt: StageCardReceipt): string {
     const hiddenCard = receipt.hiddenCard;
     if (hiddenCard === undefined) return receipt.summary;
+    if (receipt.entry.type === 'COMBAT_REWARD_CARDS') return this.receiptLabel(receipt);
     return `${this.playerName(receipt.entry.playerId ?? null)} получил ${this.hiddenCardTitle(
       hiddenCard.deck,
       hiddenCard.count,

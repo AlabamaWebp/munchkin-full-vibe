@@ -134,9 +134,9 @@ The rules in this section supersede the earlier simplified milestone behavior.
 - One public help offer may exist per combat. The active player proposes a helper
   and 0 through the total Treasure reward currently provided by all Monsters in
   the combat; promised Treasures may never exceed the reward the combat can give.
-  The invitee may accept,
-  reject, or counter, and the active player may accept/reject the counter or
-  cancel an outstanding offer. Commands use stable offer ids and combat revisions.
+  The invitee may accept or reject. The active player may cancel an outstanding
+  offer. Requests and rejections are unlimited while the combat is unresolved.
+  Commands use stable offer ids and combat revisions.
   Acceptance creates one immutable reconnect-safe agreement.
 - At victory, only the active player receives levels. The helper receives the
   smaller of the promised count and final Treasure count, and the active player

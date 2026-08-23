@@ -352,7 +352,8 @@ interface CardUse {
                   ><span>Монстры {{ game().combat!.monsterPower }}</span>
                 </div>
                 <p>
-                  Предложено сокровищ: <b>{{ offer.treasureCount }}</b>
+                  Предложено сокровищ:
+                  <b>{{ offer.treasureCount }} / {{ combatTreasureReward() }}</b>
                 </p>
                 <p>
                   <time>Ответ до {{ deadlineLabel(offer.expiresAtEpochMs) }}</time>
@@ -361,19 +362,13 @@ interface CardUse {
                   <button class="primary" type="button" (click)="sendAction('ACCEPT_HELP_OFFER')">
                     Принять
                   </button>
-                  <div class="counter">
-                    <button type="button" (click)="decreaseHelpTreasure()">−</button
-                    ><b>{{ helpTreasure() }} / {{ helpTreasureLimits().max }}</b
-                    ><button
-                      type="button"
-                      [disabled]="helpTreasure() >= helpTreasureLimits().max"
-                      (click)="increaseHelpTreasure()"
-                    >
-                      +</button
-                    ><button type="button" (click)="counterHelp()">Ответить</button>
-                  </div>
                   <button type="button" (click)="sendAction('REJECT_HELP_OFFER')">
                     Отказаться
+                  </button>
+                }
+                @if (hasIntent('CANCEL_HELP_OFFER')) {
+                  <button type="button" (click)="sendAction('CANCEL_HELP_OFFER')">
+                    Отозвать запрос
                   </button>
                 }
               } @else {
@@ -892,7 +887,6 @@ export class GameShellComponent {
           'LOOK_FOR_TROUBLE',
           'SCAVENGE',
           'PROPOSE_HELP',
-          'COUNTER_HELP',
           'ACCEPT_HELP_OFFER',
           'REJECT_HELP_OFFER',
           'CANCEL_HELP_OFFER',
@@ -931,9 +925,6 @@ export class GameShellComponent {
     const proposal = this.intent('PROPOSE_HELP');
     if (proposal?.kind === 'PROPOSE_HELP')
       return { min: proposal.minTreasures, max: proposal.maxTreasures };
-    const counter = this.intent('COUNTER_HELP');
-    if (counter?.kind === 'COUNTER_HELP')
-      return { min: counter.minTreasures ?? 0, max: counter.maxTreasures ?? 0 };
     return { min: 0, max: 0 };
   });
   protected readonly charityIntent = computed(() =>
@@ -983,7 +974,6 @@ export class GameShellComponent {
           'RUN_AWAY_ATTEMPTED',
           'BAD_STUFF_APPLIED',
           'HELP_OFFERED',
-          'HELP_COUNTERED',
           'HELP_OFFER_ACCEPTED',
         ].includes(event.entry.type);
       return true;
@@ -1083,7 +1073,6 @@ export class GameShellComponent {
       this.openHelp();
       return;
     }
-    if (action === 'COUNTER_HELP') return;
     const intent = this.intent(action);
     const command = intent === undefined ? null : this.commandForIntent(intent);
     if (command !== null) {
@@ -1151,7 +1140,7 @@ export class GameShellComponent {
 
   protected chooseUse(use: CardUse): void {
     this.cardUses.set(null);
-    this.fullHandOpen.set(false);
+    if (use.command?.type !== 'EQUIP_ITEM') this.fullHandOpen.set(false);
     if (use.command) this.send(use.command);
     else if (use.picker) this.targetPicker.set(use.picker);
   }
@@ -1234,20 +1223,6 @@ export class GameShellComponent {
       this.helpOpen.set(false);
     }
   }
-  protected counterHelp(): void {
-    const combat = this.game().combat,
-      offer = combat?.helpOffer;
-    if (combat && offer) {
-      this.send({
-        type: 'COUNTER_HELP',
-        offerId: offer.offerId,
-        treasureCount: this.clampHelpTreasure(this.helpTreasure()),
-        combatId: combat.combatId,
-        combatRevision: combat.revision,
-      });
-      this.helpOpen.set(false);
-    }
-  }
   protected decreaseHelpTreasure(): void {
     this.helpTreasure.update((value) => this.clampHelpTreasure(value - 1));
   }
@@ -1266,6 +1241,14 @@ export class GameShellComponent {
   }
   protected helperPower(id: string): number {
     return this.game().players.find((player) => player.playerId === id)?.combatPower ?? 0;
+  }
+  protected combatTreasureReward(): number {
+    return (
+      this.game().combat?.monsters.reduce(
+        (total, monster) => total + monster.currentTreasures,
+        0,
+      ) ?? 0
+    );
   }
   protected playerName(id: string): string {
     return this.player(id)?.name ?? 'Игрок';
@@ -1557,10 +1540,15 @@ export class GameShellComponent {
     const bonus =
       card.equipment?.combatBonus ??
       (bonusEffect?.type === 'COMBAT_BONUS' ? bonusEffect.amount : undefined);
+    const combatValue = card.monster
+      ? `Сила ${card.monster.strength ?? card.monster.level ?? 0}`
+      : bonus === undefined
+        ? '—'
+        : `+${bonus}`;
     const price = card.goldValue ?? card.equipment?.value;
     return [
       this.compactCardType(card),
-      bonus === undefined ? '—' : `+${bonus}`,
+      combatValue,
       price === undefined ? '—' : `${price}`,
     ];
   }

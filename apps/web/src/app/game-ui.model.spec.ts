@@ -378,7 +378,41 @@ describe('game UI state mapper', () => {
     expect(latestStageCardEvent(game)).toMatchObject({
       cards: [],
       hiddenCard: { deck: 'TREASURE', count: 1 },
-      summary: 'Ada получил закрытую карту',
+      summary: 'Ada получил 1 карту сокровища в закрытую',
+    });
+  });
+  it('combines multiple same-deck draws into one visible card selection', () => {
+    const first = card({ instanceId: 'draw-1', name: 'Door Map', deck: 'DOOR' });
+    const second = card({ instanceId: 'draw-2', name: 'Old Key', deck: 'DOOR' });
+    const game = view({
+      phase: 'POST_DOOR',
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'CARD_DRAWN',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          card: first,
+          deck: 'DOOR',
+        },
+        {
+          sequence: 2,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'CARD_DRAWN',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          card: second,
+          deck: 'DOOR',
+        },
+      ],
+    });
+
+    expect(latestStageCardEvent(game)).toMatchObject({
+      cards: [first, second],
+      summary: 'Ada получил 2 карты дверей в закрытую',
     });
   });
   it('groups simultaneous combat rewards into recipient tabs without revealing another player card', () => {
@@ -411,6 +445,9 @@ describe('game UI state mapper', () => {
       { entry: { playerId: 'p1' }, cards: [ownTreasure] },
       { entry: { playerId: 'p2' }, hiddenCard: { deck: 'TREASURE', count: 1 } },
     ]);
+    expect(latestStageCardEvent(game)?.receipts[0]?.summary).toBe(
+      'Ada получил 1 карту сокровищ в закрытую',
+    );
   });
   it('exposes an unavailable card reason', () =>
     expect(

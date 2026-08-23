@@ -176,6 +176,9 @@ describe('GameStageComponent', () => {
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.textContent).toContain('Ada получил 1 сокровище');
     expect(tabs[1]?.textContent).toContain('Grace получил 1 сокровище');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Ada получил 1 карту сокровищ в закрытую',
+    );
     expect(fixture.nativeElement.querySelector('.event-card h3')?.textContent).toContain(
       'Copper Compass',
     );
@@ -184,5 +187,45 @@ describe('GameStageComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.hidden-card-art')?.textContent).toContain('?');
     expect(fixture.nativeElement.textContent).not.toContain('Copper Compass');
+  });
+
+  it('shows all cards from one utility draw in the card selector', async () => {
+    await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(GameStageComponent);
+    const first = { ...card('draw-1', 'Door Map'), deck: 'DOOR' as const };
+    const second = { ...card('draw-2', 'Old Key'), deck: 'DOOR' as const };
+    const currentGame: GameView = {
+      ...game([]),
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'CARD_DRAWN',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          card: first,
+          deck: 'DOOR',
+        },
+        {
+          sequence: 2,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'CARD_DRAWN',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          card: second,
+          deck: 'DOOR',
+        },
+      ],
+    };
+    fixture.componentRef.setInput('game', currentGame);
+    fixture.componentRef.setInput('stage', 'POST_DOOR_CHOICE');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Ada получил 2 карты дверей в закрытую',
+    );
+    expect(fixture.nativeElement.querySelectorAll('.card-tabs button')).toHaveLength(2);
   });
 });

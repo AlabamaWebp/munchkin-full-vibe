@@ -190,11 +190,12 @@ export type CombatHistoryEntry =
       readonly monsterDefinitionId: CardDefinitionId;
     }
   | {
-      readonly type: "HELP_OFFERED" | "HELP_COUNTERED";
+      readonly type: "HELP_OFFERED";
       readonly playerId: PlayerId;
       readonly helperId: PlayerId;
       readonly offerId: HelpOfferId;
       readonly treasureCount: number;
+      readonly totalTreasureCount: number;
     }
   | {
       readonly type: "HELP_OFFER_ACCEPTED";

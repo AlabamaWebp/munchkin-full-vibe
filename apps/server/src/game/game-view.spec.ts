@@ -4,6 +4,7 @@ import {
   createGame,
   createSeededRandomSource,
   executeCommand,
+  GameMode,
   GamePhase,
   parseGameId,
   parseHelpOfferId,
@@ -771,6 +772,64 @@ describe('createGameView', () => {
     );
   });
 
+  it('projects companion and mount combat bonuses for the character sheet', () => {
+    const playerId = parsePlayerId('companion-solo');
+    const random = createSeededRandomSource(24);
+    let state = createGame({
+      id: parseGameId('COMP'),
+      config: {
+        mode: GameMode.BALANCED,
+        enabledSetIds: [CardSetId.CORE, CardSetId.COMPANIONS],
+      },
+    });
+    const added = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId: playerId, name: 'Solo' },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const started = executeCommand(
+      added.state,
+      { type: 'START_GAME', actorId: playerId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+
+    const cards = [
+      ...started.state.treasureDeck,
+      ...started.state.players[0]!.hand,
+    ];
+    const hireling = cards.find((card) =>
+      started.state.cardDefinitions.some(
+        (definition) =>
+          definition.id === card.definitionId &&
+          definition.type === CardType.HIRELING,
+      ),
+    );
+    const mount = cards.find((card) =>
+      started.state.cardDefinitions.some(
+        (definition) =>
+          definition.id === card.definitionId &&
+          definition.type === CardType.MOUNT,
+      ),
+    );
+    if (hireling === undefined || mount === undefined)
+      throw new Error('Missing development companions.');
+
+    state = {
+      ...started.state,
+      players: started.state.players.map((player) => ({
+        ...player,
+        hirelingCard: hireling,
+        mountCard: mount,
+      })),
+    };
+
+    const view = createGameView(state, playerId);
+    expect(view.self.hirelingCard?.companion?.combatBonus).toBeGreaterThan(0);
+    expect(view.self.mountCard?.companion?.combatBonus).toBeGreaterThan(0);
+  });
+
   it('does not project item transfer actions outside the viewer turn', () => {
     const adaId = parsePlayerId('trade-ada');
     const graceId = parsePlayerId('trade-grace');
@@ -1076,6 +1135,7 @@ describe('createGameView', () => {
             helperId,
             offerId: parseHelpOfferId('offer-1'),
             treasureCount: 0,
+            totalTreasureCount: 1,
           },
         ],
       },
@@ -1086,7 +1146,6 @@ describe('createGameView', () => {
       expect.arrayContaining([
         expect.objectContaining({ kind: 'ACCEPT_HELP_OFFER' }),
         expect.objectContaining({ kind: 'REJECT_HELP_OFFER' }),
-        expect.objectContaining({ kind: 'COUNTER_HELP' }),
       ]),
     );
     expect(helperView.combat?.history).toHaveLength(2);
@@ -1094,6 +1153,9 @@ describe('createGameView', () => {
     const activeView = createGameView(state, activeId);
     expect(activeView.availableIntents).not.toContainEqual(
       expect.objectContaining({ kind: 'PROPOSE_HELP' }),
+    );
+    expect(activeView.availableIntents).toContainEqual(
+      expect.objectContaining({ kind: 'CANCEL_HELP_OFFER' }),
     );
     expect(activeView.combat).toMatchObject({ requestedHelperId: helperId });
     expect(activeView.combat?.helpOffer).toEqual(helperView.combat?.helpOffer);

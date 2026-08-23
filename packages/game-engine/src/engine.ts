@@ -3266,6 +3266,7 @@ function proposeHelp(
       "The promised Treasure count is invalid.",
     );
   const offerId = parseHelpOfferId(`offer-${combat.nextHelpOfferSequence}`);
+  const totalTreasureCount = expectedCombatTreasures(state);
   const nextCombat = {
     ...combat,
     revision: combat.revision + 1,
@@ -3285,6 +3286,7 @@ function proposeHelp(
         helperId,
         offerId,
         treasureCount,
+        totalTreasureCount,
       },
     ],
   };
@@ -3296,6 +3298,7 @@ function proposeHelp(
       helperId,
       offerId,
       treasureCount,
+      totalTreasureCount,
       expiresAtEpochMs: nowEpochMs + HELP_OFFER_TIMEOUT_MS,
     },
   ]);
@@ -3308,76 +3311,6 @@ function currentOffer(
   return state.combat?.helpOffer?.offerId === offerId
     ? state.combat.helpOffer
     : null;
-}
-
-function counterHelp(
-  state: GameState,
-  actorId: PlayerId,
-  offerId: import("./identifiers.js").HelpOfferId,
-  treasureCount: number,
-  combatId: import("./identifiers.js").CombatId,
-  combatRevision: number,
-  nowEpochMs: number,
-): CommandResult {
-  const invalid = validateHelpContext(state, combatId, combatRevision);
-  if (invalid !== null) return invalid;
-  const offer = currentOffer(state, offerId);
-  if (
-    offer === null ||
-    offer.proposedBy !== "ACTIVE" ||
-    offer.helperId !== actorId
-  )
-    return fail(
-      state,
-      "HELP_NOT_REQUESTED",
-      "Only the addressed helper may counter this offer.",
-    );
-  if (
-    !Number.isInteger(treasureCount) ||
-    treasureCount < 0 ||
-    treasureCount > expectedCombatTreasures(state) ||
-    treasureCount === offer.treasureCount
-  )
-    return fail(
-      state,
-      "INVALID_CARD_SELECTION",
-      "The counter must be a different legal count.",
-    );
-  const combat = state.combat!;
-  const nextOfferId = parseHelpOfferId(`offer-${combat.nextHelpOfferSequence}`);
-  const nextCombat = {
-    ...combat,
-    revision: combat.revision + 1,
-    nextHelpOfferSequence: combat.nextHelpOfferSequence + 1,
-    helpOffer: {
-      offerId: nextOfferId,
-      helperId: actorId,
-      proposedBy: "HELPER" as const,
-      treasureCount,
-      expiresAtEpochMs: nowEpochMs + HELP_OFFER_TIMEOUT_MS,
-    },
-    history: [
-      ...combat.history,
-      {
-        type: "HELP_COUNTERED" as const,
-        playerId: actorId,
-        helperId: actorId,
-        offerId: nextOfferId,
-        treasureCount,
-      },
-    ],
-  };
-  return succeed({ ...state, combat: nextCombat }, [
-    {
-      type: "HELP_COUNTERED",
-      visibility: "PUBLIC",
-      playerId: actorId,
-      helperId: actorId,
-      offerId: nextOfferId,
-      treasureCount,
-      expiresAtEpochMs: nowEpochMs + HELP_OFFER_TIMEOUT_MS,
-    },
-  ]);
 }
 
 function acceptHelpOffer(
@@ -4417,17 +4350,6 @@ function executePlayerCommand(
     );
   }
 
-  if (command.type === "COUNTER_HELP") {
-    return counterHelp(
-      state,
-      command.actorId,
-      command.offerId,
-      command.treasureCount,
-      command.combatId,
-      command.combatRevision,
-      contextNow(context),
-    );
-  }
   if (command.type === "ACCEPT_HELP_OFFER") {
     return acceptHelpOffer(
       state,

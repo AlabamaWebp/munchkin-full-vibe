@@ -1,8 +1,4 @@
-import type {
-  GameCardView,
-  GameLogEntryView,
-  GameView,
-} from '@munchkin-lan/contracts';
+import type { GameCardView, GameLogEntryView, GameView } from '@munchkin-lan/contracts';
 
 export type GameStageKind =
   | 'TURN_READY'
@@ -74,6 +70,7 @@ export function latestStageCardEvent(game: GameView): StageCardEvent | null {
     hiddenCard: candidate.hiddenCard,
     summary: eventSummary(game, candidate),
   });
+  const drawDeck = entry.deck ?? entry.hiddenCard?.deck;
   const receipts =
     entry.type === 'COMBAT_REWARD_CARDS'
       ? game.gameLog
@@ -84,9 +81,43 @@ export function latestStageCardEvent(game: GameView): StageCardEvent | null {
               candidate.turnNumber === game.turnNumber,
           )
           .map(receipt)
+      : entry.type === 'CARD_DRAWN' && drawDeck !== undefined
+        ? [
+            combinedDrawReceipt(
+              game,
+              game.gameLog.filter(
+                (candidate) =>
+                  candidate.type === 'CARD_DRAWN' &&
+                  candidate.playerId === entry.playerId &&
+                  candidate.phase === game.phase &&
+                  candidate.turnNumber === game.turnNumber &&
+                  (candidate.deck ?? candidate.hiddenCard?.deck) === drawDeck,
+              ),
+            ),
+          ]
       : [receipt(entry)];
-  const latestReceipt = receipt(entry);
+  const latestReceipt = receipts.at(-1) ?? receipt(entry);
   return { ...latestReceipt, receipts };
+}
+
+function combinedDrawReceipt(
+  game: GameView,
+  entries: readonly GameLogEntryView[],
+): StageCardReceipt {
+  const entry = entries.at(-1);
+  if (entry === undefined) throw new Error('A card-draw receipt requires an entry.');
+  const cards = entries.flatMap((candidate) =>
+    candidate.card === undefined ? candidate.cards ?? [] : [candidate.card],
+  );
+  const deck = entry.deck ?? entry.hiddenCard?.deck;
+  if (deck === undefined) throw new Error('A card-draw receipt requires a deck.');
+  const count = cards.length || entries.reduce((sum, candidate) => sum + (candidate.hiddenCard?.count ?? 0), 0);
+  return {
+    entry,
+    cards,
+    hiddenCard: cards.length > 0 ? undefined : { deck, count },
+    summary: `${playerName(game, entry.playerId)} получил ${deckCardsLabel(deck, count)} в закрытую`,
+  };
 }
 
 export function presentEvents(game: GameView): readonly PresentedEvent[] {
@@ -109,8 +140,7 @@ export function presentEvents(game: GameView): readonly PresentedEvent[] {
 }
 
 function eventSummary(game: GameView, entry: GameLogEntryView): string {
-  const player =
-    game.players.find((candidate) => candidate.playerId === entry.playerId)?.name ?? 'Игрок';
+  const player = playerName(game, entry.playerId);
   const target = game.players.find(
     (candidate) => candidate.playerId === entry.targetPlayerId,
   )?.name;
@@ -121,11 +151,12 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     case 'DOOR_KICKED':
       return `${player} открыл ${card ?? 'дверь'}`;
     case 'CARD_ADDED_TO_HAND':
-      return `${player} получил ${card ?? 'карту'}`;
+      return `${player} получил ${card ?? 'карту'} в открытую`;
     case 'CARD_DRAWN':
-      return entry.hiddenCard === undefined
-        ? `${player} получил ${card ?? 'карту'}`
-        : `${player} получил закрытую карту`;
+      return `${player} получил ${deckCardsLabel(
+        entry.deck ?? entry.hiddenCard?.deck ?? 'TREASURE',
+        entry.hiddenCard?.count ?? 1,
+      )} в закрытую`;
     case 'LOOKED_FOR_TROUBLE':
       return `${player} нашёл неприятности: ${card ?? 'монстр'}`;
     case 'CURSE_RESOLVED':
@@ -137,9 +168,7 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     case 'CARDS_DISCARDED':
       return `${player} сбросил ${entry.count ?? 0} карт`;
     case 'HELP_OFFERED':
-      return `${player} предложил помощь`;
-    case 'HELP_COUNTERED':
-      return `${player} изменил условия помощи`;
+      return `${player} просит помощи за ${entry.count ?? 0}/${entry.totalTreasureCount ?? 0} сокровищ`;
     case 'HELP_OFFER_ACCEPTED':
       return `Помощь согласована`;
     case 'COMBAT_VICTORY_DECLARED':
@@ -159,15 +188,15 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     case 'TREASURE_GAINED':
       return `${player} получил сокровища: ${entry.count ?? 0}`;
     case 'COMBAT_REWARD_CARDS':
-      return entry.hiddenCard === undefined
-        ? `${player} получил сокровища`
-        : `${player} получил закрытые сокровища`;
+      return `${player} получил ${treasureCardsLabel(
+        entry.hiddenCard?.count ?? entry.cards?.length ?? entry.count ?? 0,
+      )} в закрытую`;
     case 'SCAVENGED':
       return `${player} нашёл снаряжение`;
     case 'SCAVENGED_CARD':
       return entry.hiddenCard === undefined
-        ? `${player} получил ${card ?? 'карту'}`
-        : `${player} получил закрытую карту`;
+        ? `${player} получил ${card ?? 'карту'} в закрытую`
+        : `${player} получил карту сокровища в закрытую`;
     case 'PLAYER_DIED':
       return `${player} погиб`;
     case 'PLAYER_REVIVED':
@@ -195,6 +224,39 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     default:
       return '';
   }
+}
+
+function playerName(game: GameView, playerId: string | undefined): string {
+  return game.players.find((candidate) => candidate.playerId === playerId)?.name ?? 'Игрок';
+}
+
+function deckCardsLabel(deck: 'DOOR' | 'TREASURE', count: number): string {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  const noun =
+    count === 1
+      ? 'карту'
+      : lastTwo >= 11 && lastTwo <= 14
+        ? 'карт'
+        : last >= 2 && last <= 4
+          ? 'карты'
+          : 'карт';
+  const deckName = count === 1 ? (deck === 'DOOR' ? 'двери' : 'сокровища') : deck === 'DOOR' ? 'дверей' : 'сокровищ';
+  return `${count} ${noun} ${deckName}`;
+}
+
+function treasureCardsLabel(count: number): string {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  const noun =
+    count === 1
+      ? 'карту'
+      : lastTwo >= 11 && lastTwo <= 14
+        ? 'карт'
+        : last >= 2 && last <= 4
+          ? 'карты'
+          : 'карт';
+  return `${count} ${noun} сокровищ`;
 }
 
 export function unavailableReason(game: GameView, cardId: string): string {

@@ -11,6 +11,12 @@ V2 final audit complete; live-game blockers remain
 - targeted card plays now show the acting player and the player who was
   targeted; this makes Curse entries explicitly identify who received them.
 
+## Companion power in profile (2026-08-23)
+
+- character-sheet companion and mount slots now receive and display their
+  authored combat bonus, rather than rendering the Equipment-only fallback of
+  `+0`.
+
 ## Curse timing (2026-08-23)
 
 - ordinary hand Curses are now server-authorized throughout an in-progress game:
@@ -44,6 +50,13 @@ V2 final audit complete; live-game blockers remain
   cards.
 - starting-hand deals remain private history only and are intentionally omitted
   from the in-stage card activity area.
+- combat reward captions now state that cards were received (with their count)
+  instead of falling back to the misleading “card played” wording.
+- multi-card utility draws now combine into one in-stage card selector; public
+  summaries identify whether the closed cards came from the Door or Treasure
+  deck.
+- card-receipt captions now explicitly state whether the recipient got the
+  card openly or facedown.
 
 ## Optional-set card interaction (2026-08-23)
 
@@ -100,9 +113,13 @@ V2 final audit complete; live-game blockers remain
 - «Переодеть» now includes the static Equipment combat-bonus change (for example, `+2 силы` or `-1 силы`) after replacing only the conflicting items.
 - server-projected card sale and charity actions now appear in the primary bottom action dock outside combat, rather than in the menu; an empty dock stays silent on the viewer's own turn.
 - game history now displays `ROLE_PLAYED` and `ROLE_DISCARDED` events, including the player, Class/Race kind, and card name.
-- help-offer and counter-offer controls now use the server-projected Treasure bounds: the
+- help-offer controls use the server-projected Treasure bounds: the
   selected amount is clamped to the current reward, the increment control disables at its
   maximum, and the UI shows the available `current / maximum` range.
+- Help negotiation now has a single offer flow: the invited player can only accept or
+  reject, while the active player can withdraw the request. Rejections, withdrawals, and
+  new requests may repeat without a per-combat limit; the log and offer sheet show the
+  promised/total Treasure count (for example, `2/3`).
 - integrated the supplied tabletop background and completed a mobile visual-alignment pass for
   the combat shell: corrected the row allocation that collapsed the combat stage, then refined
   the combat card, score hierarchy, player rail, character summary, hand cards, action dock,
@@ -718,6 +735,13 @@ Verified on 2026-08-23 after the responsive adaptation:
   and hand count; equipment artwork is no longer shown there.
 
 ## Latest UI update
+
+- Убрана дублирующая запись о сокровищах без количества: в логе остаётся запись
+  `получил сокровища: N`.
+- В нижней строке карточек меню руки у монстров теперь отображается их сила
+  рядом с типом и стоимостью, аналогично бонусу снаряжения.
+- Меню полной руки теперь остаётся открытым после надевания снаряжения; закрываются
+  только карточка и меню действия, чтобы можно было сразу продолжить выбор карт.
 
 - В `app-hand-dock` сводка персонажа и компактная кнопка открытия меню руки
   теперь находятся в одной строке; прежняя кнопка `.full-hand`, перекрывавшая

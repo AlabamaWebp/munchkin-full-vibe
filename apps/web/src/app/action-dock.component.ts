@@ -11,7 +11,6 @@ const PRIORITY: readonly AvailableGameAction[] = [
   'PASS_COMBAT_REACTION',
   'DECLARE_COMBAT_VICTORY',
   'PROPOSE_HELP',
-  'COUNTER_HELP',
   'RUN_AWAY',
   'KICK_DOOR',
   'LOOK_FOR_TROUBLE',
@@ -41,7 +40,8 @@ const PRIORITY: readonly AvailableGameAction[] = [
       }
       @for (action of utilityActions(); track action.id) {
         <button type="button" class="utility" (click)="utilityActionSelected.emit(action.id)">
-          <strong>{{ action.label }}</strong><small>{{ action.hint }}</small>
+          <strong>{{ action.label }}</strong
+          ><small>{{ action.hint }}</small>
         </button>
       }
       @if (overflow().length > 0) {
@@ -49,7 +49,12 @@ const PRIORITY: readonly AvailableGameAction[] = [
           Все действия · {{ overflow().length }}
         </button>
       }
-      @if (visible().length === 0 && utilityActions().length === 0 && !hasPlayableCombatCards() && !isOwnTurn()) {
+      @if (
+        visible().length === 0 &&
+        utilityActions().length === 0 &&
+        !hasPlayableCombatCards() &&
+        !isOwnTurn()
+      ) {
         <p>Ожидаем действие другого игрока</p>
       }
     </nav>
@@ -228,7 +233,6 @@ export class ActionDockComponent {
       LOOK_FOR_TROUBLE: 'Искать неприятности',
       SCAVENGE: 'Подобрать снаряжение',
       PROPOSE_HELP: 'Просить помощь',
-      COUNTER_HELP: 'Изменить условия',
       ACCEPT_HELP_OFFER: 'Принять помощь',
       REJECT_HELP_OFFER: 'Отказаться',
       CANCEL_HELP_OFFER: 'Отменить предложение',
