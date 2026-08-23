@@ -29,34 +29,6 @@ import { CardArtworkComponent } from './card-artwork.component';
             }
           </div>
         }
-        <button
-          type="button"
-          class="score"
-          aria-label="Открыть расчёт силы"
-          (click)="breakdownOpened.emit()"
-        >
-          <span
-            ><small>ИГРОКИ</small><b>{{ combat.playerPower }}</b></span
-          >
-          <strong>VS</strong>
-          <span
-            ><small>МОНСТРЫ</small><b>{{ combat.monsterPower }}</b></span
-          >
-          <em [class.losing]="difference() <= 0"
-            >{{ difference() > 0 ? '+' : '' }}{{ difference() }}</em
-          >
-        </button>
-        <div class="participants">
-          <span>{{ playerName(combat.playerId) }}</span>
-          @if (combat.helpAgreement; as agreement) {
-            <span class="agreement"
-              >{{ playerName(agreement.helperId) }} помогает · получит
-              {{ agreement.promisedTreasures }}</span
-            >
-          } @else if (combat.helperId) {
-            <span>{{ playerName(combat.helperId) }} помогает</span>
-          }
-        </div>
         @if (combat.monsters.length > 1) {
           <div class="encounter-tabs" aria-label="Монстры в бою">
             @for (encounter of combat.monsters; track encounter.encounterId) {
@@ -71,6 +43,9 @@ import { CardArtworkComponent } from './card-artwork.component';
           </div>
         }
         <article class="monster">
+          <div class="monster-title">
+            <h3>{{ focused().monster.name }}</h3>
+          </div>
           <button
             type="button"
             class="monster-art"
@@ -83,14 +58,19 @@ import { CardArtworkComponent } from './card-artwork.component';
               [compact]="true"
             />
           </button>
-          <div class="monster-copy">
-            <h3>{{ focused().monster.name }}</h3>
-            <div class="rewards">
-              <b>СИЛА {{ focused().currentStrength }}</b>
-              <span>💰 {{ focused().currentTreasures }}</span>
-              <span>ур. +{{ focused().baseLevelRewards }}</span>
-            </div>
+          <span class="monster-strength"
+            ><b>{{ focused().currentStrength }}</b
+            ><small>СИЛА</small></span
+          >
+          <div class="monster-footer">
             <p><strong>Непотребство:</strong> {{ badStuff() }}</p>
+            <div class="rewards">
+              <b>НАГРАДА</b>
+              <span
+                >+{{ focused().baseLevelRewards }} {{ levelWord() }} ·
+                {{ focused().currentTreasures }} {{ treasureWord() }}</span
+              >
+            </div>
             @if (focused().strengthModifier !== 0 || focused().treasureModifier !== 0) {
               <div class="modifiers">
                 @if (focused().strengthModifier !== 0) {
@@ -103,9 +83,44 @@ import { CardArtworkComponent } from './card-artwork.component';
             }
           </div>
         </article>
-        @if (canRequestHelp()) {
-          <button type="button" class="help" (click)="helpOpened.emit()">Попросить помощь</button>
+        <button
+          type="button"
+          class="score"
+          aria-label="Открыть расчёт силы"
+          (click)="breakdownOpened.emit()"
+        >
+          <span
+            ><small>ВАША СИЛА</small><b>{{ combat.playerPower }}</b></span
+          >
+          <strong>⚔</strong>
+          <span
+            ><small>СИЛА МОНСТРА</small><b>{{ combat.monsterPower }}</b></span
+          >
+          <em [class.losing]="difference() <= 0"
+            >{{ difference() > 0 ? '+' : '' }}{{ difference() }}</em
+          >
+        </button>
+        <div class="outcome" [class.losing]="difference() <= 0">
+          {{
+            difference() > 0
+              ? 'Преимущество ' + difference()
+              : 'Не хватает ' + -difference() + ' силы'
+          }}
+        </div>
+        @if (difference() <= 0) {
+          <p class="combat-hint">Усильтесь картой, позовите на помощь или смойтесь</p>
         }
+        <div class="participants">
+          <span>{{ playerName(combat.playerId) }}</span>
+          @if (combat.helpAgreement; as agreement) {
+            <span class="agreement"
+              >{{ playerName(agreement.helperId) }} помогает · получит
+              {{ agreement.promisedTreasures }}</span
+            >
+          } @else if (combat.helperId) {
+            <span>{{ playerName(combat.helperId) }} помогает</span>
+          }
+        </div>
       </section>
     }
   `,
@@ -120,7 +135,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       height: 100%;
       min-height: 0;
       align-content: center;
-      gap: 0.45rem;
+      gap: 0.32rem;
     }
     .reaction {
       display: grid;
@@ -146,14 +161,22 @@ import { CardArtworkComponent } from './card-artwork.component';
       position: relative;
       display: grid;
       width: 100%;
-      min-height: 4.6rem;
-      padding: 0.4rem 3.2rem 0.4rem 0.6rem;
+      min-height: 3.8rem;
+      padding: 0.32rem 2.65rem 0.32rem 0.55rem;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      border: 1px solid #657a6c;
-      border-radius: 0.85rem;
+      border: 1px solid #8e6734;
+      border-radius: 0.9rem;
       color: #fff;
-      background: linear-gradient(90deg, #244d37, #1a241e 48%, #402923);
+      background: linear-gradient(
+        100deg,
+        rgba(20, 27, 19, 0.97),
+        rgba(20, 15, 10, 0.97) 48%,
+        rgba(54, 25, 19, 0.97)
+      );
+      box-shadow:
+        inset 0 1px rgba(255, 225, 159, 0.13),
+        0 0.3rem 0.85rem rgba(0, 0, 0, 0.28);
     }
     .score span {
       display: grid;
@@ -161,27 +184,29 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .score small {
       color: #bdc9c0;
-      font-size: 0.58rem;
+      font-size: 0.67rem;
       letter-spacing: 0.08em;
     }
     .score b {
-      font-size: clamp(1.75rem, 9vw, 2.65rem);
+      font:
+        900 clamp(1.65rem, 8vw, 2.15rem)/1 Georgia,
+        serif;
       line-height: 1;
     }
     .score > strong {
-      color: #f0c971;
-      font-size: 0.75rem;
+      color: #edc978;
+      font-size: 1.1rem;
     }
     .score em {
       position: absolute;
       right: 0.55rem;
       display: grid;
-      width: 2.45rem;
-      height: 2.45rem;
+      width: 2rem;
+      height: 2rem;
       place-items: center;
       border-radius: 50%;
       color: #102017;
-      background: #88d19b;
+      background: #92c58b;
       font-style: normal;
       font-weight: 950;
     }
@@ -193,22 +218,54 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: flex;
       min-width: 0;
       justify-content: center;
-      gap: 0.35rem;
+      gap: 0.25rem;
       overflow: hidden;
     }
     .participants span {
-      padding: 0.18rem 0.4rem;
+      padding: 0.12rem 0.38rem;
       overflow: hidden;
       border-radius: 999px;
       color: #dce5de;
-      background: #243229;
-      font-size: 0.58rem;
+      background: rgba(34, 26, 18, 0.85);
+      font-size: 0.55rem;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .participants span:only-child {
+      display: none;
     }
     .participants .agreement {
       color: #15231a;
       background: #aad4b5;
+    }
+    .outcome {
+      justify-self: center;
+      margin-top: -0.75rem;
+      z-index: 2;
+      padding: 0.2rem 0.85rem;
+      border: 1px solid #4f8358;
+      border-radius: 999px;
+      color: #dff0df;
+      background: #173b29;
+      box-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.4);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+    .outcome.losing {
+      border-color: #ba6048;
+      color: #ffb49b;
+      background: #3b1d17;
+    }
+    .combat-hint {
+      display: block;
+      padding: 0.16rem 0.6rem;
+      border: 1px solid rgba(163, 117, 52, 0.55);
+      border-radius: 999px;
+      color: #e1ceb0;
+      background: rgba(20, 15, 10, 0.86);
+      font-size: 0.68rem;
+      text-align: center;
+      -webkit-line-clamp: 1;
     }
     .encounter-tabs {
       display: flex;
@@ -235,59 +292,106 @@ import { CardArtworkComponent } from './card-artwork.component';
       color: #ffe8b3;
     }
     .monster {
+      position: relative;
       display: grid;
-      min-height: 0;
-      padding: 0.45rem;
-      grid-template-columns: minmax(4.5rem, 28%) 1fr;
-      gap: 0.55rem;
+      width: min(100%, 12.25rem);
+      min-height: 13.15rem;
+      padding: 0.38rem;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      justify-self: center;
+      gap: 0.28rem;
       overflow: hidden;
-      border: 1px solid #754c47;
-      border-radius: 0.8rem;
-      background: linear-gradient(145deg, rgba(76, 39, 35, 0.92), rgba(24, 18, 16, 0.96));
+      border: 2px solid #b25637;
+      border-radius: 0.95rem;
+      background: linear-gradient(145deg, rgba(77, 35, 21, 0.96), rgba(17, 12, 9, 0.96));
+      box-shadow:
+        inset 0 0 0 2px rgba(10, 7, 5, 0.82),
+        0 0.5rem 1.25rem rgba(0, 0, 0, 0.58),
+        0 0 1rem rgba(113, 45, 25, 0.2);
     }
     .monster-art {
       min-width: 0;
-      min-height: 4.5rem;
+      min-height: 0;
       padding: 0;
       border: 0;
       background: transparent;
     }
-    .monster-copy {
+    .monster-art app-card-artwork {
+      height: 100%;
+    }
+    .monster-title,
+    .monster-footer {
       display: grid;
       min-width: 0;
       align-content: center;
-      gap: 0.28rem;
+      gap: 0.18rem;
+      text-align: center;
     }
     h3 {
       margin: 0;
       overflow: hidden;
       font:
-        800 clamp(0.82rem, 4vw, 1.05rem)/1.05 Georgia,
+        800 clamp(0.77rem, 3.9vw, 0.9rem)/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .rewards {
-      display: flex;
+      display: grid;
+      padding: 0.18rem 0.3rem 0.22rem;
       align-items: center;
-      gap: 0.45rem;
+      justify-content: center;
+      gap: 0.04rem;
+      border: 1px solid #c28b45;
+      border-radius: 0.42rem;
+      color: #26180c;
+      background: linear-gradient(145deg, #d1a45f, #8c5c28);
     }
     .rewards b {
-      color: #ffd67a;
-      font-size: 0.8rem;
+      color: #2b1808;
+      font:
+        900 0.62rem Georgia,
+        serif;
     }
     .rewards span {
-      font-size: 0.65rem;
+      font:
+        800 0.62rem Georgia,
+        serif;
     }
     p {
       display: -webkit-box;
       margin: 0;
       overflow: hidden;
       color: #e2d4d1;
-      font-size: 0.6rem;
+      font-size: 0.62rem;
       line-height: 1.2;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 3;
+    }
+    .monster-strength {
+      position: absolute;
+      z-index: 2;
+      top: 1.7rem;
+      right: 0.55rem;
+      display: grid;
+      width: 2.5rem;
+      height: 3.15rem;
+      place-items: center;
+      align-content: center;
+      border: 1px solid #d27751;
+      border-radius: 0.35rem 0.35rem 45% 45%;
+      color: #ffe7bd;
+      background: linear-gradient(#8e3020, #3e160f);
+      box-shadow: 0 0.2rem 0.5rem #000;
+    }
+    .monster-strength b {
+      font:
+        900 1.55rem/1 Georgia,
+        serif;
+    }
+    .monster-strength small {
+      font-size: 0.5rem;
+      font-weight: 900;
     }
     .modifiers {
       display: flex;
@@ -299,15 +403,6 @@ import { CardArtworkComponent } from './card-artwork.component';
       color: #ffddb5;
       background: #593a31;
       font-size: 0.52rem;
-    }
-    .help {
-      justify-self: center;
-      min-height: 2.75rem;
-      padding: 0.4rem 1rem;
-      border: 1px solid #73927e;
-      border-radius: 999px;
-      color: #e7f2ea;
-      background: #274132;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
@@ -361,6 +456,13 @@ export class CombatStageComponent {
     return effects.length === 0
       ? 'нет'
       : effects.map((effect) => this.badStuffEffect(effect)).join(' · ');
+  }
+  protected levelWord(): string {
+    return this.focused().baseLevelRewards === 1 ? 'уровень' : 'уровня';
+  }
+  protected treasureWord(): string {
+    const count = this.focused().currentTreasures;
+    return count === 1 ? 'сокровище' : count >= 2 && count <= 4 ? 'сокровища' : 'сокровищ';
   }
   private badStuffEffect(effect: GameBadStuffEffectView): string {
     if (effect.type === 'LOSE_LEVEL') return `потеря уровней: ${effect.amount}`;

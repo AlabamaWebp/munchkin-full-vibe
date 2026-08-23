@@ -6,6 +6,20 @@ Current milestone:
 V2 final audit complete; live-game blockers remain
 ```
 
+## UI combat pass (2026-08-23)
+
+- added the development-only `/dev/ui/combat` screen with a fixed projected `GameView`; it renders the same `GameShellComponent` and child UI components as the game screen;
+- completed the first mobile combat layout pass: fixed-height table shell, turn controls, horizontally scrollable public-player and hand rails, one event capsule, character summary, intent-complete action dock, and warm table design tokens;
+- no game-engine, server, or Socket.IO contracts were changed.
+- integrated the supplied tabletop background and completed a mobile visual-alignment pass for
+  `/dev/ui/combat`: corrected the row allocation that collapsed the combat stage, then refined
+  the combat card, score hierarchy, player rail, character summary, hand cards, action dock,
+  and warm brass/wood surface treatment against the mobile reference; no UX or game logic changed.
+- repeated the 390×844 comparison after product review: the combat focus is now a vertical card
+  with a framed art field and reward plaque; the development fixture presents the two-player
+  combat composition from the reference; action emphasis is card → help → escape; and the
+  character strip now exposes equipped items instead of a count.
+
 ## Final audit (2026-08-22)
 
 - fixed conditional Monster strength/reward-tier resolution, attachment cleanup
@@ -20,6 +34,9 @@ V2 final audit complete; live-game blockers remain
   target-only Curse responses, unified server-projected intents/events, and
   cross-combat stale-command isolation remain incomplete;
 - full findings and gate results: `docs/v2-final-audit.md`.
+- design documentation now requires cosmetic local avatar selection in the
+  lobby, with the selected avatar shown consistently in lobby and game player
+  surfaces.
 
 ## Implemented
 
@@ -477,3 +494,41 @@ Verified on 2026-08-22 after closing the final-audit blockers:
 - `npm run format:check` — succeeded across the repository;
 - `npm run balance:simulate` — succeeded with the unchanged 120-definition,
   276-physical-card catalog and no notable balance shift.
+
+## UI visual direction documented
+
+- Added `docs/ui/DESIGN.md` with the shared mobile-first fantasy-table design
+  language, fixed-viewport rules, accessibility baseline, responsive order, and
+  an explicit preserve/replace audit of the current Angular UI.
+- Added `docs/ui/combat-mobile.md`, mapping every relevant element of the combat
+  reference to the existing player-specific `GameView` and
+  `AvailableIntentView`, including multi-Monster combat, help negotiation,
+  victory reactions, escape, private hand, and blocking workflows.
+- The implementation plan targets `390 x 844` first, then compact mobile,
+  tablet, and desktop. No production code, game logic, DTO, backend, or
+  WebSocket protocol was changed in this documentation pass.
+
+## Combat mobile visual QA pass
+
+- Compared `/dev/ui/combat` at the target `390 x 844` viewport with
+  `docs/ui/reference/combat-mobile.png` and completed two screenshot-based
+  correction cycles.
+- Fixed the wide-layout grid allocation after the action and character rows
+  were added: all six table sections now retain an explicit row, so the combat
+  stage cannot collapse at wider viewport sizes.
+- Strengthened the fantasy-table hierarchy, turn banner, two-player rail,
+  recent-event capsule, Monster frame and strength badge, parchment reward,
+  combat totals and losing-state guidance, action hierarchy, character and
+  Equipment summary, and five-card hand presentation.
+- Kept the existing `GameView`, available intents, command payloads, dialogs,
+  and game rules unchanged. The new reward declension is display-only.
+- Browser QA confirmed exact `390 x 844` document dimensions, no page overflow,
+  and a five-card hand rail whose client and scroll widths both equal `379px`.
+
+Verified on 2026-08-23 after the combat mobile visual QA pass:
+
+- `npm test` — succeeded; 30 test files/suites and 282 tests passed;
+- `npm run lint` — succeeded across all workspaces with 0 errors;
+- `npm run build` — succeeded for contracts, game engine, Angular, and NestJS;
+  Angular retained the existing initial-bundle budget warning (`506.71 kB`
+  versus the `500 kB` warning budget).

@@ -9,7 +9,7 @@ import { unavailableReason } from './game-ui.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="hand-dock" aria-label="Ваша рука">
-      <div class="cards" [style.--card-count]="preview().length">
+      <div class="cards">
         @for (card of preview(); track card.instanceId) {
           <app-compact-game-card
             [card]="card"
@@ -50,13 +50,17 @@ import { unavailableReason } from './game-ui.model';
       display: grid;
       height: 100%;
       min-width: 0;
-      grid-template-columns: repeat(var(--card-count), minmax(0, 1fr));
-      gap: 0.22rem;
-      overflow: hidden;
+      grid-auto-flow: column;
+      grid-auto-columns: calc((100% - 1.2rem) / 5);
+      gap: 0.3rem;
+      overflow-x: auto;
+      padding-right: 0.2rem;
+      scroll-snap-type: x proximity;
     }
     app-compact-game-card {
       min-width: 0;
       min-height: 0;
+      scroll-snap-align: start;
     }
     .full-hand {
       position: absolute;
@@ -113,13 +117,11 @@ export class HandDockComponent {
   readonly cardDetails = output<GameCardView>();
   readonly fullHandOpened = output<void>();
   protected readonly preview = computed(() =>
-    [...this.game().self.hand]
-      .sort(
-        (a, b) =>
-          Number(this.playableIds().includes(b.instanceId)) -
-          Number(this.playableIds().includes(a.instanceId)),
-      )
-      .slice(0, 5),
+    [...this.game().self.hand].sort(
+      (a, b) =>
+        Number(this.playableIds().includes(b.instanceId)) -
+        Number(this.playableIds().includes(a.instanceId)),
+    ),
   );
   protected reason(card: GameCardView): string {
     return unavailableReason(this.game(), card.instanceId);

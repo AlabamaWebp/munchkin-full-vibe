@@ -47,6 +47,7 @@ function hashKey(value: string): number {
       position: relative;
       isolation: isolate;
       display: grid;
+      height: 100%;
       min-height: 5.2rem;
       padding: 0.65rem;
       place-items: center;

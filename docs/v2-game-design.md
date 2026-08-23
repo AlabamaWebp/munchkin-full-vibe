@@ -59,6 +59,8 @@ Any “no” means simplify or reject the card, not extend the engine automatica
 
 Before the match:
 
+- every player chooses an avatar from the bundled local avatar catalog; the
+  choice is cosmetic and may be changed until the match starts;
 - every player chooses `MALE` or `FEMALE` for their own character;
 - the host chooses `BALANCED` or `CLASSIC_CHAOS`;
 - the host enables any optional card sets; `CORE` is always enabled;
@@ -68,6 +70,10 @@ Before the match:
 
 Sex is public, supplies no inherent bonus, and is used only by a small number of
 explicit card conditions.
+
+The selected avatar is public player identity data. It is shown in the lobby
+and in the in-game avatar/status cells, uses a local asset with a stable
+fallback, and has no effect on rules or calculations.
 
 ### Setup
 

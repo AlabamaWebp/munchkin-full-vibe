@@ -1,4 +1,6 @@
-@if (game(); as currentGame) {
+@if (isDevCombatRoute) {
+  <app-dev-combat />
+} @else if (game(); as currentGame) {
   <app-game-shell [game]="currentGame" [error]="error()" />
 } @else {
   <main class="shell">

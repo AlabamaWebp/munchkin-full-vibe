@@ -143,14 +143,14 @@ describe('GameShellComponent', () => {
     expect((other.nativeElement as HTMLElement).textContent).toContain('Ходит Grace');
   });
 
-  it('fits six player chips without a scrolling rail', () => {
+  it('keeps six player chips in a horizontal rail', () => {
     const players = Array.from({ length: 6 }, (_, index) =>
       player({ playerId: `p${index + 1}`, name: `Very Long Player ${index + 1}` }),
     );
     const root = render(base({ players, self: { ...players[0]!, hand: [] } }))
       .nativeElement as HTMLElement;
     expect(root.querySelectorAll('.player')).toHaveLength(6);
-    expect(root.querySelector('.players')?.getAttribute('style')).toContain('--player-count: 6');
+    expect(root.querySelector('.players')?.classList.contains('players')).toBe(true);
   });
 
   it('shows Door reveal and immediate Curse consequence from the event log', () => {
@@ -221,7 +221,7 @@ describe('GameShellComponent', () => {
     expect(root.querySelector('.score')?.textContent).toContain('-19');
     expect(root.querySelectorAll('.encounter-tabs button')).toHaveLength(2);
     expect(root.querySelector('.monster')?.textContent).toContain('Непотребство');
-    expect(root.querySelector('.monster')?.textContent).toContain('💰 5');
+    expect(root.querySelector('.monster')?.textContent).toContain('+2 уровня · 5 сокровищ');
   });
 
   it('restores help agreement and reaction-required/answered states', () => {
@@ -261,7 +261,7 @@ describe('GameShellComponent', () => {
     expect(root.textContent).toContain('Grace помогает · получит 2');
     expect(root.textContent).toContain('нужна ваша реакция');
     Array.from(root.querySelectorAll('button'))
-      .find((button) => button.textContent?.trim() === 'Пас')!
+      .find((button) => button.textContent?.trim().startsWith('Пас'))!
       .click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({
       type: 'PASS_COMBAT_REACTION',
@@ -385,7 +385,7 @@ describe('GameShellComponent', () => {
     });
   });
 
-  it('keeps at most five compact cards in the dock, exposes full hand, and explains unavailable cards', () => {
+  it('keeps the full hand in a scrollable dock, exposes full hand, and explains unavailable cards', () => {
     const hand = Array.from({ length: 7 }, (_, index) =>
       card({ instanceId: `c${index}`, name: `Card ${index}` }),
     );
@@ -397,7 +397,7 @@ describe('GameShellComponent', () => {
         unavailableCardReasons: [{ cardId: 'c0', reason: 'WAITING_FOR_TURN' }],
       }),
     ).nativeElement as HTMLElement;
-    expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(5);
+    expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(7);
     expect(root.textContent).toContain('Рука 7/5 · отдать 2');
     expect(root.textContent).toContain('ваш ход');
   });

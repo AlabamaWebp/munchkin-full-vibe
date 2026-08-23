@@ -44,9 +44,12 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-width: 0;
       height: 100%;
       overflow: hidden;
-      border: 1px solid #526359;
-      border-radius: 0.68rem;
+      border: 2px solid #719679;
+      border-radius: 0.75rem;
       background: linear-gradient(155deg, #26382d, #121d16 72%);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.76),
+        0 0.28rem 0.6rem rgba(0, 0, 0, 0.5);
     }
     article[data-type='MONSTER'] {
       border-color: #9f5f56;
@@ -69,10 +72,10 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: grid;
       width: 100%;
       height: 100%;
-      min-height: 6.6rem;
-      padding: 0.25rem;
+      min-height: 7.9rem;
+      padding: 0.27rem;
       align-content: start;
-      gap: 0.12rem;
+      gap: 0.14rem;
       border: 0;
       color: #f5f8f6;
       background: transparent;
@@ -82,14 +85,17 @@ import { CardArtworkComponent } from './card-artwork.component';
       width: 100%;
     }
     strong {
-      display: block;
+      display: -webkit-box;
       width: 100%;
+      min-height: 2.1em;
       overflow: hidden;
       font:
-        750 0.64rem/1.05 Georgia,
+        800 0.7rem/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
     b {
       color: #f4d179;
@@ -99,7 +105,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-height: 1.35em;
       overflow: hidden;
       color: #bdc9c0;
-      font-size: 0.52rem;
+      font-size: 0.56rem;
       line-height: 1.1;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -109,7 +115,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       width: calc(100% - 1.15rem);
       overflow: hidden;
       color: #8bd49e;
-      font-size: 0.46rem;
+      font-size: 0.52rem;
       font-weight: 900;
       letter-spacing: 0.04em;
       text-overflow: ellipsis;
@@ -123,15 +129,16 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .info {
       position: absolute;
+      top: 0.18rem;
       right: 0.18rem;
-      bottom: 0.15rem;
-      width: 2.75rem;
-      min-width: 2.75rem;
-      height: 2.75rem;
+      width: 1.45rem;
+      min-width: 1.45rem;
+      height: 1.45rem;
       border: 1px solid #708078;
       border-radius: 50%;
       color: #e9efeb;
-      background: #17231c;
+      background: rgba(23, 19, 13, 0.86);
+      font-size: 0.65rem;
       font-weight: 900;
     }
     button:focus-visible {

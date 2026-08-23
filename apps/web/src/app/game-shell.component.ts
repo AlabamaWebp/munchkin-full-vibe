@@ -25,7 +25,7 @@ import { FocusTrapDirective } from './focus-trap.directive';
 import { GameStageComponent } from './game-stage.component';
 import { presentEvents, selectStage, unavailableReason } from './game-ui.model';
 import { HandDockComponent } from './hand-dock.component';
-import { LobbyClient, type UserFacingError } from './lobby-client';
+import { LobbyClient, type ConnectionState, type UserFacingError } from './lobby-client';
 import { LocalizationService } from './localization';
 import { PlayerHudComponent } from './player-hud.component';
 import { RecentEventsComponent } from './recent-events.component';
@@ -69,9 +69,10 @@ interface CardUse {
     <main class="game-shell" aria-label="Игровой стол">
       <app-player-hud
         [game]="game()"
-        [connection]="connection()"
+        [connection]="connectionState()"
         (playerOpened)="selectedPlayerId.set($event)"
         (menuOpened)="menuOpen.set(true)"
+        (historyOpened)="historyOpen.set(true)"
       />
       <app-recent-events [events]="recentEvents()" (historyOpened)="historyOpen.set(true)" />
       <app-game-stage
@@ -81,6 +82,41 @@ interface CardUse {
         (breakdownOpened)="breakdownOpen.set(true)"
         (helpOpened)="openHelp()"
       />
+      <app-action-dock
+        [actions]="primaryActions()"
+        [hasPlayableCombatCards]="hasPlayableCombatCards()"
+        (actionSelected)="sendAction($event)"
+        (playCardOpened)="openCombatHand()"
+      />
+      <button
+        type="button"
+        class="character-summary"
+        (click)="selectedPlayerId.set(game().viewerPlayerId)"
+      >
+        <span class="summary-initial">{{ game().self.name.charAt(0) }}</span>
+        <span
+          ><small>ВАШ ГЕРОЙ · УР. {{ game().self.level }}</small
+          ><strong>{{ game().self.name }}</strong></span
+        >
+        <span class="summary-power"
+          ><small>СИЛА</small
+          ><b>{{ game().combat?.playerPower ?? game().self.combatPower }}</b></span
+        >
+        <span class="summary-kit" aria-label="Ваше снаряжение">
+          @for (item of game().self.equipment; track item.instanceId) {
+            <span>
+              <app-card-artwork [artKey]="item.artKey" [label]="item.name" [compact]="true" />
+              <small>{{ item.name }}</small
+              ><em>+{{ item.equipment?.combatBonus ?? 0 }}</em>
+            </span>
+          } @empty {
+            <small>без снаряжения</small>
+          }
+        </span>
+        <span class="summary-hand"
+          >РУКА<br /><b>{{ game().self.hand.length }}/5</b></span
+        >
+      </button>
       <app-hand-dock
         [game]="game()"
         [playableIds]="playableIds()"
@@ -88,7 +124,6 @@ interface CardUse {
         (cardDetails)="selectedCard.set($event)"
         (fullHandOpened)="fullHandOpen.set(true)"
       />
-      <app-action-dock [actions]="primaryActions()" (actionSelected)="sendAction($event)" />
       @if (error(); as commandError) {
         <p class="command-error" role="alert">{{ errorMessage(commandError) }}</p>
       }
@@ -763,7 +798,11 @@ export class GameShellComponent {
   private readonly localization = inject(LocalizationService);
   readonly game = input.required<GameView>();
   readonly error = input<UserFacingError | null>(null);
+  readonly connectionOverride = input<ConnectionState | null>(null);
   protected readonly connection = this.lobbyClient.connection;
+  protected readonly connectionState = computed(
+    () => this.connectionOverride() ?? this.connection(),
+  );
   protected readonly locale = this.localization.locale;
   protected readonly stage = computed(() => selectStage(this.game()));
   protected readonly allEvents = computed(() => presentEvents(this.game()));
@@ -826,6 +865,11 @@ export class GameShellComponent {
           'END_TURN',
         ].includes(kind),
       ),
+  );
+  protected readonly hasPlayableCombatCards = computed(() =>
+    this.game().availableIntents.some(
+      (intent) => intent.kind === 'PLAY_CARD' && 'combatId' in intent,
+    ),
   );
   protected readonly helperIds = computed(() => {
     const intent = this.intent('PROPOSE_HELP');
@@ -1041,6 +1085,10 @@ export class GameShellComponent {
     );
     this.helpTreasure.set(this.game().combat?.helpOffer?.treasureCount ?? 0);
     this.helpOpen.set(true);
+  }
+  protected openCombatHand(): void {
+    this.handFilter.set('COMBAT');
+    this.fullHandOpen.set(true);
   }
   protected proposeHelp(): void {
     const combat = this.game().combat,

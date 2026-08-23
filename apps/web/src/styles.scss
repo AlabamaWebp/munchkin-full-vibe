@@ -1,4 +1,15 @@
 :root {
+  --color-canvas: #080b09;
+  --color-table: #24180f;
+  --color-surface: #17130f;
+  --color-surface-raised: #2b2117;
+  --color-forest: #173b29;
+  --color-gold: #d4aa58;
+  --color-brass: #8d632e;
+  --color-danger: #a54836;
+  --color-text: #f3e4c7;
+  --color-text-muted: #b9aa91;
+  --color-focus: #fff1a8;
   color-scheme: dark;
   font-family:
     Inter,
@@ -8,8 +19,8 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color: #f7faf8;
-  background: #0d1712;
+  color: var(--color-text);
+  background: var(--color-canvas);
 }
 
 * {
@@ -20,9 +31,7 @@ body {
   margin: 0;
   min-width: 20rem;
   min-height: 100dvh;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(95, 139, 103, 0.3), transparent 34rem),
-    radial-gradient(circle at 100% 100%, rgba(116, 82, 45, 0.16), transparent 30rem), #0d1712;
+  background: #080b09;
 }
 
 html.game-active,
