@@ -58,7 +58,7 @@ import type { PresentedEvent } from './game-ui.model';
       min-width: 0;
       overflow: hidden;
       color: #d9b76f;
-      font-size: 0.98rem;
+      font-size: 0.72rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -78,7 +78,7 @@ import type { PresentedEvent } from './game-ui.model';
       overflow: hidden;
       display: flex;
       align-items: center;
-      font-size: clamp(1.02rem, 3vw, 1.23rem);
+      font-size: clamp(0.76rem, 2.3vw, 0.92rem);
       line-height: 1;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -102,14 +102,14 @@ import type { PresentedEvent } from './game-ui.model';
         padding-block: 0.4rem;
       }
       .title {
-        font-size: 0.9rem;
+        font-size: 0.68rem;
       }
       .event-list span,
       .empty {
-        font-size: 1rem;
+        font-size: 0.78rem;
       }
     }
-    @media (max-height: 55rem) {
+    @media (max-height: 42rem) {
       .event-list span:nth-child(n + 2) {
         display: none;
       }

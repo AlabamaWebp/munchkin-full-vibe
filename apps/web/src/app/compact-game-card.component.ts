@@ -83,11 +83,12 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     app-card-artwork {
       width: 100%;
+      height: clamp(3.5rem, 14vw, 4.4rem);
     }
     strong {
       display: -webkit-box;
       width: 100%;
-      min-height: 2.1em;
+      min-height: 1.8em;
       overflow: hidden;
       font:
         800 0.7rem/1.05 Georgia,

@@ -70,9 +70,11 @@ interface CardUse {
       <app-player-hud
         [game]="game()"
         [connection]="connectionState()"
+        [fullscreenSupported]="fullscreenSupported"
+        [fullscreen]="isFullscreen()"
         (playerOpened)="selectedPlayerId.set($event)"
         (menuOpened)="menuOpen.set(true)"
-        (historyOpened)="historyOpen.set(true)"
+        (fullscreenOpened)="toggleFullscreen()"
       />
       <app-recent-events [events]="recentEvents()" (historyOpened)="historyOpen.set(true)" />
       <app-game-stage
@@ -102,17 +104,6 @@ interface CardUse {
           ><small>СИЛА</small
           ><b>{{ game().combat?.playerPower ?? game().self.combatPower }}</b></span
         >
-        <span class="summary-kit" aria-label="Ваше снаряжение">
-          @for (item of game().self.equipment; track item.instanceId) {
-            <span>
-              <app-card-artwork [artKey]="item.artKey" [label]="item.name" [compact]="true" />
-              <small>{{ item.name }}</small
-              ><em>+{{ item.equipment?.combatBonus ?? 0 }}</em>
-            </span>
-          } @empty {
-            <small>без снаряжения</small>
-          }
-        </span>
         <span class="summary-hand"
           >РУКА<br /><b>{{ game().self.hand.length }}/5</b></span
         >
@@ -652,17 +643,9 @@ interface CardUse {
                   Раздать милостыню · {{ charity.count }}
                 </button>
               }
-              <button type="button" (click)="historyOpen.set(true); menuOpen.set(false)">
-                Полная история
-              </button>
               <button type="button" (click)="toggleLocale()">
                 Язык: {{ locale() === 'ru' ? 'Русский' : 'English' }}
               </button>
-              @if (fullscreenSupported) {
-                <button type="button" (click)="toggleFullscreen()">
-                  {{ isFullscreen() ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим' }}
-                </button>
-              }
               @if (game().status === 'FINISHED') {
                 <button type="button" (click)="rematch()">Играть снова</button
                 ><button type="button" (click)="returnToLobby()">В лобби</button>
@@ -809,7 +792,7 @@ export class GameShellComponent {
   protected readonly recentEvents = computed(() =>
     this.allEvents()
       .filter((event) => event.priority !== 'ROUTINE')
-      .slice(-3)
+      .slice(-2)
       .reverse(),
   );
   protected readonly playableIds = computed(() => this.collectPlayableIds());

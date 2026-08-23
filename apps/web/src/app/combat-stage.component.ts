@@ -328,7 +328,13 @@ import { CardArtworkComponent } from './card-artwork.component';
         0 0 1rem rgba(113, 45, 25, 0.2);
     }
     .monster-art {
+      position: relative;
       display: grid;
+      width: min(100%, 14rem);
+      height: min(100%, 21rem);
+      aspect-ratio: 2 / 3;
+      align-self: center;
+      justify-self: center;
       min-width: 0;
       min-height: 0;
       place-items: center;
@@ -338,10 +344,12 @@ import { CardArtworkComponent } from './card-artwork.component';
       background: transparent;
     }
     .monster-art app-card-artwork {
-      width: min(100%, 14rem);
-      max-height: 100%;
-      aspect-ratio: 2 / 3;
-      height: auto;
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      width: 100%;
+      min-height: 0;
+      height: 100%;
     }
     .monster-title,
     .monster-footer {

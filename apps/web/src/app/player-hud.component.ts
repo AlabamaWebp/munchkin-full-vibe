@@ -18,9 +18,17 @@ import type { ConnectionState } from './lobby-client';
           <span class="warning" role="status">Нет связи</span>
         }
         <button type="button" aria-label="Открыть меню" (click)="menuOpened.emit()">☰</button>
-        <button type="button" aria-label="Открыть историю игры" (click)="historyOpened.emit()">
-          ↶
-        </button>
+        @if (fullscreenSupported()) {
+          <button
+            type="button"
+            class="fullscreen-button"
+            [class.active]="fullscreen()"
+            aria-label="Переключить полноэкранный режим"
+            (click)="fullscreenOpened.emit()"
+          >
+            ⛶
+          </button>
+        }
       </div>
       <div class="players">
         @for (player of orderedPlayers(); track player.playerId) {
@@ -100,7 +108,7 @@ import type { ConnectionState } from './lobby-client';
     .turn-line button[aria-label='Открыть меню'] {
       order: 1;
     }
-    .turn-line button[aria-label='Открыть историю игры'] {
+    .fullscreen-button {
       order: 3;
     }
     .warning {
@@ -189,9 +197,11 @@ import type { ConnectionState } from './lobby-client';
 export class PlayerHudComponent {
   readonly game = input.required<GameView>();
   readonly connection = input.required<ConnectionState>();
+  readonly fullscreenSupported = input(false);
+  readonly fullscreen = input(false);
   readonly playerOpened = output<string>();
   readonly menuOpened = output<void>();
-  readonly historyOpened = output<void>();
+  readonly fullscreenOpened = output<void>();
 
   protected orderedPlayers() {
     const combat = this.game().combat;

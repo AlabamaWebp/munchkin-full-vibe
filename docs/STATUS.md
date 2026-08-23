@@ -613,3 +613,14 @@ Verified on 2026-08-23 after the responsive adaptation:
 - Tightened the player HUD grid to keep the complete player tiles visible,
   enlarged recent-action text while retaining at least the newest entry, and
   constrained focused monster artwork to a full portrait image without crop.
+- Kept history filters at their natural height instead of letting the sheet grid
+  stretch the tab row vertically; centered the monster image inside a bounded
+  portrait viewport.
+- Limited history access to the recent-actions panel, moved fullscreen toggle
+  to the top-right HUD button, and reduced the recent-actions list to two
+  entries.
+- Isolated the central monster artwork to its own bounded layer and reserved
+  space for names in compact hand cards so bottom cards show both image and
+  title.
+- Simplified and shortened the character summary to identity, level, power,
+  and hand count; equipment artwork is no longer shown there.
