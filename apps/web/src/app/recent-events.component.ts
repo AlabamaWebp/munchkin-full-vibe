@@ -11,12 +11,15 @@ import type { PresentedEvent } from './game-ui.model';
       aria-label="Открыть историю игры"
       (click)="historyOpened.emit()"
     >
+      <strong class="title">ПОСЛЕДНИЕ ДЕЙСТВИЯ</strong>
       @if (events().length === 0) {
         <span class="empty">Игра начинается…</span>
       } @else {
-        @for (event of events(); track event.entry.sequence) {
-          <span [class.important]="event.priority !== 'ROUTINE'">{{ event.summary }}</span>
-        }
+        <span class="event-list">
+          @for (event of events(); track event.entry.sequence) {
+            <span [class.important]="event.priority !== 'ROUTINE'">{{ event.summary }}</span>
+          }
+        </span>
       }
     </button>
   `,
@@ -24,16 +27,18 @@ import type { PresentedEvent } from './game-ui.model';
     :host {
       display: block;
       min-width: 0;
+      min-height: 0;
+      overflow: hidden;
     }
     .strip {
       position: relative;
-      display: flex;
-      flex-direction: column;
+      display: grid;
       width: 100%;
-      min-height: 4rem;
-      padding: 0.52rem 0.75rem;
-      align-items: flex-start;
-      gap: 0;
+      height: 100%;
+      min-height: 0;
+      padding: 0.4rem 0.75rem;
+      grid-template-rows: auto minmax(0, 1fr);
+      align-items: stretch;
       overflow: hidden;
       border: 1px solid #876033;
       border-radius: 0.85rem;
@@ -49,30 +54,36 @@ import type { PresentedEvent } from './game-ui.model';
         0 0.25rem 0.7rem rgba(0, 0, 0, 0.38);
       text-align: left;
     }
-    .strip::before {
-      position: absolute;
-      margin-top: -0.15rem;
-      content: 'ПОСЛЕДНИЕ ДЕЙСТВИЯ';
-      color: #d9b76f;
-      font-size: 0.64rem;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-    }
-    span {
-      width: 100%;
+    .title {
       min-width: 0;
       overflow: hidden;
-      font-size: 0.78rem;
-      line-height: 1.15;
+      color: #d9b76f;
+      font-size: 0.98rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      line-height: 1;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    span:first-of-type {
-      margin-top: 1rem;
+    .event-list {
+      display: grid;
+      min-height: 0;
+      grid-auto-rows: minmax(0, 1fr);
+      overflow: hidden;
     }
-    span + span {
-      margin-top: 0.2rem;
-      padding-top: 0.2rem;
+    .event-list span,
+    .empty {
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      font-size: clamp(1.02rem, 3vw, 1.23rem);
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .event-list span + span {
       border-top: 1px solid rgba(190, 132, 55, 0.28);
     }
     .important {
@@ -87,17 +98,20 @@ import type { PresentedEvent } from './game-ui.model';
     }
     @media (max-height: 42rem) {
       .strip {
-        min-height: 3.5rem;
+        min-height: 0;
         padding-block: 0.4rem;
       }
-      .strip::before {
-        font-size: 0.56rem;
+      .title {
+        font-size: 0.9rem;
       }
-      span {
-        font-size: 0.68rem;
+      .event-list span,
+      .empty {
+        font-size: 1rem;
       }
-      span:first-of-type {
-        margin-top: 0.85rem;
+    }
+    @media (max-height: 55rem) {
+      .event-list span:nth-child(n + 2) {
+        display: none;
       }
     }
   `,

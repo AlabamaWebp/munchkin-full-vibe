@@ -29,60 +29,62 @@ import { CardArtworkComponent } from './card-artwork.component';
             }
           </div>
         }
-        @if (combat.monsters.length > 1) {
-          <div class="encounter-tabs" aria-label="Монстры в бою">
-            @for (encounter of combat.monsters; track encounter.encounterId) {
-              <button
-                type="button"
-                [class.active]="focused().encounterId === encounter.encounterId"
-                (click)="focusedId.set(encounter.encounterId)"
-              >
-                {{ encounter.monster.name }} · {{ encounter.currentStrength }}
-              </button>
-            }
-          </div>
-        }
-        <article class="monster">
-          <div class="monster-title">
-            <h3>{{ focused().monster.name }}</h3>
-          </div>
-          <button
-            type="button"
-            class="monster-art"
-            [attr.aria-label]="'Подробнее: ' + focused().monster.name"
-            (click)="cardOpened.emit(focused().monster)"
-          >
-            <app-card-artwork
-              [artKey]="focused().monster.artKey"
-              [label]="focused().monster.name"
-              [compact]="true"
-            />
-          </button>
-          <span class="monster-strength"
-            ><b>{{ focused().currentStrength }}</b
-            ><small>СИЛА</small></span
-          >
-          <div class="monster-footer">
-            <p><strong>Непотребство:</strong> {{ badStuff() }}</p>
-            <div class="rewards">
-              <b>НАГРАДА</b>
-              <span
-                >+{{ focused().baseLevelRewards }} {{ levelWord() }} ·
-                {{ focused().currentTreasures }} {{ treasureWord() }}</span
-              >
+        <div class="monster-zone">
+          @if (combat.monsters.length > 1) {
+            <div class="encounter-tabs" aria-label="Монстры в бою">
+              @for (encounter of combat.monsters; track encounter.encounterId) {
+                <button
+                  type="button"
+                  [class.active]="focused().encounterId === encounter.encounterId"
+                  (click)="focusedId.set(encounter.encounterId)"
+                >
+                  {{ encounter.monster.name }} · {{ encounter.currentStrength }}
+                </button>
+              }
             </div>
-            @if (focused().strengthModifier !== 0 || focused().treasureModifier !== 0) {
-              <div class="modifiers">
-                @if (focused().strengthModifier !== 0) {
-                  <span>Сила {{ signed(focused().strengthModifier) }}</span>
-                }
-                @if (focused().treasureModifier !== 0) {
-                  <span>Сокровища {{ signed(focused().treasureModifier) }}</span>
-                }
+          }
+          <article class="monster">
+            <div class="monster-title">
+              <h3>{{ focused().monster.name }}</h3>
+            </div>
+            <button
+              type="button"
+              class="monster-art"
+              [attr.aria-label]="'Подробнее: ' + focused().monster.name"
+              (click)="cardOpened.emit(focused().monster)"
+            >
+              <app-card-artwork
+                [artKey]="focused().monster.artKey"
+                [label]="focused().monster.name"
+                [compact]="true"
+              />
+            </button>
+            <span class="monster-strength"
+              ><b>{{ focused().currentStrength }}</b
+              ><small>СИЛА</small></span
+            >
+            <div class="monster-footer">
+              <p><strong>Непотребство:</strong> {{ badStuff() }}</p>
+              <div class="rewards">
+                <b>НАГРАДА</b>
+                <span
+                  >+{{ focused().baseLevelRewards }} {{ levelWord() }} ·
+                  {{ focused().currentTreasures }} {{ treasureWord() }}</span
+                >
               </div>
-            }
-          </div>
-        </article>
+              @if (focused().strengthModifier !== 0 || focused().treasureModifier !== 0) {
+                <div class="modifiers">
+                  @if (focused().strengthModifier !== 0) {
+                    <span>Сила {{ signed(focused().strengthModifier) }}</span>
+                  }
+                  @if (focused().treasureModifier !== 0) {
+                    <span>Сокровища {{ signed(focused().treasureModifier) }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </article>
+        </div>
         <button
           type="button"
           class="score"
@@ -134,7 +136,17 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: grid;
       height: 100%;
       min-height: 0;
-      align-content: center;
+      grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+      gap: 0.32rem;
+    }
+    .combat:has(.reaction) {
+      grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+    }
+    .monster-zone {
+      display: grid;
+      min-width: 0;
+      min-height: 0;
+      grid-template-rows: auto minmax(0, 1fr);
       gap: 0.32rem;
     }
     .reaction {
@@ -161,7 +173,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       position: relative;
       display: grid;
       width: 100%;
-      min-height: 3.8rem;
+      min-height: 4.5rem;
       padding: 0.32rem 2.65rem 0.32rem 0.55rem;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
@@ -189,7 +201,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .score b {
       font:
-        900 clamp(1.65rem, 8vw, 2.15rem)/1 Georgia,
+        900 clamp(1.7rem, 9vw, 2.35rem)/1 Georgia,
         serif;
       line-height: 1;
     }
@@ -273,14 +285,16 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: flex;
       min-width: 0;
       gap: 0.25rem;
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
     }
     .encounter-tabs button {
-      min-width: 0;
+      min-width: 8rem;
       min-height: 2.4rem;
       padding: 0.3rem 0.45rem;
       overflow: hidden;
-      flex: 1;
+      flex: 0 0 8rem;
       border: 1px solid #5c5140;
       border-radius: 0.5rem;
       color: #d9dedb;
@@ -296,9 +310,10 @@ import { CardArtworkComponent } from './card-artwork.component';
     .monster {
       position: relative;
       display: grid;
-      width: min(100%, 12.25rem);
-      min-height: 13.15rem;
-      max-height: 15.5rem;
+      width: min(100%, 20rem);
+      min-height: 0;
+      height: 100%;
+      max-height: none;
       padding: 0.38rem;
       grid-template-rows: auto minmax(0, 1fr) auto;
       justify-self: center;
@@ -313,14 +328,20 @@ import { CardArtworkComponent } from './card-artwork.component';
         0 0 1rem rgba(113, 45, 25, 0.2);
     }
     .monster-art {
+      display: grid;
       min-width: 0;
       min-height: 0;
+      place-items: center;
       padding: 0;
+      overflow: hidden;
       border: 0;
       background: transparent;
     }
     .monster-art app-card-artwork {
-      height: 100%;
+      width: min(100%, 14rem);
+      max-height: 100%;
+      aspect-ratio: 2 / 3;
+      height: auto;
     }
     .monster-title,
     .monster-footer {
@@ -437,9 +458,7 @@ import { CardArtworkComponent } from './card-artwork.component';
         gap: 0.2rem;
       }
       .monster {
-        width: 10rem;
-        min-height: 10.5rem;
-        max-height: 10.5rem;
+        width: min(100%, 14rem);
       }
       .score {
         min-height: 3.35rem;

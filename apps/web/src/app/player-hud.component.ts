@@ -49,6 +49,8 @@ import type { ConnectionState } from './lobby-client';
     .hud {
       display: grid;
       height: 100%;
+      min-height: 0;
+      grid-template-rows: auto minmax(0, 1fr);
       gap: 0.3rem;
       min-width: 0;
     }
@@ -108,24 +110,25 @@ import type { ConnectionState } from './lobby-client';
       background: #7a3525;
     }
     .players {
-      display: flex;
-      gap: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
       min-width: 0;
-      overflow-x: auto;
-      scroll-snap-type: x proximity;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
     }
     .player {
       display: grid;
       min-width: 0;
-      min-height: 3.3rem;
+      min-height: 0;
+      height: 100%;
+      box-sizing: border-box;
       padding: 0.35rem 0.5rem;
       grid-template-columns: 2.35rem minmax(0, 1fr);
       grid-template-rows: 1fr 1fr;
       column-gap: 0.35rem;
       text-align: left;
-      scroll-snap-align: start;
       border: 1px solid #846337;
-      flex: 1 1 50%;
       border-radius: 0;
       color: #eef4ef;
       background: linear-gradient(105deg, rgba(22, 17, 12, 0.94), rgba(52, 35, 21, 0.9));
@@ -135,14 +138,6 @@ import type { ConnectionState } from './lobby-client';
     }
     .player:last-child {
       border-radius: 0 0.8rem 0.8rem 0;
-    }
-    .players:has(.player:nth-child(3)) {
-      gap: 0.2rem;
-    }
-    .players:has(.player:nth-child(3)) .player {
-      min-width: 11.1rem;
-      flex-basis: 11.1rem;
-      border-radius: 0.8rem;
     }
     .player.active {
       border-color: #e5bd62;

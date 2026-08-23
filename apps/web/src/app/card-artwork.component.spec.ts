@@ -23,4 +23,24 @@ describe('CardArtworkComponent', () => {
     expect(first.componentInstance.palette()).not.toEqual(other.componentInstance.palette());
     expect(first.componentInstance.glyph()).toBe(repeat.componentInstance.glyph());
   });
+
+  it('does not keep a failed image hidden after switching to another card', async () => {
+    await TestBed.configureTestingModule({ imports: [CardArtworkComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(CardArtworkComponent);
+    fixture.componentRef.setInput('artKey', 'core.missing-monster');
+    fixture.componentRef.setInput('label', 'Missing Monster');
+    fixture.detectChanges();
+
+    const image = fixture.nativeElement.querySelector('img') as HTMLImageElement;
+    image.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+    expect(image.classList.contains('hidden')).toBe(true);
+
+    fixture.componentRef.setInput('artKey', 'core.clockwork-yak');
+    fixture.componentRef.setInput('label', 'Clockwork Yak');
+    fixture.detectChanges();
+
+    expect(image.getAttribute('src')).toBe('/assets/cards/clockwork-yak.png');
+    expect(image.classList.contains('hidden')).toBe(false);
+  });
 });

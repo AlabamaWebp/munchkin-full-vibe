@@ -138,19 +138,19 @@ const PRIORITY: readonly AvailableGameAction[] = [
       inset: 0;
       display: grid;
       padding: 0;
-      place-items: stretch;
+      place-items: end center;
       background: rgba(22, 12, 6, 0.78);
     }
     .action-sheet {
       display: grid;
       width: 100%;
-      height: 100%;
-      max-height: none;
+      height: min(90dvh, 48rem);
+      max-height: 90dvh;
       padding: 0.7rem;
       gap: 0.4rem;
       overflow: auto;
       border: 0;
-      border-radius: 0;
+      border-radius: 1rem 1rem 0 0;
       background: linear-gradient(180deg, #2f1e11, #140f0a);
     }
     .action-sheet header {

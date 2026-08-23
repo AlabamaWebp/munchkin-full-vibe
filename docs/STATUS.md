@@ -588,3 +588,28 @@ Verified on 2026-08-23 after the responsive adaptation:
 - Kept the source list capped at the latest three events and clipped overflow
   without horizontal scrolling, so a tight viewport still shows the newest
   visible entry first.
+
+## Overlay sizing and recent-actions containment
+
+- Constrained the recent-actions host and strip to their grid row so the latest
+  three entries redistribute into the available height with ellipsis instead
+  of painting under the combat card.
+- Standardized profile, card, history, menu, and action panels as bottom sheets
+  occupying 90% of the viewport, including the full-hand panel.
+
+## Combat viewport sizing
+
+- Kept the player strip fully visible without horizontal scrolling by fitting
+  player tiles into the available header width.
+- Made recent actions use a larger readable type size while preserving the
+  newest entry at short heights.
+- Put monster tabs into a horizontally scrollable strip and let the focused
+  monster card expand into the free combat-stage space; the dev combat fixture
+  now contains four monsters for responsive testing.
+- Increased the combat score area and power numerals so larger totals remain
+  legible.
+- Scoped card-art fallback state to the failed image URL, so switching from a
+  card without artwork back to a card with artwork restores the image.
+- Tightened the player HUD grid to keep the complete player tiles visible,
+  enlarged recent-action text while retaining at least the newest entry, and
+  constrained focused monster artwork to a full portrait image without crop.

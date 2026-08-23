@@ -26,16 +26,16 @@ function hashKey(value: string): number {
       @if (imageUrl()) {
         <img
           class="card-image"
-          [class.hidden]="imageError()"
+          [class.hidden]="failedImageUrl() === imageUrl()"
           [src]="imageUrl()"
           [alt]="label()"
-          (error)="imageError.set(true)"
+          (error)="failedImageUrl.set(imageUrl())"
         />
       }
-      <span class="orb orb-one" [class.hidden]="!imageError()"></span>
-      <span class="orb orb-two" [class.hidden]="!imageError()"></span>
-      <span class="glyph" [class.hidden]="!imageError()">{{ glyph() }}</span>
-      <small [class.hidden]="!imageError()">{{ label() }}</small>
+      <span class="orb orb-one" [class.hidden]="failedImageUrl() !== imageUrl()"></span>
+      <span class="orb orb-two" [class.hidden]="failedImageUrl() !== imageUrl()"></span>
+      <span class="glyph" [class.hidden]="failedImageUrl() !== imageUrl()">{{ glyph() }}</span>
+      <small [class.hidden]="failedImageUrl() !== imageUrl()">{{ label() }}</small>
     </div>
   `,
   styles: `
@@ -152,7 +152,7 @@ export class CardArtworkComponent {
   readonly label = input.required<string>();
   readonly compact = input(false);
 
-  readonly imageError = signal(false);
+  readonly failedImageUrl = signal<string | null>(null);
 
   readonly imageUrl = computed(() => {
     const lastDot = this.artKey().lastIndexOf('.');
