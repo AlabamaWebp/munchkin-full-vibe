@@ -472,6 +472,10 @@ helperCount = min(promisedTreasures, finalTreasureCount)
 activeCount = finalTreasureCount - helperCount
 ```
 
+The active player may promise zero through the current total Treasure reward of
+all Monsters in the combat, never more than that reward. The server validates
+both initial offers and counters against this authoritative total.
+
 If reward fell below the promise, the helper is paid first up to the final total.
 If reward grew, every additional Treasure belongs to the active player. Only the
 active player receives Monster level rewards.

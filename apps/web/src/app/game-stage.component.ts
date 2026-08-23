@@ -209,7 +209,7 @@ import { latestRevealedCard } from './game-ui.model';
     .eyebrow {
       margin: 0;
       color: #e2bd69 !important;
-      font-size: 0.62rem !important;
+      font-size: 0.68rem !important;
       font-weight: 900;
       letter-spacing: 0.12em;
     }
@@ -222,7 +222,7 @@ import { latestRevealedCard } from './game-ui.model';
     p {
       margin: 0;
       color: #bdc9c0;
-      font-size: 0.72rem;
+      font-size: 0.78rem;
       line-height: 1.25;
     }
     .reveal {
@@ -266,7 +266,7 @@ import { latestRevealedCard } from './game-ui.model';
       border-radius: 0.45rem;
       color: #dff0e3;
       background: #24422e;
-      font-size: 0.62rem;
+      font-size: 0.68rem;
     }
     .attempts span.failed {
       color: #ffd8cf;

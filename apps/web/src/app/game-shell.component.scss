@@ -72,17 +72,21 @@ app-hand-dock {
 .character-summary small {
   display: block;
   color: #c8b99d;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   letter-spacing: 0.04em;
 }
 .character-summary strong {
   display: block;
   overflow: hidden;
   font:
-    800 0.85rem Georgia,
+    800 0.9rem Georgia,
     serif;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.character-summary .summary-sex {
+  color: #e0c792;
+  font-size: 0.64rem;
 }
 .summary-power,
 .summary-hand {
@@ -97,7 +101,7 @@ app-hand-dock {
 }
 .summary-hand {
   color: #c6b596;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
 }
 .backdrop {
   position: fixed;
@@ -139,8 +143,19 @@ app-hand-dock {
 .compact-sheet {
   max-height: 90dvh;
 }
+.sheet.compact-sheet:has(.help-sheet) {
+  width: min(100%, 30rem);
+  height: auto;
+}
 .menu-sheet {
   max-height: 90dvh;
+}
+.menu-sheet .option-list {
+  justify-items: start;
+}
+.menu-sheet .option-list button {
+  width: 100%;
+  height: fit-content;
 }
 .sheet > header {
   display: flex;
@@ -159,7 +174,7 @@ app-hand-dock {
 }
 .sheet header small {
   color: #e6b85f;
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.1em;
 }
@@ -190,7 +205,7 @@ app-hand-dock {
 .sheet p {
   margin: 0;
   color: #ddc8a8;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   line-height: 1.35;
 }
 .sheet button,
@@ -209,13 +224,14 @@ app-hand-dock {
   color: #2b1b0d;
   background: #e5b55c;
   font-weight: 900;
+  width: 100%;
 }
 .sheet button:disabled {
   opacity: 0.45;
 }
 .full-hand-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.55rem;
 }
 .full-hand-grid app-compact-game-card {
@@ -233,7 +249,7 @@ app-hand-dock {
   min-width: max-content;
   padding: 0.3rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
 }
 .hand-filters button.selected,
 .history-filters button.selected {
@@ -258,7 +274,7 @@ app-hand-dock {
 }
 .option-list button small {
   color: #b8c6bc;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
 }
 .picker-grid button.selected {
   border-color: #efcb78;
@@ -283,6 +299,15 @@ app-hand-dock {
   color: #fff;
   background: #223128;
 }
+.help-sheet > button {
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+}
+.help-sheet .counter button {
+  flex: 0 0 auto;
+  width: auto;
+}
 .power-preview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -293,7 +318,7 @@ app-hand-dock {
   border-radius: 0.45rem;
   color: #dbe6de;
   background: #26372d;
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   text-align: center;
 }
 .counter {
@@ -318,7 +343,7 @@ app-hand-dock {
   border-radius: 0.45rem;
   color: #dbe4de;
   background: #49301a;
-  font-size: 0.7rem;
+  font-size: 0.76rem;
 }
 .history-list {
   display: grid;
@@ -346,16 +371,43 @@ app-hand-dock {
   background: #1c2921;
   text-align: left;
 }
+.history-turn button.history-event-combat {
+  border-left-color: #c96a52;
+  background: #3a211e;
+}
+.history-turn button.history-event-help {
+  border-left-color: #6d9fce;
+  background: #1d2e3e;
+}
+.history-turn button.history-event-reward {
+  border-left-color: #d1aa55;
+  background: #3a301c;
+}
+.history-turn button.history-event-curse {
+  border-left-color: #a982c8;
+  background: #30223d;
+}
+.history-turn button.history-event-card {
+  border-left-color: #72b28a;
+  background: #1e3528;
+}
+.history-turn button.history-event-player {
+  border-left-color: #d28c59;
+  background: #35271d;
+}
+.history-turn button.history-event-other {
+  border-left-color: #77877d;
+}
 .history-turn button.private {
   border-left-color: #a77bc5;
 }
 .history-turn small {
   color: #93a197;
-  font-size: 0.58rem;
+  font-size: 0.64rem;
 }
 .history-turn span {
   color: #dce7df;
-  font-size: 0.7rem;
+  font-size: 0.76rem;
 }
 .breakdown {
   display: grid;
@@ -371,6 +423,75 @@ app-hand-dock {
   justify-content: space-between;
   padding: 0.35rem 0.45rem;
   background: #223128;
+}
+.breakdown-monster {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: 0.55rem;
+  padding: 0.45rem;
+  border: 1px solid #6f4d2a;
+  border-radius: 0.65rem;
+  background: #1d2b22;
+}
+.breakdown-monster > app-card-artwork {
+  width: 3.5rem;
+  height: 4.65rem;
+}
+.breakdown-monster-details {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 0.2rem;
+}
+.breakdown-monster-details > strong {
+  overflow: hidden;
+  color: #f0d28e;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breakdown-monster-details > span {
+  display: flex;
+  justify-content: space-between;
+  color: #dbe7de;
+  font-size: 0.76rem;
+}
+.breakdown-modifier {
+  display: grid;
+  min-width: 0;
+  margin-top: 0.2rem;
+  padding: 0.25rem;
+  grid-template-columns: 2.1rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #a36b47;
+  border-radius: 0.45rem;
+  color: #f2e2c3;
+  background: #3a2720;
+  text-align: left;
+}
+.breakdown-modifier app-card-artwork {
+  width: 2.1rem;
+  height: 2.8rem;
+}
+.breakdown-modifier > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+.breakdown-modifier strong,
+.breakdown-modifier small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breakdown-modifier strong {
+  font-size: 0.72rem;
+}
+.breakdown-modifier small {
+  color: #f3dfbd;
+  font-size: 0.68rem;
 }
 .character {
   display: grid;
@@ -500,7 +621,7 @@ select:focus-visible {
   }
   .character-summary small,
   .summary-hand {
-    font-size: 0.55rem;
+    font-size: 0.62rem;
   }
   .summary-power b,
   .summary-hand b {

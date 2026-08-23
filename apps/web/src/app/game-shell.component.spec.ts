@@ -143,6 +143,12 @@ describe('GameShellComponent', () => {
     expect((other.nativeElement as HTMLElement).textContent).toContain('Ходит Grace');
   });
 
+  it('shows the character sex below the nickname', () => {
+    const fixture = render(base({ self: { ...player({ sex: 'FEMALE' }), hand: [] } }));
+
+    expect(fixture.nativeElement.querySelector('.summary-sex')?.textContent).toContain('женский');
+  });
+
   it('keeps six player chips in a horizontal rail', () => {
     const players = Array.from({ length: 6 }, (_, index) =>
       player({ playerId: `p${index + 1}`, name: `Very Long Player ${index + 1}` }),
@@ -222,6 +228,7 @@ describe('GameShellComponent', () => {
     expect(root.querySelectorAll('.encounter-tabs button')).toHaveLength(2);
     expect(root.querySelector('.monster')?.textContent).toContain('Непотребство');
     expect(root.querySelector('.monster')?.textContent).toContain('+2 уровня · 5 сокровищ');
+    expect(root.querySelector('.score')?.textContent).toContain('НАГРАДА: +4 уровня · 10 сокровищ');
   });
 
   it('restores help agreement and reaction-required/answered states', () => {
@@ -399,7 +406,7 @@ describe('GameShellComponent', () => {
     ).nativeElement as HTMLElement;
     expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(7);
     expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/5 · отдать 2');
-    expect(root.textContent).toContain('ваш ход');
+    expect(root.textContent).toContain('Card 0');
   });
 
   it('dispatches a direct zero-target card action and opens a multiple-target picker', () => {

@@ -58,7 +58,7 @@ import type { PresentedEvent } from './game-ui.model';
       min-width: 0;
       overflow: hidden;
       color: #d9b76f;
-      font-size: 0.72rem;
+      font-size: 0.78rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -102,7 +102,7 @@ import type { PresentedEvent } from './game-ui.model';
         padding-block: 0.4rem;
       }
       .title {
-        font-size: 0.68rem;
+        font-size: 0.74rem;
       }
       .event-list span,
       .empty {

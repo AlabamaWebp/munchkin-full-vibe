@@ -98,7 +98,8 @@ interface CardUse {
         <span class="summary-initial">{{ game().self.name.charAt(0) }}</span>
         <span
           ><small>ВАШ ГЕРОЙ · УР. {{ game().self.level }}</small
-          ><strong>{{ game().self.name }}</strong></span
+          ><strong>{{ game().self.name }}</strong
+          ><small class="summary-sex">Пол: {{ sexLabel(game().self.sex) }}</small></span
         >
         <span class="summary-power"
           ><small>СИЛА</small
@@ -474,7 +475,7 @@ interface CardUse {
             </header>
             <div class="sheet-scroll history-list" #historyList>
               <div class="history-filters" aria-label="Фильтр истории">
-                @for (filter of historyFilters; track filter.id) {
+                @for (filter of historyFilters(); track filter.id) {
                   <button
                     type="button"
                     [class.selected]="historyFilter() === filter.id"
@@ -491,6 +492,7 @@ interface CardUse {
                   @for (event of turn.events; track event.entry.sequence) {
                     <button
                       type="button"
+                      [class]="historyEventClass(event.entry.type)"
                       [class.private]="event.entry.visibility === 'PRIVATE'"
                       (click)="openEventCard(event.entry.card ?? event.entry.cards?.[0] ?? null)"
                     >
@@ -539,10 +541,39 @@ interface CardUse {
                 }
                 <h3>Монстры · {{ combat.monsterPower }}</h3>
                 @for (monster of combat.monsters; track monster.encounterId) {
-                  <p>
-                    <span>{{ monster.monster.name }}</span
-                    ><b>{{ monster.currentStrength }}</b>
-                  </p>
+                  <article class="breakdown-monster">
+                    <app-card-artwork
+                      [artKey]="monster.monster.artKey"
+                      [label]="monster.monster.name"
+                      [compact]="true"
+                    />
+                    <div class="breakdown-monster-details">
+                      <strong>{{ monster.monster.name }}</strong>
+                      <span>Сила <b>{{ monster.currentStrength }}</b></span>
+                      <span>Уровни <b>{{ monster.baseLevelRewards }}</b></span>
+                      <span>Сокровища <b>{{ monster.currentTreasures }}</b></span>
+                      @for (played of monster.playedCards; track played.card.instanceId) {
+                        <button
+                          type="button"
+                          class="breakdown-modifier"
+                          (click)="selectedCard.set(played.card)"
+                        >
+                          <app-card-artwork
+                            [artKey]="played.card.artKey"
+                            [label]="played.card.name"
+                            [compact]="true"
+                          />
+                          <span
+                            ><strong>{{ played.card.name }}</strong
+                            ><small
+                              >Сила {{ signed(played.strengthModifier) }} · сокровища
+                              {{ signed(played.treasureModifier) }}</small
+                            ></span
+                          >
+                        </button>
+                      }
+                    </div>
+                  </article>
                 }
               </div>
             </section>
@@ -896,6 +927,12 @@ export class GameShellComponent {
   protected readonly saleRemainder = computed(() => this.saleTotal() % 1000);
   protected readonly historyTurns = computed(() => {
     const events = this.allEvents().filter((event) => {
+      if (this.historyFilter() === 'CURRENT_TURN')
+        return event.entry.turnNumber === this.game().turnNumber;
+      if (this.historyFilter().startsWith('PLAYER:')) {
+        const playerId = this.historyFilter().slice('PLAYER:'.length);
+        return event.entry.playerId === playerId || event.entry.targetPlayerId === playerId;
+      }
       if (this.historyFilter() === 'COMBAT')
         return [
           'COMBAT_STARTED',
@@ -908,11 +945,7 @@ export class GameShellComponent {
           'HELP_COUNTERED',
           'HELP_OFFER_ACCEPTED',
         ].includes(event.entry.type);
-      return (
-        this.historyFilter() !== 'ME' ||
-        event.entry.playerId === this.game().viewerPlayerId ||
-        event.entry.targetPlayerId === this.game().viewerPlayerId
-      );
+      return true;
     });
     const grouped = new Map<number, typeof events>();
     for (const event of events)
@@ -929,11 +962,15 @@ export class GameShellComponent {
     { id: 'COMBAT', label: 'Бой' },
     { id: 'OTHER', label: 'Остальное' },
   ] as const;
-  protected readonly historyFilters = [
+  protected readonly historyFilters = computed(() => [
     { id: 'ALL', label: 'Все' },
+    { id: 'CURRENT_TURN', label: 'Текущий ход' },
     { id: 'COMBAT', label: 'Бой' },
-    { id: 'ME', label: 'Я' },
-  ] as const;
+    ...this.game().players.map((player) => ({
+      id: `PLAYER:${player.playerId}`,
+      label: player.name,
+    })),
+  ]);
   protected readonly equipmentLabels = {
     head: 'Голова',
     body: 'Тело',
@@ -956,7 +993,7 @@ export class GameShellComponent {
   protected readonly saleOpen = signal(false);
   protected readonly charityOpen = signal(false);
   protected readonly handFilter = signal<(typeof this.handFilters)[number]['id']>('ALL');
-  protected readonly historyFilter = signal<(typeof this.historyFilters)[number]['id']>('ALL');
+  protected readonly historyFilter = signal('ALL');
   protected readonly saleSelection = signal<readonly string[]>([]);
   protected readonly charitySelection = signal<readonly string[]>([]);
   protected readonly charityRecipientId = signal<string | null>(null);
@@ -1192,6 +1229,23 @@ export class GameShellComponent {
         OTHER: 'Карта',
       } as Record<GameCardView['type'], string>
     )[card.type];
+  }
+  protected historyEventClass(type: string): string {
+    const tone =
+      type.startsWith('COMBAT_') || type === 'RUN_AWAY_ATTEMPTED' || type === 'BAD_STUFF_APPLIED'
+        ? 'combat'
+        : type.startsWith('HELP_')
+          ? 'help'
+          : type.includes('TREASURE') || type.includes('LEVEL') || type === 'CARDS_SOLD'
+            ? 'reward'
+            : type.includes('CURSE')
+              ? 'curse'
+              : type.includes('CARD') || type.includes('ITEM') || type === 'DOOR_KICKED'
+                ? 'card'
+                : type.includes('PLAYER') || type.startsWith('TURN_')
+                  ? 'player'
+                  : 'other';
+    return `history-event history-event-${tone}`;
   }
   protected sexLabel(sex: GameView['self']['sex']): string {
     return sex === 'MALE' ? 'мужской' : sex === 'FEMALE' ? 'женский' : 'не выбран';

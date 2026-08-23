@@ -94,7 +94,7 @@ import type { ConnectionState } from './lobby-client';
     }
     .turn-line span {
       color: #dac78e;
-      font-size: 0.72rem;
+      font-size: 0.78rem;
     }
     .turn-line button {
       width: 2.75rem;
@@ -176,7 +176,7 @@ import type { ConnectionState } from './lobby-client';
       width: 100%;
       overflow: hidden;
       font:
-        800 0.74rem/1.05 Georgia,
+        800 0.8rem/1.05 Georgia,
         serif;
       font-weight: 750;
       text-overflow: ellipsis;
@@ -185,7 +185,7 @@ import type { ConnectionState } from './lobby-client';
     small {
       color: #b9aa91;
       color: #d2b984;
-      font-size: 0.68rem;
+      font-size: 0.74rem;
       white-space: nowrap;
     }
     button:focus-visible {

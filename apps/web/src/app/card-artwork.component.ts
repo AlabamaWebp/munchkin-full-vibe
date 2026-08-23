@@ -126,8 +126,10 @@ function hashKey(value: string): number {
       white-space: nowrap;
     }
     .artwork.compact {
-      min-height: 3rem;
-      padding: 0.35rem;
+      height: 100%;
+      min-height: 0;
+      padding: 0.2rem;
+     display: flex;
     }
     .artwork.compact .glyph {
       font-size: 1rem;
@@ -136,8 +138,11 @@ function hashKey(value: string): number {
       display: none;
     }
     .card-image {
+      display: block;
       width: 100%;
       height: 100%;
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
       object-position: center;
       border-radius: 0.6rem;

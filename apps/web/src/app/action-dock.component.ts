@@ -81,7 +81,7 @@ const PRIORITY: readonly AvailableGameAction[] = [
       border-radius: 0.85rem;
       color: #e5ede7;
       background: linear-gradient(145deg, #49301a, #21140c);
-      font-size: 0.7rem;
+      font-size: 0.76rem;
       font-weight: 850;
       text-overflow: ellipsis;
       text-transform: uppercase;
@@ -95,13 +95,13 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     button strong {
       font:
-        900 0.66rem/1.05 Georgia,
+        900 0.72rem/1.05 Georgia,
         serif;
     }
     button small {
       margin-top: 0.12rem;
       color: #dccdae;
-      font-size: 0.55rem;
+      font-size: 0.62rem;
       font-weight: 600;
       text-transform: none;
     }
@@ -113,11 +113,15 @@ const PRIORITY: readonly AvailableGameAction[] = [
         inset 0 1px rgba(255, 255, 255, 0.35),
         0 0.25rem 0.55rem rgba(0, 0, 0, 0.36);
     }
+    button.primary small {
+      color: #fff8df;
+      text-shadow: 0 1px 2px rgba(45, 27, 9, 0.72);
+    }
     p {
       margin: 0;
       align-self: center;
       color: #8f9e94;
-      font-size: 0.68rem;
+      font-size: 0.74rem;
       text-align: center;
     }
     .card-gateway {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import type { GameCardView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
 
@@ -20,9 +20,6 @@ import { CardArtworkComponent } from './card-artwork.component';
       >
         <app-card-artwork [artKey]="card().artKey" [label]="card().name" [compact]="true" />
         <strong>{{ card().name }}</strong>
-        <b>{{ headline() }}</b>
-        <small>{{ subline() }}</small>
-        <span class="state">{{ playable() ? 'СЫГРАТЬ' : reason() }}</span>
       </button>
       <button
         type="button"
@@ -74,7 +71,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       height: 100%;
       min-height: 7.9rem;
       padding: 0.27rem;
-      align-content: start;
+      grid-template-rows: minmax(0, 1fr) auto;
       gap: 0.14rem;
       border: 0;
       color: #f5f8f6;
@@ -83,47 +80,21 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     app-card-artwork {
       width: 100%;
-      height: clamp(3.5rem, 14vw, 4.4rem);
+      height: 100%;
+      min-height: 0;
     }
     strong {
       display: -webkit-box;
       width: 100%;
-      min-height: 1.8em;
+      min-height: 2.1em;
       overflow: hidden;
       font:
-        800 0.7rem/1.05 Georgia,
+        800 0.76rem/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
       white-space: normal;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
-    }
-    b {
-      color: #f4d179;
-      font-size: 0.68rem;
-    }
-    small {
-      min-height: 1.35em;
-      overflow: hidden;
-      color: #bdc9c0;
-      font-size: 0.56rem;
-      line-height: 1.1;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .state {
-      display: block;
-      width: calc(100% - 1.15rem);
-      overflow: hidden;
-      color: #8bd49e;
-      font-size: 0.52rem;
-      font-weight: 900;
-      letter-spacing: 0.04em;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .unavailable .state {
-      color: #b7c0ba;
     }
     .unavailable {
       filter: saturate(0.75);
@@ -147,18 +118,8 @@ import { CardArtworkComponent } from './card-artwork.component';
       outline-offset: -2px;
     }
     @media (min-width: 48rem) {
-      .card-action {
-        grid-template-rows: minmax(5.5rem, 1fr) auto auto auto auto;
-      }
       strong {
-        font-size: 0.78rem;
-      }
-      b {
-        font-size: 0.74rem;
-      }
-      small,
-      .state {
-        font-size: 0.6rem;
+        font-size: 0.82rem;
       }
     }
   `,
@@ -170,36 +131,7 @@ export class CompactGameCardComponent {
   readonly activated = output<GameCardView>();
   readonly detailsOpened = output<GameCardView>();
 
-  protected readonly headline = computed(() => {
-    const card = this.card();
-    if (card.type === 'MONSTER')
-      return `СИЛА ${card.monster?.strength ?? card.monster?.level ?? 0} · 💰${card.monster?.treasureRewards ?? 0}`;
-    if (card.type === 'EQUIPMENT') return `+${card.equipment?.combatBonus ?? 0}`;
-    const bonus = card.effects.find(
-      (effect) => effect.type === 'COMBAT_BONUS' || effect.type === 'MONSTER_COMBAT_BONUS',
-    );
-    if (bonus && 'amount' in bonus)
-      return `${bonus.amount >= 0 ? '+' : ''}${bonus.amount} · ${bonus.type === 'MONSTER_COMBAT_BONUS' ? 'МОНСТР' : 'ИГРОК'}`;
-    if (card.type === 'CURSE' || card.type === 'COMBAT_CURSE') return 'ПРОКЛЯТИЕ';
-    return card.type.replaceAll('_', ' ');
-  });
-
-  protected readonly subline = computed(() => {
-    const card = this.card();
-    if (card.type === 'EQUIPMENT')
-      return `${card.equipment?.slot ?? ''}${card.equipment?.hands ? ` · ${card.equipment.hands} руки` : ''}`;
-    if (card.type === 'CURSE' || card.type === 'COMBAT_CURSE') return card.description;
-    if (
-      card.type === 'CLASS' ||
-      card.type === 'RACE' ||
-      card.type === 'HIRELING' ||
-      card.type === 'MOUNT'
-    )
-      return card.description;
-    return card.play?.timings.join(' · ') ?? '';
-  });
-
   protected ariaLabel(): string {
-    return `${this.card().name}. ${this.headline()}. ${this.playable() ? 'Доступно сейчас' : this.reason()}`;
+    return `${this.card().name}. ${this.playable() ? 'Доступно сейчас' : this.reason()}`;
   }
 }

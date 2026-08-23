@@ -54,6 +54,10 @@ const monsterFour = card('map-eater', 'Пожиратель карт', 'MONSTER'
     badStuff: [{ type: 'DEATH' }],
   },
 });
+const mapEaterModifier = card('map-eater-booster', 'Усиление пожирателя карт', 'MONSTER_MODIFIER', {
+  artKey: 'core.executive-monster-promotion',
+  effects: [{ type: 'MODIFY_MONSTER', strength: 5, treasures: 1 }],
+});
 const sword = card('line-sword', 'Линейный клинок', 'EQUIPMENT', {
   artKey: 'core.tuning-fork-rapier',
   equipment: { slot: 'HANDS', hands: 1, combatBonus: 4, restrictions: [], value: 400 },
@@ -177,16 +181,24 @@ export const DEV_COMBAT_GAME: GameView = {
         clonedFromEncounterId: null,
         baseStrength: 5,
         strengthModifier: 0,
-        currentStrength: 5,
+        currentStrength: 10,
         baseLevelRewards: 1,
         baseTreasureRewards: 1,
-        treasureModifier: 0,
-        currentTreasures: 1,
-        playedCards: [],
+        treasureModifier: 1,
+        currentTreasures: 2,
+        playedCards: [
+          {
+            card: mapEaterModifier,
+            playerId: 'system',
+            strengthModifier: 5,
+            treasureModifier: 1,
+            purpose: 'MODIFIER',
+          },
+        ],
       },
     ],
     playerPower: 7,
-    monsterPower: 28,
+    monsterPower: 33,
     requestedHelperId: null,
     helperId: null,
     helperContribution: 0,

@@ -624,3 +624,17 @@ Verified on 2026-08-23 after the responsive adaptation:
   title.
 - Simplified and shortened the character summary to identity, level, power,
   and hand count; equipment artwork is no longer shown there.
+## Latest UI update
+
+- Menu action buttons now size to their content instead of stretching across the sheet.
+- Bottom hand cards now use a narrower image-oriented layout with a full-height contained illustration and one-line ellipsized name.
+- Small game-screen labels and controls now use more readable type sizes while retaining truncation and compact layout constraints.
+- Compact card names now wrap to at most two lines before truncating.
+- Typography was increased across the game screen, and the centered combat monster artwork now has a stricter responsive height limit so it stays inside the viewport.
+- The help action keeps its secondary label readable, and the help dialog now sizes its action buttons to their content.
+- The combat power sheet now shows each Monster's image, strength, level reward, Treasure reward, and attached modifier cards; the development Map-Eater encounter includes a +5 strength / +1 Treasure modifier card.
+- History now has tabs for the current turn and each player, with event colors grouped by category.
+- The full hand view now lays out three cards per row on compact screens.
+- The character summary now shows the character's sex directly below the nickname.
+- Bottom hand cards show only their card names below the artwork.
+- Card artwork in the hand and active combat uses the card's full 3:4 image without cropping.

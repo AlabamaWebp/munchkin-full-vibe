@@ -52,7 +52,7 @@ import { unavailableReason } from './game-ui.model';
       height: 100%;
       min-width: 0;
       grid-auto-flow: column;
-      grid-auto-columns: clamp(7rem, 32vw, 8rem);
+      grid-auto-columns: clamp(5.25rem, 24vw, 6.25rem);
       gap: 0.45rem;
       overflow-x: auto;
       padding: 0 0.25rem 0.15rem 0;
@@ -92,7 +92,7 @@ import { unavailableReason } from './game-ui.model';
     }
     @media (min-width: 48rem) {
       .cards {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-auto-flow: row;
         grid-auto-columns: auto;
         grid-auto-rows: minmax(9rem, 1fr);

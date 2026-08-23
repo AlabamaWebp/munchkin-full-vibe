@@ -137,7 +137,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     small {
       color: #c6d1c8;
-      font-size: 0.65rem;
+      font-size: 0.72rem;
       font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -160,7 +160,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       gap: 0.22rem;
       list-style: none;
       color: #d4ddd6;
-      font-size: 0.66rem;
+      font-size: 0.72rem;
       line-height: 1.25;
     }
     .facts li {
@@ -174,7 +174,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     .badge {
       margin-top: auto;
       color: #b5c0b8;
-      font-size: 0.7rem;
+      font-size: 0.76rem;
       overflow-wrap: anywhere;
     }
     em {

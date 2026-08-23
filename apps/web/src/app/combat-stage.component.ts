@@ -98,6 +98,10 @@ import { CardArtworkComponent } from './card-artwork.component';
           <span
             ><small>СИЛА МОНСТРА</small><b>{{ combat.monsterPower }}</b></span
           >
+          <span class="score-reward"
+            >НАГРАДА: +{{ totalLevelRewards() }} {{ totalLevelWord() }} ·
+            {{ totalTreasureRewards() }} {{ totalTreasureWord() }}</span
+          >
           <em [class.losing]="difference() <= 0"
             >{{ difference() > 0 ? '+' : '' }}{{ difference() }}</em
           >
@@ -167,7 +171,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .reaction span,
     .reaction small {
-      font-size: 0.62rem;
+      font-size: 0.68rem;
     }
     .score {
       position: relative;
@@ -196,7 +200,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .score small {
       color: #bdc9c0;
-      font-size: 0.67rem;
+      font-size: 0.72rem;
       letter-spacing: 0.08em;
     }
     .score b {
@@ -208,6 +212,15 @@ import { CardArtworkComponent } from './card-artwork.component';
     .score > strong {
       color: #edc978;
       font-size: 1.1rem;
+    }
+    .score-reward {
+      grid-column: 1 / -1;
+      color: #e6c987;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1.1;
+      text-align: center;
+      margin: 3px 0 0;
     }
     .score em {
       position: absolute;
@@ -239,7 +252,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       border-radius: 999px;
       color: #dce5de;
       background: rgba(34, 26, 18, 0.85);
-      font-size: 0.55rem;
+      font-size: 0.62rem;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -252,7 +265,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .outcome {
       justify-self: center;
-      margin-top: -0.75rem;
+      margin: -0.5rem 0;
       z-index: 2;
       padding: 0.2rem 0.85rem;
       border: 1px solid #4f8358;
@@ -299,7 +312,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       border-radius: 0.5rem;
       color: #d9dedb;
       background: #211d17;
-      font-size: 0.55rem;
+      font-size: 0.62rem;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -330,9 +343,10 @@ import { CardArtworkComponent } from './card-artwork.component';
     .monster-art {
       position: relative;
       display: grid;
-      width: min(100%, 14rem);
-      height: min(100%, 21rem);
-      aspect-ratio: 2 / 3;
+      width: min(100%, 12rem);
+      height: min(100%, 16rem);
+      max-height: 100%;
+      aspect-ratio: 3 / 4;
       align-self: center;
       justify-self: center;
       min-width: 0;
@@ -363,7 +377,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       margin: 0;
       overflow: hidden;
       font:
-        800 clamp(0.77rem, 3.9vw, 0.9rem)/1.05 Georgia,
+        800 clamp(0.84rem, 4.2vw, 1rem)/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -382,12 +396,12 @@ import { CardArtworkComponent } from './card-artwork.component';
     .rewards b {
       color: #2b1808;
       font:
-        900 0.62rem Georgia,
+        900 0.68rem Georgia,
         serif;
     }
     .rewards span {
       font:
-        800 0.62rem Georgia,
+        800 0.68rem Georgia,
         serif;
     }
     p {
@@ -395,7 +409,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       margin: 0;
       overflow: hidden;
       color: #e2d4d1;
-      font-size: 0.62rem;
+      font-size: 0.74rem;
       line-height: 1.2;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 3;
@@ -422,7 +436,7 @@ import { CardArtworkComponent } from './card-artwork.component';
         serif;
     }
     .monster-strength small {
-      font-size: 0.5rem;
+      font-size: 0.56rem;
       font-weight: 900;
     }
     .modifiers {
@@ -434,7 +448,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       border-radius: 999px;
       color: #ffddb5;
       background: #593a31;
-      font-size: 0.52rem;
+      font-size: 0.58rem;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
@@ -445,7 +459,7 @@ import { CardArtworkComponent } from './card-artwork.component';
         padding: 0.5rem 0;
       }
       .monster {
-        width: min(100%, 16rem);
+        width: min(100%, 12.5rem);
         min-height: 20rem;
         max-height: min(26rem, 50dvh);
       }
@@ -466,7 +480,7 @@ import { CardArtworkComponent } from './card-artwork.component';
         gap: 0.2rem;
       }
       .monster {
-        width: min(100%, 14rem);
+        width: min(100%, 12rem);
       }
       .score {
         min-height: 3.35rem;
@@ -499,6 +513,20 @@ export class CombatStageComponent {
 
   protected readonly difference = computed(
     () => (this.game().combat?.playerPower ?? 0) - (this.game().combat?.monsterPower ?? 0),
+  );
+  protected readonly totalLevelRewards = computed(
+    () =>
+      this.game().combat?.monsters.reduce(
+        (sum, encounter) => sum + encounter.baseLevelRewards,
+        0,
+      ) ?? 0,
+  );
+  protected readonly totalTreasureRewards = computed(
+    () =>
+      this.game().combat?.monsters.reduce(
+        (sum, encounter) => sum + encounter.currentTreasures,
+        0,
+      ) ?? 0,
   );
   protected viewerMustReact(): boolean {
     return (
@@ -534,8 +562,15 @@ export class CombatStageComponent {
   protected levelWord(): string {
     return this.focused().baseLevelRewards === 1 ? 'уровень' : 'уровня';
   }
+  protected totalLevelWord(): string {
+    return this.totalLevelRewards() === 1 ? 'уровень' : 'уровня';
+  }
   protected treasureWord(): string {
     const count = this.focused().currentTreasures;
+    return count === 1 ? 'сокровище' : count >= 2 && count <= 4 ? 'сокровища' : 'сокровищ';
+  }
+  protected totalTreasureWord(): string {
+    const count = this.totalTreasureRewards();
     return count === 1 ? 'сокровище' : count >= 2 && count <= 4 ? 'сокровища' : 'сокровищ';
   }
   private badStuffEffect(effect: GameBadStuffEffectView): string {

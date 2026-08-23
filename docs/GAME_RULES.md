@@ -132,7 +132,9 @@ The rules in this section supersede the earlier simplified milestone behavior.
   unavailable at level 9 and a selection that would cross the pre-victory level
   limit is rejected atomically.
 - One public help offer may exist per combat. The active player proposes a helper
-  and 0 through the current expected Treasure reward; the invitee may accept,
+  and 0 through the total Treasure reward currently provided by all Monsters in
+  the combat; promised Treasures may never exceed the reward the combat can give.
+  The invitee may accept,
   reject, or counter, and the active player may accept/reject the counter or
   cancel an outstanding offer. Commands use stable offer ids and combat revisions.
   Acceptance creates one immutable reconnect-safe agreement.
