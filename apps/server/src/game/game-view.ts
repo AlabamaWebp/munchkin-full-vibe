@@ -439,6 +439,42 @@ function projectLogEntry(
   }
 }
 
+function projectHiddenPrivateCardReceipt(
+  entry: GameLogEntry,
+): GameLogEntryView | null {
+  const base = {
+    sequence: entry.sequence,
+    turnNumber: entry.turnNumber,
+    phase: entry.phase,
+    type: entry.event.type,
+    visibility: 'PUBLIC' as const,
+  };
+  const event = entry.event;
+
+  switch (event.type) {
+    case 'CARD_DRAWN':
+      return {
+        ...base,
+        playerId: event.playerId,
+        hiddenCard: { deck: event.deck, count: 1 },
+      };
+    case 'SCAVENGED_CARD':
+      return {
+        ...base,
+        playerId: event.playerId,
+        hiddenCard: { deck: 'TREASURE', count: 1 },
+      };
+    case 'COMBAT_REWARD_CARDS':
+      return {
+        ...base,
+        playerId: event.playerId,
+        hiddenCard: { deck: 'TREASURE', count: event.cardIds.length },
+      };
+    default:
+      return null;
+  }
+}
+
 export const EVENT_IMPORTANCE = {
   PLAYER_ADDED: 'ROUTINE',
   GAME_STARTED: 'IMPORTANT',
@@ -1240,13 +1276,15 @@ export function createGameView(
   );
   if (ownPublic === undefined)
     throw new TypeError('The viewer projection is missing.');
-  const visibleLog = state.eventLog
-    .filter(
-      (entry) =>
-        entry.event.visibility === 'PUBLIC' ||
-        entry.event.recipientPlayerId === viewerPlayerId,
+  const visibleLog = state.eventLog.flatMap((entry) => {
+    if (
+      entry.event.visibility === 'PUBLIC' ||
+      entry.event.recipientPlayerId === viewerPlayerId
     )
-    .map((entry) => projectLogEntry(state, entry));
+      return [projectLogEntry(state, entry)];
+    const hiddenReceipt = projectHiddenPrivateCardReceipt(entry);
+    return hiddenReceipt === null ? [] : [hiddenReceipt];
+  });
 
   return {
     gameId: state.id,

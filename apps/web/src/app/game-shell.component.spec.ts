@@ -532,6 +532,50 @@ describe('GameShellComponent', () => {
     expect(root.querySelector('.full-hand-grid .with-details .facts')?.textContent).toContain('+3');
   });
 
+  it('filters the full hand by card type and keeps combat to active-combat bonuses', () => {
+    const combatBonus = card({
+      instanceId: 'combat-bonus',
+      name: 'Combat bonus',
+      play: { timings: ['ACTIVE_COMBAT'], target: 'COMBAT_PLAYER' },
+    });
+    const turnBonus = card({
+      instanceId: 'turn-bonus',
+      name: 'Turn bonus',
+      play: { timings: ['TURN'], target: 'SELF' },
+    });
+    const curse = card({ instanceId: 'curse', name: 'Curse', type: 'CURSE' });
+    const race = card({ instanceId: 'race', name: 'Race', type: 'RACE' });
+    const gamePlayer = player({ handCount: 5 });
+    const fixture = render(
+      base({
+        players: [gamePlayer],
+        self: { ...gamePlayer, hand: [combatBonus, turnBonus, curse, monster, race] },
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.full-hand')!.click();
+    fixture.detectChanges();
+
+    const filter = (label: string): void => {
+      Array.from(root.querySelectorAll<HTMLButtonElement>('.hand-filters button'))
+        .find((button) => button.textContent?.includes(label))!
+        .click();
+      fixture.detectChanges();
+    };
+    const cardsText = (): string => root.querySelector('.full-hand-grid')?.textContent ?? '';
+
+    filter('Проклятия');
+    expect(cardsText()).toContain('Curse');
+    expect(cardsText()).not.toContain('Race');
+    filter('Расы');
+    expect(cardsText()).toContain('Race');
+    expect(cardsText()).not.toContain('Curse');
+    filter('Усиления в бою');
+    expect(cardsText()).toContain('Combat bonus');
+    expect(cardsText()).not.toContain('Turn bonus');
+    expect(cardsText()).not.toContain('Curse');
+  });
+
   it('requires card details before dispatching an equip action or opening a target picker', () => {
     const equipment = card({
       instanceId: 'eq',

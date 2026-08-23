@@ -6,6 +6,23 @@ Current milestone:
 V2 final audit complete; live-game blockers remain
 ```
 
+## Current-phase card activity (2026-08-23)
+
+- `app-game-stage` now presents the newest visible card event for the current
+  game phase, including its matching action text and a card-detail entry point;
+- multi-card events, such as sales, use a compact selectable card rail above
+  the displayed card;
+- the presentation is derived only from the server-projected event log and its
+  authoritative phase stamp, so cards automatically leave the stage when play
+  moves to a new phase (for example, after opening another Door or ending a
+  turn).
+- cards and their summaries on the game stage now use the selected catalog
+  locale; private Door/Treasure draws are projected to other players only as
+  an identity-free question-mark card with the deck and count.
+- card activity is additionally scoped to the current turn number, preventing
+  a card played during a previous `TURN_START` from reappearing at the start
+  of the next turn.
+
 ## Optional-set card interaction (2026-08-23)
 
 - connected the server-authorized optional-set intents to the card details UI:
@@ -678,6 +695,10 @@ Verified on 2026-08-23 after the responsive adaptation:
 - Simplified and shortened the character summary to identity, level, power,
   and hand count; equipment artwork is no longer shown there.
 ## Latest UI update
+
+- Добавлены переносимые по строкам вкладки руки для проклятий, монстров, рас и
+  классов. Вкладка боевых карт теперь показывает только усиления с таймингом
+  `ACTIVE_COMBAT`.
 
 - The general "Look for trouble" action now always opens the Monster picker,
   including when exactly one legal Monster is in hand. Combat begins only after

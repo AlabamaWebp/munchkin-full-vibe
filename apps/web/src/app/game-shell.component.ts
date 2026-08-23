@@ -894,22 +894,21 @@ export class GameShellComponent {
       if (filter === 'PLAYABLE') return this.playableIds().includes(card.instanceId);
       if (filter === 'EQUIPMENT') return card.type === 'EQUIPMENT';
       if (filter === 'COMBAT')
-        return [
-          'MONSTER',
-          'TEMPORARY_BONUS',
-          'MONSTER_MODIFIER',
-          'ADD_MONSTER',
-          'CLONE_MONSTER',
-          'COMBAT_CURSE',
-        ].includes(card.type);
+        return (
+          card.type === 'TEMPORARY_BONUS' &&
+          (card.play?.timings.includes('ACTIVE_COMBAT') ?? false)
+        );
+      if (filter === 'CURSES') return card.type === 'CURSE' || card.type === 'COMBAT_CURSE';
+      if (filter === 'MONSTERS') return card.type === 'MONSTER';
+      if (filter === 'RACES') return card.type === 'RACE';
+      if (filter === 'CLASSES') return card.type === 'CLASS';
       return ![
         'EQUIPMENT',
         'MONSTER',
-        'TEMPORARY_BONUS',
-        'MONSTER_MODIFIER',
-        'ADD_MONSTER',
-        'CLONE_MONSTER',
+        'CURSE',
         'COMBAT_CURSE',
+        'RACE',
+        'CLASS',
       ].includes(card.type);
     });
   });
@@ -1032,7 +1031,11 @@ export class GameShellComponent {
     { id: 'ALL', label: 'Все' },
     { id: 'PLAYABLE', label: 'Сейчас' },
     { id: 'EQUIPMENT', label: 'Снаряжение' },
-    { id: 'COMBAT', label: 'Бой' },
+    { id: 'COMBAT', label: 'Усиления в бою' },
+    { id: 'CURSES', label: 'Проклятия' },
+    { id: 'MONSTERS', label: 'Монстры' },
+    { id: 'RACES', label: 'Расы' },
+    { id: 'CLASSES', label: 'Классы' },
     { id: 'OTHER', label: 'Остальное' },
   ] as const;
   protected readonly historyFilters = computed(() => [

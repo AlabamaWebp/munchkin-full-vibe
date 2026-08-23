@@ -1209,14 +1209,26 @@ describe('createGameView', () => {
     ).toEqual([activeCard.instanceId]);
     expect(
       helperView.gameLog
-        .find((entry) => entry.type === 'COMBAT_REWARD_CARDS')
+        .find(
+          (entry) =>
+            entry.type === 'COMBAT_REWARD_CARDS' && entry.playerId === ids[1],
+        )
         ?.cards?.map((card) => card.instanceId),
     ).toEqual([helperCard.instanceId]);
     expect(
-      spectatorView.gameLog.some(
+      spectatorView.gameLog.filter(
         (entry) => entry.type === 'COMBAT_REWARD_CARDS',
       ),
-    ).toBe(false);
+    ).toEqual([
+      expect.objectContaining({
+        playerId: ids[0],
+        hiddenCard: { deck: 'TREASURE', count: 1 },
+      }),
+      expect.objectContaining({
+        playerId: ids[1],
+        hiddenCard: { deck: 'TREASURE', count: 1 },
+      }),
+    ]);
     expect(JSON.stringify(spectatorView)).not.toContain(activeCard.instanceId);
     expect(JSON.stringify(spectatorView)).not.toContain(helperCard.instanceId);
   });

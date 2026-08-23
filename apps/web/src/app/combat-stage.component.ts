@@ -1,6 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import type { GameBadStuffEffectView, GameCardView, GameView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
+import { LocalizationService } from './localization';
 
 @Component({
   selector: 'app-combat-stage',
@@ -38,24 +47,24 @@ import { CardArtworkComponent } from './card-artwork.component';
                   [class.active]="focused().encounterId === encounter.encounterId"
                   (click)="focusedId.set(encounter.encounterId)"
                 >
-                  {{ encounter.monster.name }} · {{ encounter.currentStrength }}
+                  {{ cardName(encounter.monster) }} · {{ encounter.currentStrength }}
                 </button>
               }
             </div>
           }
           <article class="monster">
             <div class="monster-title">
-              <h3>{{ focused().monster.name }}</h3>
+              <h3>{{ cardName(focused().monster) }}</h3>
             </div>
             <button
               type="button"
               class="monster-art"
-              [attr.aria-label]="'Подробнее: ' + focused().monster.name"
+              [attr.aria-label]="'Подробнее: ' + cardName(focused().monster)"
               (click)="cardOpened.emit(focused().monster)"
             >
               <app-card-artwork
                 [artKey]="focused().monster.artKey"
-                [label]="focused().monster.name"
+                [label]="cardName(focused().monster)"
                 [compact]="true"
               />
             </button>
@@ -499,6 +508,7 @@ import { CardArtworkComponent } from './card-artwork.component';
   `,
 })
 export class CombatStageComponent {
+  private readonly localization = inject(LocalizationService);
   readonly game = input.required<GameView>();
   readonly reactionMode = input(false);
   readonly breakdownOpened = output<void>();
@@ -542,6 +552,9 @@ export class CombatStageComponent {
   }
   protected playerName(id: string): string {
     return this.game().players.find((player) => player.playerId === id)?.name ?? 'Игрок';
+  }
+  protected cardName(card: GameCardView): string {
+    return this.localization.cardName(card);
   }
   protected signed(value: number): string {
     return value > 0 ? `+${value}` : `${value}`;

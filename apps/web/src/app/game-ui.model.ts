@@ -2,7 +2,6 @@ import type {
   GameCardView,
   GameLogEntryView,
   GameView,
-  PresentedGameEventView,
 } from '@munchkin-lan/contracts';
 
 export type GameStageKind =
@@ -22,6 +21,18 @@ export interface PresentedEvent {
   readonly summary: string;
 }
 
+/**
+ * A public or viewer-private card event that belongs to the phase and turn
+ * currently shown on the table. Event entries are stamped by the server, so
+ * this deliberately disappears as soon as play advances.
+ */
+export interface StageCardEvent {
+  readonly entry: GameLogEntryView;
+  readonly cards: readonly GameCardView[];
+  readonly hiddenCard: GameLogEntryView['hiddenCard'];
+  readonly summary: string;
+}
+
 export function selectStage(game: GameView): GameStageKind {
   if (game.status === 'FINISHED' || game.phase === 'FINISHED') return 'FINISHED';
   if (game.combat?.reactionWindow !== null && game.combat?.reactionWindow !== undefined)
@@ -35,14 +46,21 @@ export function selectStage(game: GameView): GameStageKind {
   return 'TURN_CLEANUP';
 }
 
-export function latestRevealedCard(game: GameView): GameCardView | null {
-  return (
-    [...game.gameLog]
-      .reverse()
-      .find((entry) =>
-        ['DOOR_KICKED', 'LOOKED_FOR_TROUBLE', 'CURSE_RESOLVED', 'CARD_DRAWN'].includes(entry.type),
-      )?.card ?? null
-  );
+export function latestStageCardEvent(game: GameView): StageCardEvent | null {
+  const entry = [...game.gameLog]
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.phase === game.phase &&
+        candidate.turnNumber === game.turnNumber &&
+        (candidate.card !== undefined ||
+          (candidate.cards?.length ?? 0) > 0 ||
+          candidate.hiddenCard !== undefined),
+    );
+  if (entry === undefined) return null;
+
+  const cards = entry.cards ?? (entry.card === undefined ? [] : [entry.card]);
+  return { entry, cards, hiddenCard: entry.hiddenCard, summary: eventSummary(game, entry) };
 }
 
 export function presentEvents(game: GameView): readonly PresentedEvent[] {
@@ -64,7 +82,7 @@ export function presentEvents(game: GameView): readonly PresentedEvent[] {
     .filter((event) => event.summary.length > 0);
 }
 
-function eventSummary(game: GameView, entry: PresentedGameEventView): string {
+function eventSummary(game: GameView, entry: GameLogEntryView): string {
   const player =
     game.players.find((candidate) => candidate.playerId === entry.playerId)?.name ?? 'Игрок';
   const target = game.players.find(
@@ -76,6 +94,12 @@ function eventSummary(game: GameView, entry: PresentedGameEventView): string {
       return `Ход: ${player}`;
     case 'DOOR_KICKED':
       return `${player} открыл ${card ?? 'дверь'}`;
+    case 'CARD_ADDED_TO_HAND':
+      return `${player} получил ${card ?? 'карту'}`;
+    case 'CARD_DRAWN':
+      return entry.hiddenCard === undefined
+        ? `${player} получил ${card ?? 'карту'}`
+        : `${player} получил закрытую карту`;
     case 'LOOKED_FOR_TROUBLE':
       return `${player} нашёл неприятности: ${card ?? 'монстр'}`;
     case 'CURSE_RESOLVED':
@@ -84,6 +108,8 @@ function eventSummary(game: GameView, entry: PresentedGameEventView): string {
       return `${player} вступил в бой${card ? `: ${card}` : ''}`;
     case 'CARD_PLAYED':
       return `${player} сыграл ${card ?? 'карту'}`;
+    case 'CARDS_DISCARDED':
+      return `${player} сбросил ${entry.count ?? 0} карт`;
     case 'HELP_OFFERED':
       return `${player} предложил помощь`;
     case 'HELP_COUNTERED':
@@ -106,8 +132,16 @@ function eventSummary(game: GameView, entry: PresentedGameEventView): string {
       return `${player} потерял ур. ${entry.amount ?? 1}`;
     case 'TREASURE_GAINED':
       return `${player} получил сокровища: ${entry.count ?? 0}`;
+    case 'COMBAT_REWARD_CARDS':
+      return entry.hiddenCard === undefined
+        ? `${player} получил сокровища`
+        : `${player} получил закрытые сокровища`;
     case 'SCAVENGED':
       return `${player} нашёл снаряжение`;
+    case 'SCAVENGED_CARD':
+      return entry.hiddenCard === undefined
+        ? `${player} получил ${card ?? 'карту'}`
+        : `${player} получил закрытую карту`;
     case 'PLAYER_DIED':
       return `${player} погиб`;
     case 'PLAYER_REVIVED':
@@ -122,8 +156,14 @@ function eventSummary(game: GameView, entry: PresentedGameEventView): string {
       return `${player} выбрал ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${card ?? 'роль'}`;
     case 'ROLE_DISCARDED':
       return `${player} сбросил ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${card ?? 'роль'}`;
+    case 'ROLE_PERMISSION_PLAYED':
+      return `${player} активировал разрешение роли: ${card ?? 'карту'}`;
+    case 'ROLE_PERMISSION_DISCARDED':
+      return `${player} сбросил разрешение роли: ${card ?? 'карту'}`;
     case 'CARDS_SOLD':
       return `${player} продал карты`;
+    case 'ITEM_TRADED':
+      return `${player} передал ${card ?? 'предмет'}${target ? ` игроку ${target}` : ''}`;
     case 'CHARITY_RESOLVED':
       return `${player} раздал милостыню`;
     default:

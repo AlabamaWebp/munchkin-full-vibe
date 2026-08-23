@@ -1,5 +1,10 @@
 import type { GameCardView, GamePlayerView, GameView } from '@munchkin-lan/contracts';
-import { presentEvents, selectStage, unavailableReason } from './game-ui.model';
+import {
+  latestStageCardEvent,
+  presentEvents,
+  selectStage,
+  unavailableReason,
+} from './game-ui.model';
 
 const player = (overrides: Partial<GamePlayerView> = {}): GamePlayerView => ({
   playerId: 'p1',
@@ -26,6 +31,17 @@ const monster: GameCardView = {
   effects: [],
   monster: { strength: 3, levelRewards: 1, treasureRewards: 2, badStuff: [] },
 };
+const card = (overrides: Partial<GameCardView> = {}): GameCardView => ({
+  instanceId: 'c1',
+  definitionId: 'card',
+  artKey: 'test.card',
+  name: 'Useful Card',
+  description: 'A useful effect.',
+  type: 'EQUIPMENT',
+  deck: 'TREASURE',
+  effects: [],
+  ...overrides,
+});
 const view = (overrides: Partial<GameView> = {}): GameView => {
   const self = player();
   return {
@@ -240,6 +256,84 @@ describe('game UI state mapper', () => {
       'Ada выбрал класс: Clockwork Yak',
       'Ada сбросил расу: Clockwork Yak',
     ]);
+  });
+  it('keeps the latest card event of the current phase and clears it on a phase change', () => {
+    const soldCard = card({ instanceId: 'sold-1', name: 'Brass Greaves' });
+    const otherSoldCard = card({ instanceId: 'sold-2', name: 'Silver Cloak' });
+    const game = view({
+      phase: 'POST_DOOR',
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'DOOR_KICKED',
+          visibility: 'PUBLIC',
+          playerId: 'p1',
+          card: monster,
+        },
+        {
+          sequence: 2,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'CARDS_SOLD',
+          visibility: 'PUBLIC',
+          playerId: 'p1',
+          cards: [soldCard, otherSoldCard],
+          value: 1000,
+          amount: 1,
+        },
+      ],
+    });
+
+    expect(latestStageCardEvent(game)).toMatchObject({
+      summary: 'Ada продал карты',
+      cards: [soldCard, otherSoldCard],
+    });
+    expect(latestStageCardEvent({ ...game, phase: 'TURN_START' })).toBeNull();
+  });
+  it('clears a previous turn card when the next turn returns to the same phase', () => {
+    const equippedCard = card({ instanceId: 'old-role', name: 'Riverfolk' });
+    const game = view({
+      phase: 'TURN_START',
+      turnNumber: 2,
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'TURN_START',
+          type: 'ROLE_PLAYED',
+          visibility: 'PUBLIC',
+          playerId: 'p1',
+          card: equippedCard,
+          role: 'RACE',
+        },
+      ],
+    });
+
+    expect(latestStageCardEvent(game)).toBeNull();
+  });
+  it('keeps an identity-free private card receipt visible to other players', () => {
+    const game = view({
+      phase: 'END_TURN',
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'END_TURN',
+          type: 'CARD_DRAWN',
+          visibility: 'PUBLIC',
+          playerId: 'p1',
+          hiddenCard: { deck: 'TREASURE', count: 1 },
+        },
+      ],
+    });
+
+    expect(latestStageCardEvent(game)).toMatchObject({
+      cards: [],
+      hiddenCard: { deck: 'TREASURE', count: 1 },
+      summary: 'Ada получил закрытую карту',
+    });
   });
   it('exposes an unavailable card reason', () =>
     expect(

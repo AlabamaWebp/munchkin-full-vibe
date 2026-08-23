@@ -516,6 +516,11 @@ export interface GameLogEntryView {
   readonly protectedCardId?: string;
   readonly card?: GameCardView;
   readonly cards?: readonly GameCardView[];
+  /** A deliberately identity-free private draw, shown only to other players. */
+  readonly hiddenCard?: {
+    readonly deck: GameDeckType;
+    readonly count: number;
+  };
   readonly count?: number;
   readonly amount?: number;
   readonly value?: number;

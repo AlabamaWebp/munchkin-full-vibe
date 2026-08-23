@@ -243,9 +243,9 @@ app-hand-dock {
 .hand-filters,
 .history-filters {
   display: flex;
+  flex-wrap: wrap;
   margin-bottom: 0.65rem;
   gap: 0.35rem;
-  overflow-x: auto;
 }
 .hand-filters button,
 .history-filters button {

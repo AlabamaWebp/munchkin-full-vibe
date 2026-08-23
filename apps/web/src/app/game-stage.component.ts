@@ -1,9 +1,18 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import type { GameCardView, GameView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
 import { CombatStageComponent } from './combat-stage.component';
 import type { GameStageKind } from './game-ui.model';
-import { latestRevealedCard } from './game-ui.model';
+import { latestStageCardEvent } from './game-ui.model';
+import { LocalizationService } from './localization';
 
 @Component({
   selector: 'app-game-stage',
@@ -11,7 +20,60 @@ import { latestRevealedCard } from './game-ui.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="stage" [attr.data-stage]="stage()">
-      @switch (stage()) {
+      @if (showsStageCard() && stageCardEvent(); as event) {
+        @if (event.hiddenCard; as hiddenCard) {
+          <section class="card-event" aria-label="Закрытая полученная карта">
+            <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+            <h2 class="event-summary">{{ hiddenCardSummary(event) }}</h2>
+            <article class="event-card hidden-card">
+              <div class="event-card-title">
+                <small>ЗАКРЫТАЯ КАРТА</small>
+                <h3>{{ hiddenCardTitle(hiddenCard.deck, hiddenCard.count) }}</h3>
+              </div>
+              <div class="hidden-card-art" aria-hidden="true">?</div>
+              <p>{{ hiddenCardDescription(hiddenCard.deck, hiddenCard.count) }}</p>
+            </article>
+          </section>
+        } @else if (focusedStageCard(); as focused) {
+          <section class="card-event" aria-label="Последнее карточное действие">
+            @if (event.cards.length > 1) {
+              <div class="card-tabs" aria-label="Карты последнего действия">
+                @for (card of event.cards; track card.instanceId) {
+                  <button
+                    type="button"
+                    [class.active]="focused.instanceId === card.instanceId"
+                    (click)="focusedStageCardId.set(card.instanceId)"
+                  >
+                    {{ cardName(card) }}
+                  </button>
+                }
+              </div>
+            }
+            <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+            <h2 class="event-summary">{{ stageSummary(event.summary, event.cards) }}</h2>
+            <article class="event-card">
+              <div class="event-card-title">
+                <small>{{ cardZone(focused) }}</small>
+                <h3>{{ cardName(focused) }}</h3>
+              </div>
+              <button
+                type="button"
+                class="event-card-art"
+                [attr.aria-label]="'Подробнее: ' + cardName(focused)"
+                (click)="cardOpened.emit(focused)"
+              >
+                <app-card-artwork
+                  [artKey]="focused.artKey"
+                  [label]="cardName(focused)"
+                  [compact]="true"
+                />
+              </button>
+              <p>{{ cardDescription(focused) }}</p>
+            </article>
+          </section>
+        }
+      } @else {
+        @switch (stage()) {
         @case ('COMBAT_OPEN') {
           <app-combat-stage
             [game]="game()"
@@ -77,19 +139,7 @@ import { latestRevealedCard } from './game-ui.model';
           </div>
         }
         @case ('DOOR_REVEAL') {
-          @if (revealedCard(); as card) {
-            <article class="reveal">
-              <app-card-artwork [artKey]="card.artKey" [label]="card.name" />
-              <div>
-                <p class="eyebrow">ДВЕРЬ ОТКРЫТА</p>
-                <h2>{{ card.name }}</h2>
-                <p>{{ card.description }}</p>
-              </div>
-              <button type="button" (click)="cardOpened.emit(card)">Подробнее</button>
-            </article>
-          } @else {
-            <div class="message"><h2>Дверь открывается…</h2></div>
-          }
+          <div class="message"><h2>Дверь открывается…</h2></div>
         }
         @case ('POST_DOOR_CHOICE') {
           <div class="message">
@@ -167,6 +217,7 @@ import { latestRevealedCard } from './game-ui.model';
             </p>
           </div>
         }
+        }
       }
     </section>
   `,
@@ -225,35 +276,136 @@ import { latestRevealedCard } from './game-ui.model';
       font-size: 0.78rem;
       line-height: 1.25;
     }
-    .reveal {
+    .card-event {
       display: grid;
       height: 100%;
       min-height: 0;
       padding: 0.65rem;
-      grid-template-columns: minmax(5.5rem, 34%) 1fr;
-      align-content: center;
-      gap: 0.6rem;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      align-items: center;
+      justify-items: center;
+      gap: 0.35rem;
       overflow: hidden;
-      border: 1px solid #806f48;
-      border-radius: 0.9rem;
-      background: linear-gradient(145deg, #332a1d, #151d18);
     }
-    .reveal > div {
+    .card-tabs {
+      display: flex;
+      width: 100%;
+      min-width: 0;
+      justify-content: flex-start;
+      gap: 0.25rem;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .card-tabs button {
+      min-width: 7rem;
+      min-height: 2.15rem;
+      padding: 0.3rem 0.45rem;
+      overflow: hidden;
+      flex: 0 0 7rem;
+      border: 1px solid #5c5140;
+      border-radius: 0.5rem;
+      color: #d9dedb;
+      background: #211d17;
+      font-size: 0.62rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-tabs button.active {
+      border-color: #e2b965;
+      color: #ffe8b3;
+    }
+    .event-summary {
+      width: 100%;
+      text-align: center;
+    }
+    .event-card {
+      display: grid;
+      width: min(100%, 17rem);
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      padding: 0.38rem;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      justify-self: center;
+      gap: 0.28rem;
+      overflow: hidden;
+      border: 2px solid #8e6734;
+      border-radius: 0.95rem;
+      background: linear-gradient(145deg, rgba(77, 54, 28, 0.96), rgba(17, 12, 9, 0.96));
+      box-shadow:
+        inset 0 0 0 2px rgba(10, 7, 5, 0.82),
+        0 0.5rem 1.25rem rgba(0, 0, 0, 0.58);
+    }
+    .event-card-title {
       display: grid;
       min-width: 0;
-      align-content: center;
-      gap: 0.35rem;
+      gap: 0.1rem;
+      text-align: center;
     }
-    .reveal app-card-artwork {
-      min-width: 0;
+    .event-card-title small {
+      color: #d9b76f;
+      font-size: 0.56rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
     }
-    .reveal button {
-      min-height: 2.75rem;
-      grid-column: 1 / -1;
-      border: 1px solid #6e7d74;
-      border-radius: 0.6rem;
-      color: #eaf0ec;
-      background: #233129;
+    h3 {
+      margin: 0;
+      overflow: hidden;
+      font:
+        800 clamp(0.84rem, 4.2vw, 1rem)/1.05 Georgia,
+        serif;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .event-card-art {
+      position: relative;
+      display: grid;
+      width: min(100%, 11rem);
+      min-height: 0;
+      height: 100%;
+      aspect-ratio: 3 / 4;
+      align-self: center;
+      justify-self: center;
+      padding: 0;
+      overflow: hidden;
+      border: 0;
+      background: transparent;
+    }
+    .event-card-art app-card-artwork {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      min-height: 0;
+      height: 100%;
+    }
+    .hidden-card-art {
+      display: grid;
+      width: min(100%, 11rem);
+      min-height: 0;
+      height: 100%;
+      aspect-ratio: 3 / 4;
+      align-self: center;
+      justify-self: center;
+      place-items: center;
+      border: 2px dashed #c49b53;
+      border-radius: 0.72rem;
+      color: #ffe4a5;
+      background:
+        radial-gradient(circle at 30% 25%, rgba(228, 183, 93, 0.2), transparent 35%),
+        repeating-linear-gradient(45deg, #332313, #332313 0.5rem, #21170e 0.5rem, #21170e 1rem);
+      font: 900 clamp(3rem, 18vw, 5rem)/1 Georgia, serif;
+      text-shadow: 0 0.2rem 0.5rem #000;
+    }
+    .event-card > p {
+      display: -webkit-box;
+      margin: 0;
+      overflow: hidden;
+      color: #e2d4d1;
+      font-size: 0.7rem;
+      line-height: 1.2;
+      text-align: center;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
     .attempts {
       display: grid;
@@ -279,13 +431,63 @@ import { latestRevealedCard } from './game-ui.model';
   `,
 })
 export class GameStageComponent {
+  private readonly localization = inject(LocalizationService);
   readonly game = input.required<GameView>();
   readonly stage = input.required<GameStageKind>();
   readonly cardOpened = output<GameCardView>();
   readonly breakdownOpened = output<void>();
   readonly helpOpened = output<void>();
-  protected revealedCard(): GameCardView | null {
-    return latestRevealedCard(this.game());
+  protected readonly focusedStageCardId = signal<string | null>(null);
+  protected readonly stageCardEvent = computed(() => latestStageCardEvent(this.game()));
+  protected readonly focusedStageCard = computed(() => {
+    const event = this.stageCardEvent();
+    if (event === null) return null;
+    return (
+      event.cards.find((card) => card.instanceId === this.focusedStageCardId()) ?? event.cards[0]!
+    );
+  });
+  protected showsStageCard(): boolean {
+    return ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE', 'TURN_CLEANUP'].includes(
+      this.stage(),
+    );
+  }
+  protected cardZone(card: GameCardView): string {
+    return card.deck === 'DOOR' ? 'КАРТА ДВЕРИ' : 'КАРТА СОКРОВИЩА';
+  }
+  protected cardName(card: GameCardView): string {
+    return this.localization.cardName(card);
+  }
+  protected cardDescription(card: GameCardView): string {
+    return this.localization.cardDescription(card);
+  }
+  protected stageSummary(summary: string, cards: readonly GameCardView[]): string {
+    return cards.reduce(
+      (translated, card) => translated.replaceAll(card.name, this.cardName(card)),
+      summary || 'Сыграна карта',
+    );
+  }
+  protected hiddenCardSummary(event: NonNullable<ReturnType<typeof latestStageCardEvent>>): string {
+    const hiddenCard = event.hiddenCard;
+    if (hiddenCard === undefined) return event.summary;
+    return `${this.playerName(event.entry.playerId ?? null)} получил ${this.hiddenCardTitle(
+      hiddenCard.deck,
+      hiddenCard.count,
+    ).toLowerCase()}`;
+  }
+  protected hiddenCardTitle(deck: 'DOOR' | 'TREASURE', count: number): string {
+    const deckName = deck === 'DOOR' ? 'ДВЕРИ' : 'СОКРОВИЩА';
+    if (count === 1) return `КАРТА ${deckName}`;
+    const lastTwo = count % 100;
+    const last = count % 10;
+    const noun =
+      lastTwo >= 11 && lastTwo <= 14 ? 'КАРТ' : last >= 2 && last <= 4 ? 'КАРТЫ' : 'КАРТ';
+    return `${count} ${noun} ${deck === 'DOOR' ? 'ДВЕРЕЙ' : 'СОКРОВИЩ'}`;
+  }
+  protected hiddenCardDescription(deck: 'DOOR' | 'TREASURE', count: number): string {
+    const source = deck === 'DOOR' ? 'дверей' : 'сокровищ';
+    return count === 1
+      ? `Карта из колоды ${source} получена закрытой. Её знает только получивший игрок.`
+      : `${count} карт из колоды ${source} получены закрытыми. Их знает только получивший игрок.`;
   }
   protected playerName(id: string | null): string {
     return this.game().players.find((player) => player.playerId === id)?.name ?? 'Игрок';
