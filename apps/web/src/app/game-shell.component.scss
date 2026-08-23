@@ -141,7 +141,15 @@ app-hand-dock {
   padding: 0;
 }
 .compact-sheet {
+  height: auto;
   max-height: 90dvh;
+}
+.compact-sheet .sheet-scroll {
+  max-height: calc(90dvh - 7rem);
+}
+.compact-sheet .option-list button,
+.compact-sheet .picker-grid button {
+  height: auto;
 }
 .sheet.compact-sheet:has(.help-sheet) {
   width: min(100%, 30rem);
@@ -268,6 +276,7 @@ app-hand-dock {
 .option-list button,
 .picker-grid button {
   width: 100%;
+  height: auto;
   padding: 0.45rem 0.65rem;
   text-align: left;
 }

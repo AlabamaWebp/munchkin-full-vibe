@@ -10,7 +10,7 @@ import {
 import type { GameCardView, GameView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
 import { CombatStageComponent } from './combat-stage.component';
-import type { GameStageKind } from './game-ui.model';
+import type { GameStageKind, StageCardReceipt } from './game-ui.model';
 import { latestStageCardEvent } from './game-ui.model';
 import { LocalizationService } from './localization';
 
@@ -21,24 +21,36 @@ import { LocalizationService } from './localization';
   template: `
     <section class="stage" [attr.data-stage]="stage()">
       @if (showsStageCard() && stageCardEvent(); as event) {
-        @if (event.hiddenCard; as hiddenCard) {
-          <section class="card-event" aria-label="Закрытая полученная карта">
-            <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
-            <h2 class="event-summary">{{ hiddenCardSummary(event) }}</h2>
-            <article class="event-card hidden-card">
-              <div class="event-card-title">
-                <small>ЗАКРЫТАЯ КАРТА</small>
-                <h3>{{ hiddenCardTitle(hiddenCard.deck, hiddenCard.count) }}</h3>
-              </div>
-              <div class="hidden-card-art" aria-hidden="true">?</div>
-              <p>{{ hiddenCardDescription(hiddenCard.deck, hiddenCard.count) }}</p>
-            </article>
-          </section>
-        } @else if (focusedStageCard(); as focused) {
+        @if (focusedReceipt(); as receipt) {
           <section class="card-event" aria-label="Последнее карточное действие">
-            @if (event.cards.length > 1) {
+            @if (event.receipts.length > 1) {
+              <div class="card-tabs receipt-tabs" aria-label="Получатели карт">
+                @for (candidate of event.receipts; track candidate.entry.sequence) {
+                  <button
+                    type="button"
+                    [class.active]="receipt.entry.sequence === candidate.entry.sequence"
+                    (click)="focusedReceiptSequence.set(candidate.entry.sequence)"
+                  >
+                    {{ receiptLabel(candidate) }}
+                  </button>
+                }
+              </div>
+            }
+            @if (receipt.hiddenCard; as hiddenCard) {
+              <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+              <h2 class="event-summary">{{ hiddenCardSummary(receipt) }}</h2>
+              <article class="event-card hidden-card">
+                <div class="event-card-title">
+                  <small>ЗАКРЫТАЯ КАРТА</small>
+                  <h3>{{ hiddenCardTitle(hiddenCard.deck, hiddenCard.count) }}</h3>
+                </div>
+                <div class="hidden-card-art" aria-hidden="true">?</div>
+                <p>{{ hiddenCardDescription(hiddenCard.deck, hiddenCard.count) }}</p>
+              </article>
+            } @else if (focusedStageCard(); as focused) {
+              @if (receipt.cards.length > 1) {
               <div class="card-tabs" aria-label="Карты последнего действия">
-                @for (card of event.cards; track card.instanceId) {
+                @for (card of receipt.cards; track card.instanceId) {
                   <button
                     type="button"
                     [class.active]="focused.instanceId === card.instanceId"
@@ -48,28 +60,29 @@ import { LocalizationService } from './localization';
                   </button>
                 }
               </div>
+              }
+              <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+              <h2 class="event-summary">{{ stageSummary(receipt.summary, receipt.cards) }}</h2>
+              <article class="event-card">
+                <div class="event-card-title">
+                  <small>{{ cardZone(focused) }}</small>
+                  <h3>{{ cardName(focused) }}</h3>
+                </div>
+                <button
+                  type="button"
+                  class="event-card-art"
+                  [attr.aria-label]="'Подробнее: ' + cardName(focused)"
+                  (click)="cardOpened.emit(focused)"
+                >
+                  <app-card-artwork
+                    [artKey]="focused.artKey"
+                    [label]="cardName(focused)"
+                    [compact]="true"
+                  />
+                </button>
+                <p>{{ cardDescription(focused) }}</p>
+              </article>
             }
-            <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
-            <h2 class="event-summary">{{ stageSummary(event.summary, event.cards) }}</h2>
-            <article class="event-card">
-              <div class="event-card-title">
-                <small>{{ cardZone(focused) }}</small>
-                <h3>{{ cardName(focused) }}</h3>
-              </div>
-              <button
-                type="button"
-                class="event-card-art"
-                [attr.aria-label]="'Подробнее: ' + cardName(focused)"
-                (click)="cardOpened.emit(focused)"
-              >
-                <app-card-artwork
-                  [artKey]="focused.artKey"
-                  [label]="cardName(focused)"
-                  [compact]="true"
-                />
-              </button>
-              <p>{{ cardDescription(focused) }}</p>
-            </article>
           </section>
         }
       } @else {
@@ -438,12 +451,28 @@ export class GameStageComponent {
   readonly breakdownOpened = output<void>();
   readonly helpOpened = output<void>();
   protected readonly focusedStageCardId = signal<string | null>(null);
+  protected readonly focusedReceiptSequence = signal<number | null>(null);
   protected readonly stageCardEvent = computed(() => latestStageCardEvent(this.game()));
-  protected readonly focusedStageCard = computed(() => {
+  protected readonly focusedReceipt = computed(() => {
     const event = this.stageCardEvent();
     if (event === null) return null;
+    const receipts = event.receipts;
     return (
-      event.cards.find((card) => card.instanceId === this.focusedStageCardId()) ?? event.cards[0]!
+      receipts.find((receipt) => receipt.entry.sequence === this.focusedReceiptSequence()) ??
+      receipts.find(
+        (receipt) =>
+          receipt.entry.playerId === this.game().viewerPlayerId && receipt.cards.length > 0,
+      ) ??
+      receipts.at(-1) ??
+      null
+    );
+  });
+  protected readonly focusedStageCard = computed(() => {
+    const receipt = this.focusedReceipt();
+    if (receipt === null) return null;
+    return (
+      receipt.cards.find((card) => card.instanceId === this.focusedStageCardId()) ??
+      receipt.cards[0]!
     );
   });
   protected showsStageCard(): boolean {
@@ -466,13 +495,30 @@ export class GameStageComponent {
       summary || 'Сыграна карта',
     );
   }
-  protected hiddenCardSummary(event: NonNullable<ReturnType<typeof latestStageCardEvent>>): string {
-    const hiddenCard = event.hiddenCard;
-    if (hiddenCard === undefined) return event.summary;
-    return `${this.playerName(event.entry.playerId ?? null)} получил ${this.hiddenCardTitle(
+  protected receiptLabel(receipt: StageCardReceipt): string {
+    const count = receipt.hiddenCard?.count ?? receipt.cards.length;
+    return `${this.playerName(receipt.entry.playerId ?? null)} получил ${this.treasureCountLabel(count)}`;
+  }
+  protected hiddenCardSummary(receipt: StageCardReceipt): string {
+    const hiddenCard = receipt.hiddenCard;
+    if (hiddenCard === undefined) return receipt.summary;
+    return `${this.playerName(receipt.entry.playerId ?? null)} получил ${this.hiddenCardTitle(
       hiddenCard.deck,
       hiddenCard.count,
     ).toLowerCase()}`;
+  }
+  private treasureCountLabel(count: number): string {
+    const lastTwo = count % 100;
+    const last = count % 10;
+    const noun =
+      lastTwo >= 11 && lastTwo <= 14
+        ? 'сокровищ'
+        : last === 1
+          ? 'сокровище'
+          : last >= 2 && last <= 4
+            ? 'сокровища'
+            : 'сокровищ';
+    return `${count} ${noun}`;
   }
   protected hiddenCardTitle(deck: 'DOOR' | 'TREASURE', count: number): string {
     const deckName = deck === 'DOOR' ? 'ДВЕРИ' : 'СОКРОВИЩА';

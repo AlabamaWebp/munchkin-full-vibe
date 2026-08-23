@@ -677,10 +677,16 @@ function unavailableCardReason(
     return 'WRONG_PHASE';
   }
 
-  if (definition.type === CardType.CURSE)
-    return state.combat?.reactionWindow === null || state.combat === null
-      ? null
-      : 'REACTION_WINDOW_ACTIVE';
+  if (definition.type === CardType.CURSE) {
+    const window = state.combat?.reactionWindow;
+    if (
+      window !== null &&
+      window !== undefined &&
+      window.confirmedPlayerIds.includes(viewerPlayerId)
+    )
+      return 'REACTION_ALREADY_CONFIRMED';
+    return null;
+  }
   if (definition.type === CardType.COMBAT_CURSE) {
     const window = state.combat?.reactionWindow;
     if (window === null || window === undefined) return 'NO_AVAILABLE_ACTION';
@@ -807,6 +813,12 @@ function combatCardIntents(
             ]
           : [],
       );
+    if (definition.type === CardType.CURSE)
+      return state.players.map((player) => ({
+        ...base,
+        id: `curse:${card.instanceId}:${player.id}:${combat.revision}`,
+        target: { type: 'PLAYER' as const, playerId: player.id },
+      }));
     if (
       definition.type === CardType.COMBAT_CURSE &&
       combat.reactionWindow !== null

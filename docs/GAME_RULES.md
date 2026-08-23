@@ -327,8 +327,9 @@ Implement before advanced rule systems:
 - reaction-window and combat-revision ids are server-authored. Duplicate or stale
   passes, declarations, and card reactions are rejected without changing state;
 - while the window is active, the only allowed commands are the exact-window pass
-  and typed combat reactions. Help, escape, equipment, economy, turn, ordinary
-  Curse, and other gameplay commands are blocked;
+  and typed combat reactions. Help, escape, equipment, economy, turn, and other
+  gameplay commands are blocked; ordinary Curses remain an explicit exception and
+  may be played against any player;
 - allowed typed reactions are: a combat Curse targeting the active combat player
   or accepted helper; adding a selected owned hand Monster; cloning a selected
   encounter; strengthening or weakening a selected encounter; and a temporary
@@ -363,9 +364,11 @@ Add after the core loop works end-to-end:
   replacement, including `DISCARD_ROLE` Curse effects, the engine revalidates
   all equipped items, returns every newly illegal item to its owner's private
   hand, and emits one public unequip event per item without exposing the hand;
-- a Curse held in hand may target any player. Its typed effects resolve
-  immediately and the Curse is discarded; expanded effects include losing a
-  Class or Race and death;
+- a Curse held in hand may target any player at any time during an in-progress
+  game, including another player's turn, combat, and a combat-reaction window.
+  Its typed effects resolve immediately and the Curse is discarded; an existing
+  blocking protection or card-choice response must still finish before another
+  command is accepted. Expanded effects include losing a Class or Race and death;
 - equipment has a data-driven gold value. During their own non-combat turn, a
   player may sell owned items worth at least 1,000 gold total and gains one level
   per complete 1,000 gold; clients never submit the level gain;

@@ -263,9 +263,7 @@ function c(
   return e(
     {
       id: idValue,
-      artKey:
-        legacyArtKeys[idValue] ??
-        `door.curse.${idValue.replace(/^curse-/, "")}`,
+      artKey: `door.curse.${idValue}`,
       setId: CardSetId.CORE,
       tier,
       name,

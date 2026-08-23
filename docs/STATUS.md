@@ -6,6 +6,18 @@ Current milestone:
 V2 final audit complete; live-game blockers remain
 ```
 
+## Curse timing (2026-08-23)
+
+- ordinary hand Curses are now server-authorized throughout an in-progress game:
+  on any player's turn, during combat, and during a combat-reaction window;
+- Curse plays during combat carry the current combat address and, when they
+  resolve immediately, reset the reaction window through the existing
+  authoritative intervention flow; protection and card-choice responses remain
+  blocking until resolved;
+- player-specific available intents now expose legal Curse targets in combat and
+  during the reaction window, so the mobile card menu offers the action whenever
+  it is currently legal.
+
 ## Current-phase card activity (2026-08-23)
 
 - `app-game-stage` now presents the newest visible card event for the current
@@ -22,6 +34,11 @@ V2 final audit complete; live-game blockers remain
 - card activity is additionally scoped to the current turn number, preventing
   a card played during a previous `TURN_START` from reappearing at the start
   of the next turn.
+- simultaneous combat rewards are grouped into recipient tabs; each viewer sees
+  their own reward identities while the other recipients remain question-mark
+  cards.
+- starting-hand deals remain private history only and are intentionally omitted
+  from the in-stage card activity area.
 
 ## Optional-set card interaction (2026-08-23)
 
@@ -696,6 +713,19 @@ Verified on 2026-08-23 after the responsive adaptation:
   and hand count; equipment artwork is no longer shown there.
 ## Latest UI update
 
+- Компактные окна выбора (продажа, поиск неприятностей и другие списки) и меню
+  «Все действия» теперь подстраивают высоту под содержимое; прокрутка остаётся
+  только при превышении доступной высоты экрана.
+
+- Улучшены русские описания карт: классы и расы теперь показывают конкретный
+  постоянный бонус и условие его применения, а Utility-карты — колоду и точное
+  количество карт, которые они добирают. Описания строятся из типизированных
+  эффектов каталога, поэтому не дублируют игровую логику в интерфейсе.
+- Проклятия теперь также показывают конкретное последствие: потерю уровня,
+  сброс карты из руки или предмета, потерю класса/расы и смерть.
+- Исправлены `artKey` проклятий: префикс `curse-` теперь сохраняется, поэтому
+  карта «Проклятие! Не тот поворот» загружает `curse-wrong-turn.png`.
+
 - Добавлены переносимые по строкам вкладки руки для проклятий, монстров, рас и
   классов. Вкладка боевых карт теперь показывает только усиления с таймингом
   `ACTIVE_COMBAT`.
@@ -715,3 +745,9 @@ Verified on 2026-08-23 after the responsive adaptation:
 - The character summary now shows the character's sex directly below the nickname.
 - Bottom hand cards show only their card names below the artwork.
 - Card artwork in the hand and active combat uses the card's full 3:4 image without cropping.
+
+## Lobby start gate
+
+- Кнопка «Начать игру» у ведущего теперь заблокирована, пока каждый игрок в
+  комнате не выберет пол персонажа. Серверная проверка `SEX_REQUIRED` сохранена
+  как авторитетная защита, а интерфейс показывает ведущему причину блокировки.

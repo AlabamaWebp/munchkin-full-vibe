@@ -135,7 +135,10 @@
           </p>
         }
         @if (isHost() && !hasStarted()) {
-          <button class="primary" type="button" [disabled]="pending()" (click)="startGame()">
+          @if (!allPlayersHaveSex()) {
+            <p class="settings-hint">{{ t('sexRequiredBeforeStart') }}</p>
+          }
+          <button class="primary" type="button" [disabled]="!canStartGame()" (click)="startGame()">
             {{ pending() ? t('starting') : t('startGame') }}
           </button>
         } @else if (!hasStarted()) {

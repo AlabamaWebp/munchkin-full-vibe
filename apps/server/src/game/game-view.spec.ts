@@ -1007,11 +1007,13 @@ describe('createGameView', () => {
     const monster = findCard(CardType.MONSTER);
     const bonus = findCard(CardType.TEMPORARY_BONUS);
     const modifier = findCard(CardType.MONSTER_MODIFIER);
+    const curse = findCard(CardType.CURSE);
     const combatCurse = findCard(CardType.COMBAT_CURSE);
     if (
       monster === undefined ||
       bonus === undefined ||
       modifier === undefined ||
+      curse === undefined ||
       combatCurse === undefined
     )
       throw new Error('Missing development multiplayer combat cards.');
@@ -1024,7 +1026,7 @@ describe('createGameView', () => {
       phase: 'DOOR_RESOLUTION',
       players: started.state.players.map((player) =>
         player.id === helperId
-          ? { ...player, hand: [bonus, modifier, combatCurse] }
+          ? { ...player, hand: [bonus, modifier, curse, combatCurse] }
           : player,
       ),
       combat: {
@@ -1131,6 +1133,13 @@ describe('createGameView', () => {
       expect.objectContaining({
         kind: 'PLAY_CARD',
         cardId: combatCurse.instanceId,
+        target: { type: 'PLAYER', playerId: activeId },
+      }),
+    );
+    expect(reactionView.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'PLAY_CARD',
+        cardId: curse.instanceId,
         target: { type: 'PLAYER', playerId: activeId },
       }),
     );

@@ -2583,6 +2583,7 @@ function playCard(
   }
   if (reactionWindow !== null) {
     const isReactionCard =
+      definition.type === CardType.CURSE ||
       definition.type === CardType.COMBAT_CURSE ||
       definition.type === CardType.TEMPORARY_BONUS ||
       definition.type === CardType.MONSTER_MODIFIER ||
@@ -2767,7 +2768,14 @@ function playCard(
       random,
       nowEpochMs,
     );
-    return succeed(applied.state, [
+    const intervention =
+      applied.state.combat !== null &&
+      (applied.state.curseResponse === null ||
+        applied.state.curseResponse === undefined) &&
+      applied.state.pendingDecision === null
+        ? updateCombatAfterIntervention(applied.state, nowEpochMs)
+        : { state: applied.state, events: [] };
+    return succeed(intervention.state, [
       {
         type: "CARD_PLAYED",
         visibility: "PUBLIC",
@@ -2776,6 +2784,7 @@ function playCard(
         target: command.target,
       },
       ...applied.events,
+      ...intervention.events,
     ]);
   }
   if (state.combat === null || state.phase !== GamePhase.DOOR_RESOLUTION) {

@@ -313,6 +313,24 @@ describe('game UI state mapper', () => {
 
     expect(latestStageCardEvent(game)).toBeNull();
   });
+  it('does not show the private starting deal on the game stage', () => {
+    const game = view({
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'TURN_START',
+          type: 'CARDS_DEALT',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          cards: [card({ instanceId: 'starter' })],
+          count: 8,
+        },
+      ],
+    });
+
+    expect(latestStageCardEvent(game)).toBeNull();
+  });
   it('keeps an identity-free private card receipt visible to other players', () => {
     const game = view({
       phase: 'END_TURN',
@@ -334,6 +352,37 @@ describe('game UI state mapper', () => {
       hiddenCard: { deck: 'TREASURE', count: 1 },
       summary: 'Ada получил закрытую карту',
     });
+  });
+  it('groups simultaneous combat rewards into recipient tabs without revealing another player card', () => {
+    const ownTreasure = card({ instanceId: 'own-treasure', name: 'Copper Compass' });
+    const game = view({
+      phase: 'END_TURN',
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'END_TURN',
+          type: 'COMBAT_REWARD_CARDS',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          cards: [ownTreasure],
+        },
+        {
+          sequence: 2,
+          turnNumber: 1,
+          phase: 'END_TURN',
+          type: 'COMBAT_REWARD_CARDS',
+          visibility: 'PUBLIC',
+          playerId: 'p2',
+          hiddenCard: { deck: 'TREASURE', count: 1 },
+        },
+      ],
+    });
+
+    expect(latestStageCardEvent(game)?.receipts).toMatchObject([
+      { entry: { playerId: 'p1' }, cards: [ownTreasure] },
+      { entry: { playerId: 'p2' }, hiddenCard: { deck: 'TREASURE', count: 1 } },
+    ]);
   });
   it('exposes an unavailable card reason', () =>
     expect(

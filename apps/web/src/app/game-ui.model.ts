@@ -31,6 +31,14 @@ export interface StageCardEvent {
   readonly cards: readonly GameCardView[];
   readonly hiddenCard: GameLogEntryView['hiddenCard'];
   readonly summary: string;
+  readonly receipts: readonly StageCardReceipt[];
+}
+
+export interface StageCardReceipt {
+  readonly entry: GameLogEntryView;
+  readonly cards: readonly GameCardView[];
+  readonly hiddenCard: GameLogEntryView['hiddenCard'];
+  readonly summary: string;
 }
 
 export function selectStage(game: GameView): GameStageKind {
@@ -53,14 +61,32 @@ export function latestStageCardEvent(game: GameView): StageCardEvent | null {
       (candidate) =>
         candidate.phase === game.phase &&
         candidate.turnNumber === game.turnNumber &&
+        candidate.type !== 'CARDS_DEALT' &&
         (candidate.card !== undefined ||
           (candidate.cards?.length ?? 0) > 0 ||
           candidate.hiddenCard !== undefined),
     );
   if (entry === undefined) return null;
 
-  const cards = entry.cards ?? (entry.card === undefined ? [] : [entry.card]);
-  return { entry, cards, hiddenCard: entry.hiddenCard, summary: eventSummary(game, entry) };
+  const receipt = (candidate: GameLogEntryView): StageCardReceipt => ({
+    entry: candidate,
+    cards: candidate.cards ?? (candidate.card === undefined ? [] : [candidate.card]),
+    hiddenCard: candidate.hiddenCard,
+    summary: eventSummary(game, candidate),
+  });
+  const receipts =
+    entry.type === 'COMBAT_REWARD_CARDS'
+      ? game.gameLog
+          .filter(
+            (candidate) =>
+              candidate.type === 'COMBAT_REWARD_CARDS' &&
+              candidate.phase === game.phase &&
+              candidate.turnNumber === game.turnNumber,
+          )
+          .map(receipt)
+      : [receipt(entry)];
+  const latestReceipt = receipt(entry);
+  return { ...latestReceipt, receipts };
 }
 
 export function presentEvents(game: GameView): readonly PresentedEvent[] {

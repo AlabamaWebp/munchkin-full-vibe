@@ -1,4 +1,4 @@
-import { Component, HostListener, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   APPLICATION_NAME,
@@ -36,6 +36,13 @@ export class App {
   protected readonly pending = this.lobbyClient.pending;
   protected readonly isHost = this.lobbyClient.isHost;
   protected readonly hasStarted = this.lobbyClient.hasStarted;
+  protected readonly allPlayersHaveSex = computed(() => {
+    const room = this.lobby();
+    return room !== null && room.players.every((player) => player.sex !== null && player.sex !== undefined);
+  });
+  protected readonly canStartGame = computed(
+    () => this.isHost() && !this.hasStarted() && !this.pending() && this.allPlayersHaveSex(),
+  );
   protected readonly optionalSets = ['COMPANIONS', 'ARSENAL', 'DUAL_IDENTITY'] as const;
 
   constructor() {

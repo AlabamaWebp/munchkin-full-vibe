@@ -164,7 +164,7 @@ const PRIORITY: readonly AvailableGameAction[] = [
     .action-sheet {
       display: grid;
       width: 100%;
-      height: min(90dvh, 48rem);
+      height: auto;
       max-height: 90dvh;
       padding: 0.7rem;
       gap: 0.4rem;
@@ -180,6 +180,7 @@ const PRIORITY: readonly AvailableGameAction[] = [
       justify-content: space-between;
     }
     .action-sheet button {
+      height: auto;
       min-height: 2.75rem;
       padding: 0.45rem 0.6rem;
       border: 1px solid #8d632e;

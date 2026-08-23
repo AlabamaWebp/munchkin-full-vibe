@@ -22,6 +22,7 @@ const encounterId = parseEncounterId("encounter-1");
 const definitionIds = {
   monster: parseCardDefinitionId("reaction-monster"),
   extraMonster: parseCardDefinitionId("reaction-extra-monster"),
+  curse: parseCardDefinitionId("reaction-curse"),
   combatCurse: parseCardDefinitionId("reaction-combat-curse"),
   playerBonus: parseCardDefinitionId("reaction-player-bonus"),
   monsterBonus: parseCardDefinitionId("reaction-monster-bonus"),
@@ -39,6 +40,10 @@ const cards = {
   extraMonster: {
     instanceId: parseCardInstanceId("reaction-extra-monster-1"),
     definitionId: definitionIds.extraMonster,
+  },
+  curse: {
+    instanceId: parseCardInstanceId("reaction-curse-1"),
+    definitionId: definitionIds.curse,
   },
   combatCurse: {
     instanceId: parseCardInstanceId("reaction-combat-curse-1"),
@@ -102,6 +107,14 @@ const definitions: readonly CardDefinition[] = [
       treasureRewards: 0,
       badStuff: [],
     },
+  },
+  {
+    id: definitionIds.curse,
+    name: "Anytime Curse",
+    description: "Lowers the target's level.",
+    type: CardType.CURSE,
+    deck: DeckType.DOOR,
+    effects: [{ type: "LOSE_LEVEL", amount: 1 }],
   },
   {
     id: definitionIds.combatCurse,
@@ -193,6 +206,7 @@ function combatState(options?: {
     player(heroId, options?.heroLevel ?? 8, []),
     player(firstResponderId, 1, [cards.secondPlayerBonus]),
     player(secondResponderId, 1, [
+      cards.curse,
       cards.combatCurse,
       cards.playerBonus,
       cards.monsterBonus,
@@ -583,6 +597,16 @@ describe("combat victory reaction window", () => {
 
   it.each([
     {
+      name: "ordinary Curse",
+      command: {
+        type: "PLAY_CARD",
+        actorId: secondResponderId,
+        cardId: cards.curse.instanceId,
+        target: { type: "PLAYER", playerId: heroId },
+        reactionWindowId: 1,
+      } satisfies GameCommand,
+    },
+    {
       name: "combat Curse",
       command: {
         type: "PLAY_CARD",
@@ -652,7 +676,7 @@ describe("combat victory reaction window", () => {
         reactionWindowId: 1,
       } satisfies GameCommand,
     },
-  ])("allows a typed $name reaction", ({ command }) => {
+  ])("allows a $name reaction", ({ command }) => {
     const initial = combatState({ heroLevel: 20 });
     const declared = declare(initial);
     if (!declared.success) throw new Error(declared.error.message);
@@ -666,6 +690,27 @@ describe("combat victory reaction window", () => {
         },
       },
     });
+  });
+
+  it("allows an ordinary Curse during combat before victory is declared", () => {
+    const result = executeCommand(
+      combatState(),
+      {
+        type: "PLAY_CARD",
+        actorId: secondResponderId,
+        cardId: cards.curse.instanceId,
+        target: { type: "PLAYER", playerId: heroId },
+      },
+      { random },
+    );
+    expect(result).toMatchObject({
+      success: true,
+      state: { combat: { revision: 2 } },
+    });
+    if (!result.success) throw new Error(result.error.message);
+    expect(result.state.players).toContainEqual(
+      expect.objectContaining({ id: heroId, level: 7 }),
+    );
   });
 
   it("limits combat Curses to the active player or accepted helper", () => {

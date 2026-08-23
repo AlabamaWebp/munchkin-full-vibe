@@ -67,8 +67,8 @@ describe('App lobby', () => {
         status: LobbyStatus.LOBBY,
         hostPlayerId: 'p1',
         players: [
-          { playerId: 'p1', name: 'Ada', isHost: true, connected: true },
-          { playerId: 'p2', name: 'Grace', isHost: false, connected: false },
+          { playerId: 'p1', name: 'Ada', isHost: true, connected: true, sex: 'FEMALE' },
+          { playerId: 'p2', name: 'Grace', isHost: false, connected: false, sex: 'MALE' },
         ],
       },
       'p1',
@@ -82,6 +82,32 @@ describe('App lobby', () => {
       .find((button) => button.textContent?.includes('Начать'))!
       .click();
     expect(client.startGame).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the host from starting until every player chooses a sex', () => {
+    client.showLobby(
+      {
+        roomCode: 'ABCD',
+        status: LobbyStatus.LOBBY,
+        hostPlayerId: 'p1',
+        players: [
+          { playerId: 'p1', name: 'Ada', isHost: true, connected: true, sex: 'FEMALE' },
+          { playerId: 'p2', name: 'Grace', isHost: false, connected: true },
+        ],
+      },
+      'p1',
+    );
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const buttons = fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>;
+    const startButton = Array.from(buttons).find((button) =>
+      button.textContent?.includes('Начать'),
+    ) as HTMLButtonElement;
+
+    expect(startButton.disabled).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('каждый игрок должен выбрать');
+    startButton.click();
+    expect(client.startGame).not.toHaveBeenCalled();
   });
 
   it('lets only the host configure mode and optional sets before start', () => {

@@ -136,4 +136,53 @@ describe('GameStageComponent', () => {
       'Бригада пылевых кроликов',
     );
   });
+
+  it('shows simultaneous combat rewards in recipient tabs, with only the owner card revealed', async () => {
+    await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(GameStageComponent);
+    const ownTreasure = card('own-treasure', 'Copper Compass');
+    const currentGame: GameView = {
+      ...game([]),
+      phase: 'END_TURN',
+      players: [player, { ...player, playerId: 'p2', name: 'Grace' }],
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'END_TURN',
+          type: 'COMBAT_REWARD_CARDS',
+          visibility: 'PRIVATE',
+          playerId: 'p1',
+          cards: [ownTreasure],
+        },
+        {
+          sequence: 2,
+          turnNumber: 1,
+          phase: 'END_TURN',
+          type: 'COMBAT_REWARD_CARDS',
+          visibility: 'PUBLIC',
+          playerId: 'p2',
+          hiddenCard: { deck: 'TREASURE', count: 1 },
+        },
+      ],
+    };
+    fixture.componentRef.setInput('game', currentGame);
+    fixture.componentRef.setInput('stage', 'TURN_CLEANUP');
+    fixture.detectChanges();
+
+    const tabs = fixture.nativeElement.querySelectorAll(
+      '.receipt-tabs button',
+    ) as NodeListOf<HTMLButtonElement>;
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]?.textContent).toContain('Ada получил 1 сокровище');
+    expect(tabs[1]?.textContent).toContain('Grace получил 1 сокровище');
+    expect(fixture.nativeElement.querySelector('.event-card h3')?.textContent).toContain(
+      'Copper Compass',
+    );
+
+    tabs[1]?.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.hidden-card-art')?.textContent).toContain('?');
+    expect(fixture.nativeElement.textContent).not.toContain('Copper Compass');
+  });
 });
