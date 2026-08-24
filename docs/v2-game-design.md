@@ -2,10 +2,15 @@
 
 ## Status and authority
 
-This document is the gameplay and presentation contract for V2. It refines the
-current rules in `docs/GAME_RULES.md`; where the two disagree, V2 implementation
-work must follow this document and update the older document in the milestone
-that changes production behavior.
+Status: **AUTHORITATIVE DESIGN CONTRACT**, checked against the schema-5 V2
+implementation on 2026-08-24. It specifies intentional gameplay and presentation
+behavior; code and tests remain the source of truth for what is currently built.
+Historical plans and audits do not override this contract.
+
+This document is the detailed gameplay and presentation contract for V2.
+`docs/GAME_RULES.md` is the compact implementation summary; where an explicit
+intentional rule differs from that summary, use this document and record the
+resulting product decision before changing behavior.
 
 V2 preserves the existing foundations:
 
@@ -59,8 +64,8 @@ Any “no” means simplify or reject the card, not extend the engine automatica
 
 Before the match:
 
-- every player chooses an avatar from the bundled local avatar catalog; the
-  choice is cosmetic and may be changed until the match starts;
+- every player has one unique selectable lobby color; it is cosmetic and may be
+  changed to an unused color until the match starts;
 - every player chooses `MALE` or `FEMALE` for their own character;
 - the host chooses `BALANCED` or `CLASSIC_CHAOS`;
 - the host enables any optional card sets; `CORE` is always enabled;
@@ -71,9 +76,8 @@ Before the match:
 Sex is public, supplies no inherent bonus, and is used only by a small number of
 explicit card conditions.
 
-The selected avatar is public player identity data. It is shown in the lobby
-and in the in-game avatar/status cells, uses a local asset with a stable
-fallback, and has no effect on rules or calculations.
+The selected color is public player identity data. It is shown in the lobby and
+in player status surfaces and has no effect on rules or calculations.
 
 ### Setup
 
@@ -693,7 +697,7 @@ GAME ROOT: height 100dvh; overflow hidden; safe-area padding
 
 There is no document/page scroll on either axis. The browser brand/header is
 folded into the Top HUD during play. Six players fit as compact, non-scrolling
-avatar/status cells. The Hand Dock itself does not scroll; the Full Hand sheet
+color/status cells. The Hand Dock itself does not scroll; the Full Hand sheet
 does.
 
 Scrolling is allowed only inside sheets/dialogs, history, Full Hand, and long

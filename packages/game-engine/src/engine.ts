@@ -1048,6 +1048,7 @@ function addPlayer(
     id: command.actorId,
     name,
     sex: command.sex,
+    ...(command.color === undefined ? {} : { color: command.color }),
     level: 1,
     hand: [],
     equipment: [],

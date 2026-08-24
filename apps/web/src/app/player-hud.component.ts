@@ -41,7 +41,12 @@ import type { ConnectionState } from './lobby-client';
             [attr.aria-label]="player.name + ', уровень ' + player.level"
             (click)="playerOpened.emit(player.playerId)"
           >
-            <span class="avatar" aria-hidden="true">{{ player.name.charAt(0).toUpperCase() }}</span>
+            <span
+              class="avatar"
+              [class]="'avatar player-color-' + (player.color?.toLowerCase() ?? 'default')"
+              aria-hidden="true"
+              >{{ player.name.charAt(0).toUpperCase() }}</span
+            >
             <span class="name">{{ player.name }}</span>
             <small>ур. {{ player.level }} · {{ player.handCount }} карт</small>
           </button>
@@ -166,10 +171,37 @@ import type { ConnectionState } from './lobby-client';
       grid-row: 1 / -1;
       place-items: center;
       border-radius: 50%;
+      border: 3px solid #e0b660;
       color: #2b1b0d;
       background: radial-gradient(circle at 35% 30%, #e0b660, #66411d 60%, #21140c);
       font-size: 1rem;
       font-weight: 900;
+    }
+    .player-color-pink {
+      --player-color: #ee78ab;
+    }
+    .player-color-blue {
+      --player-color: #4d9de0;
+    }
+    .player-color-red {
+      --player-color: #e15151;
+    }
+    .player-color-yellow {
+      --player-color: #f0c84b;
+    }
+    .player-color-green {
+      --player-color: #59ad70;
+    }
+    .player-color-black {
+      --player-color: #101010;
+    }
+    .avatar.player-color-pink,
+    .avatar.player-color-blue,
+    .avatar.player-color-red,
+    .avatar.player-color-yellow,
+    .avatar.player-color-green,
+    .avatar.player-color-black {
+      border-color: var(--player-color);
     }
     .name {
       display: block;

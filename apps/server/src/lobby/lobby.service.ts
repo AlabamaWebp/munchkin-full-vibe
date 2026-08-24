@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   LOBBY_MAX_PLAYERS,
+  PLAYER_COLORS,
   LobbyStatus,
   ROOM_CODE_LENGTH,
   type CreateLobbyPayload,
@@ -12,6 +13,7 @@ import {
   type LobbyState,
   type ResumeSessionPayload,
   type SetLobbySettingsPayload,
+  type SetPlayerColorPayload,
   type SetPlayerSexPayload,
   type StartLobbyPayload,
 } from '@munchkin-lan/contracts';
@@ -24,6 +26,7 @@ interface LobbyPlayerRecord {
   socketId: string | null;
   connected: boolean;
   sex: import('@munchkin-lan/contracts').PlayerSex | null;
+  color: import('@munchkin-lan/contracts').PlayerColor;
 }
 
 interface LobbyRoomRecord {
@@ -61,6 +64,7 @@ export interface LobbyGamePlayer {
   readonly playerId: string;
   readonly name: string;
   readonly sex: import('@munchkin-lan/contracts').PlayerSex;
+  readonly color: import('@munchkin-lan/contracts').PlayerColor;
 }
 
 export interface ConnectedLobbyPlayer extends LobbyGamePlayer {
@@ -99,7 +103,7 @@ export class LobbyService {
       return failure('INVALID_PLAYER_NAME', 'Enter a player name.');
 
     const roomCode = this.generateUniqueRoomCode();
-    const player = this.createPlayer(socketId, name);
+    const player = this.createPlayer(socketId, name, PLAYER_COLORS[0]);
     const room: LobbyRoomRecord = {
       roomCode,
       status: LobbyStatus.LOBBY,
@@ -143,7 +147,15 @@ export class LobbyService {
       );
     }
 
-    const player = this.createPlayer(socketId, name);
+    const color = PLAYER_COLORS.find(
+      (candidate) => !room.players.some((player) => player.color === candidate),
+    );
+    if (color === undefined)
+      return failure(
+        'ROOM_FULL',
+        `A room supports at most ${LOBBY_MAX_PLAYERS} players.`,
+      );
+    const player = this.createPlayer(socketId, name, color);
     room.players.push(player);
     this.trackPlayer(roomCode, player);
     return this.success(room, player);
@@ -255,6 +267,37 @@ export class LobbyService {
     return this.success(room, player);
   }
 
+  setPlayerColor(
+    socketId: string,
+    payload: SetPlayerColorPayload,
+  ): LobbyOperationResult {
+    const roomCode = this.normalizeRoomCode(payload?.roomCode);
+    const room = roomCode === null ? undefined : this.rooms.get(roomCode);
+    const player = room?.players.find(
+      (candidate) =>
+        candidate.socketId === socketId &&
+        candidate.playerId === payload?.playerId,
+    );
+    if (room === undefined || player === undefined)
+      return failure(
+        'PLAYER_NOT_FOUND',
+        'This connection is not a player in that room.',
+      );
+    if (room.status !== LobbyStatus.LOBBY)
+      return failure('GAME_ALREADY_STARTED', 'The game has already started.');
+    if (!PLAYER_COLORS.includes(payload.color))
+      return failure('INVALID_GAME_SETTINGS', 'Choose a valid player color.');
+    if (
+      room.players.some(
+        (candidate) =>
+          candidate !== player && candidate.color === payload.color,
+      )
+    )
+      return failure('COLOR_TAKEN', 'That player color is already taken.');
+    player.color = payload.color;
+    return this.success(room, player);
+  }
+
   setSettings(
     socketId: string,
     payload: SetLobbySettingsPayload,
@@ -333,8 +376,8 @@ export class LobbyService {
     return (
       this.rooms
         .get(roomCode)
-        ?.players.flatMap(({ playerId, name, sex }) =>
-          sex === null ? [] : [{ playerId, name, sex }],
+        ?.players.flatMap(({ playerId, name, sex, color }) =>
+          sex === null ? [] : [{ playerId, name, sex, color }],
         ) ?? []
     );
   }
@@ -352,6 +395,7 @@ export class LobbyService {
                 playerId: player.playerId,
                 name: player.name,
                 sex: player.sex ?? 'MALE',
+                color: player.color,
                 socketId: player.socketId,
               },
             ]
@@ -378,7 +422,12 @@ export class LobbyService {
       ? null
       : player.sex === null
         ? null
-        : { playerId: player.playerId, name: player.name, sex: player.sex };
+        : {
+            playerId: player.playerId,
+            name: player.name,
+            sex: player.sex,
+            color: player.color,
+          };
   }
 
   private findHost(
@@ -454,7 +503,11 @@ export class LobbyService {
     return roomCode;
   }
 
-  private createPlayer(socketId: string, name: string): LobbyPlayerRecord {
+  private createPlayer(
+    socketId: string,
+    name: string,
+    color: import('@munchkin-lan/contracts').PlayerColor,
+  ): LobbyPlayerRecord {
     return {
       playerId: randomUUID(),
       name,
@@ -462,6 +515,7 @@ export class LobbyService {
       socketId,
       connected: true,
       sex: null,
+      color,
     };
   }
 
@@ -497,6 +551,7 @@ export class LobbyService {
         isHost: player.playerId === room.hostPlayerId,
         connected: player.connected,
         sex: player.sex,
+        color: player.color,
       })),
       settings: room.settings,
     };

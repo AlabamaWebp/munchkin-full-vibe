@@ -67,8 +67,22 @@ describe('App lobby', () => {
         status: LobbyStatus.LOBBY,
         hostPlayerId: 'p1',
         players: [
-          { playerId: 'p1', name: 'Ada', isHost: true, connected: true, sex: 'FEMALE' },
-          { playerId: 'p2', name: 'Grace', isHost: false, connected: false, sex: 'MALE' },
+          {
+            playerId: 'p1',
+            name: 'Ada',
+            isHost: true,
+            connected: true,
+            sex: 'FEMALE',
+            color: 'PINK',
+          },
+          {
+            playerId: 'p2',
+            name: 'Grace',
+            isHost: false,
+            connected: false,
+            sex: 'MALE',
+            color: 'BLUE',
+          },
         ],
       },
       'p1',
@@ -91,15 +105,24 @@ describe('App lobby', () => {
         status: LobbyStatus.LOBBY,
         hostPlayerId: 'p1',
         players: [
-          { playerId: 'p1', name: 'Ada', isHost: true, connected: true, sex: 'FEMALE' },
-          { playerId: 'p2', name: 'Grace', isHost: false, connected: true },
+          {
+            playerId: 'p1',
+            name: 'Ada',
+            isHost: true,
+            connected: true,
+            sex: 'FEMALE',
+            color: 'PINK',
+          },
+          { playerId: 'p2', name: 'Grace', isHost: false, connected: true, color: 'BLUE' },
         ],
       },
       'p1',
     );
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
-    const buttons = fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>;
+    const buttons = fixture.nativeElement.querySelectorAll(
+      'button',
+    ) as NodeListOf<HTMLButtonElement>;
     const startButton = Array.from(buttons).find((button) =>
       button.textContent?.includes('Начать'),
     ) as HTMLButtonElement;
@@ -116,7 +139,16 @@ describe('App lobby', () => {
         roomCode: 'ABCD',
         status: LobbyStatus.LOBBY,
         hostPlayerId: 'p1',
-        players: [{ playerId: 'p1', name: 'Ada', isHost: true, connected: true, sex: 'FEMALE' }],
+        players: [
+          {
+            playerId: 'p1',
+            name: 'Ada',
+            isHost: true,
+            connected: true,
+            sex: 'FEMALE',
+            color: 'PINK',
+          },
+        ],
         settings: { mode: 'BALANCED', enabledSetIds: ['CORE'] },
       },
       'p1',

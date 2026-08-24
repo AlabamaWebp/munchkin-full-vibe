@@ -1,5 +1,10 @@
 # V2 final audit
 
+> **HISTORICAL — superseded as a blocker snapshot.** This audit records the
+> state on 2026-08-22 before the four listed blockers were closed. See
+> `docs/v2-release-audit.md` for the subsequent closure evidence, and verify
+> current code/tests before relying on either verdict.
+
 Date: 2026-08-22
 
 ## Verdict

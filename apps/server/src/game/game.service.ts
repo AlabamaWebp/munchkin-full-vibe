@@ -72,6 +72,7 @@ export class GameService {
           actorId: parsePlayerId(player.playerId),
           name: player.name,
           sex: player.sex,
+          color: player.color,
         },
         { random, clock: this.clock },
       );

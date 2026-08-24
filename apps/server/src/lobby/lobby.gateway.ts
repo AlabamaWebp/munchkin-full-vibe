@@ -16,6 +16,7 @@ import type {
   LobbyActionAck,
   ResumeSessionPayload,
   SetLobbySettingsPayload,
+  SetPlayerColorPayload,
   SetPlayerSexPayload,
   ServerToClientEvents,
   StartLobbyPayload,
@@ -116,6 +117,17 @@ export class LobbyGateway implements OnGatewayDisconnect {
     @MessageBody() payload: SetPlayerSexPayload,
   ): LobbyActionAck {
     const result = this.lobbyService.setPlayerSex(client.id, payload);
+    if (result.success)
+      this.server.to(result.state.roomCode).emit('lobby:state', result.state);
+    return result.acknowledgement;
+  }
+
+  @SubscribeMessage('lobby:set-color')
+  setPlayerColor(
+    @ConnectedSocket() client: LobbySocket,
+    @MessageBody() payload: SetPlayerColorPayload,
+  ): LobbyActionAck {
+    const result = this.lobbyService.setPlayerColor(client.id, payload);
     if (result.success)
       this.server.to(result.state.roomCode).emit('lobby:state', result.state);
     return result.acknowledgement;

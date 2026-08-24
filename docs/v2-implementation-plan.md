@@ -1,5 +1,10 @@
 # Munchkin LAN V2 implementation plan
 
+> **HISTORICAL.** This is the pre-schema-5 sequencing plan written before the
+> V2 implementation. Its baseline, prompts, and “to do” statements are evidence
+> of intended sequencing, not a description of the current repository. Consult
+> `docs/README.md`, current code/tests, and `docs/STATUS.md` for current status.
+
 ## Scope and sequencing contract
 
 This plan is for coding prompts 02–07. They are sequential and must not be

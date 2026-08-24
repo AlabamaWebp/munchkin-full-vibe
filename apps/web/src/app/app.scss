@@ -170,7 +170,34 @@
   border-radius: 50%;
   color: #152019;
   background: #afd0b7;
+  border: 3px solid #afd0b7;
   font-weight: 900;
+}
+.player-color-pink {
+  --player-color: #ee78ab;
+}
+.player-color-blue {
+  --player-color: #4d9de0;
+}
+.player-color-red {
+  --player-color: #e15151;
+}
+.player-color-yellow {
+  --player-color: #f0c84b;
+}
+.player-color-green {
+  --player-color: #59ad70;
+}
+.player-color-black {
+  --player-color: #101010;
+}
+.avatar.player-color-pink,
+.avatar.player-color-blue,
+.avatar.player-color-red,
+.avatar.player-color-yellow,
+.avatar.player-color-green,
+.avatar.player-color-black {
+  border-color: var(--player-color);
 }
 .player-list strong {
   margin-right: auto;
@@ -200,6 +227,41 @@
   border-radius: 0.55rem;
   color: #dfe8e1;
   background: #302014;
+}
+.color-picker {
+  display: grid;
+  margin: 0 0 1rem;
+  gap: 0.35rem;
+}
+.color-picker > span {
+  color: #c8d2ca;
+  font-size: 0.72rem;
+}
+.color-picker > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+.color-picker button {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #5d7064;
+  border-radius: 0.55rem;
+}
+.color-picker button.active {
+  border-color: var(--player-color);
+  box-shadow: inset 0 0 0 1px var(--player-color);
+}
+.color-picker button:disabled {
+  opacity: 0.45;
+}
+.color-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid var(--player-color);
 }
 .sex-picker button.active {
   border-color: #e2bd67;

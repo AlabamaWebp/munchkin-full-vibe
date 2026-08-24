@@ -1,5 +1,10 @@
 # Architecture decisions
 
+Status: **CURRENT DURABLE DECISION RECORD**. ADRs preserve the decision and
+rationale made at the time; detailed implementation wording in older ADRs may
+be historical. Resolve a conflict with current code/tests first, then the
+explicit design contract in `docs/v2-game-design.md`.
+
 ## ADR-001 — Server-authoritative state
 
 All authoritative game state exists on the server.

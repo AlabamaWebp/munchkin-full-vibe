@@ -1,5 +1,9 @@
 # Munchkin LAN V2 release audit
 
+> **HISTORICAL / SUPPORTING EVIDENCE.** This 2026-08-22 self-audit records the
+> closure of four earlier blockers. It is not a current production-readiness
+> claim; current limitations are in `docs/STATUS.md` and `docs/ROADMAP.md`.
+
 Date: 2026-08-22
 
 ## Verdict

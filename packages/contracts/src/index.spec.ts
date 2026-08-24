@@ -24,6 +24,7 @@ describe("shared contracts", () => {
           name: "Ada",
           isHost: true,
           connected: true,
+          color: "PINK",
         },
       ],
     };

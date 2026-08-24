@@ -1,5 +1,8 @@
 # V2 balance report
 
+> **SUPPORTING, DATED EVIDENCE.** These deterministic simulation results are a
+> balance sanity check, not a current live-playtest result or a gameplay contract.
+
 ## Run
 
 - Harness: `npm run balance:simulate`

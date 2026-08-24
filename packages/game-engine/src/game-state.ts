@@ -42,6 +42,9 @@ export const GamePhase = {
 
 export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
 
+export type PlayerColor =
+  "PINK" | "BLUE" | "RED" | "YELLOW" | "GREEN" | "BLACK";
+
 export interface GameConfig {
   readonly mode: GameMode;
   readonly enabledSetIds: readonly CardSetId[];
@@ -74,6 +77,7 @@ export interface PlayerState {
   readonly id: PlayerId;
   readonly name: string;
   readonly sex: PlayerSex;
+  readonly color?: PlayerColor;
   readonly level: number;
   readonly hand: readonly CardInstance[];
   readonly equipment: readonly CardInstance[];

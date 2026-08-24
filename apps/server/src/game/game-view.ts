@@ -1236,6 +1236,7 @@ export function createGameView(
     playerId: player.id,
     name: player.name,
     sex: player.sex,
+    ...(player.color === undefined ? {} : { color: player.color }),
     level: player.level,
     handCount: player.hand.length,
     equipment: player.equipment.map((card) => cardView(state, card)),

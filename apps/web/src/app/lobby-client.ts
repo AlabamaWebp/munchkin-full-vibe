@@ -8,6 +8,7 @@ import {
   type GameView,
   type LobbyActionAck,
   type LobbyState,
+  type PlayerColor,
   type ServerToClientEvents,
 } from '@munchkin-lan/contracts';
 import { io, type Socket } from 'socket.io-client';
@@ -134,6 +135,16 @@ export class LobbyClient {
     if (lobby === null || playerId === null) return;
     this.beginRequest();
     this.socket.emit('lobby:set-sex', { roomCode: lobby.roomCode, playerId, sex }, (response) =>
+      this.handleAcknowledgement(response),
+    );
+  }
+
+  setColor(color: PlayerColor): void {
+    const lobby = this.currentLobby();
+    const playerId = this.currentPlayerId();
+    if (lobby === null || playerId === null) return;
+    this.beginRequest();
+    this.socket.emit('lobby:set-color', { roomCode: lobby.roomCode, playerId, color }, (response) =>
       this.handleAcknowledgement(response),
     );
   }

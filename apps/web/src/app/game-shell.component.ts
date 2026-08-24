@@ -34,6 +34,7 @@ interface PickerOption {
   readonly id: string;
   readonly label: string;
   readonly facts?: string;
+  readonly playerColor?: GameView['players'][number]['color'];
 }
 
 interface TargetPickerState {
@@ -279,6 +280,14 @@ interface CardUse {
             <div class="sheet-scroll option-list">
               @for (option of picker.options; track option.id) {
                 <button type="button" (click)="chooseTarget(picker, option.id)">
+                  @if (option.playerColor; as color) {
+                    <span
+                      class="target-avatar"
+                      [class]="'target-avatar player-color-' + color.toLowerCase()"
+                      aria-hidden="true"
+                      >{{ option.label.charAt(0).toUpperCase() }}</span
+                    >
+                  }
                   <strong>{{ option.label }}</strong>
                   @if (option.facts) {
                     <small>{{ option.facts }}</small>
@@ -1546,11 +1555,7 @@ export class GameShellComponent {
         ? '—'
         : `+${bonus}`;
     const price = card.goldValue ?? card.equipment?.value;
-    return [
-      this.compactCardType(card),
-      combatValue,
-      price === undefined ? '—' : `${price}`,
-    ];
+    return [this.compactCardType(card), combatValue, price === undefined ? '—' : `${price}`];
   }
   private compactCardType(card: GameCardView): string {
     const labels: Partial<Record<GameCardView['type'], string>> = {
@@ -1893,6 +1898,9 @@ export class GameShellComponent {
       const options = curseIntents.map((intent) => ({
         id: intent.target.type === 'PLAYER' ? intent.target.playerId : '',
         label: this.playerName(intent.target.type === 'PLAYER' ? intent.target.playerId : ''),
+        playerColor: this.playerColor(
+          intent.target.type === 'PLAYER' ? intent.target.playerId : '',
+        ),
       }));
       uses.push(this.useWithTargets('Наложить проклятие', 'Выберите цель', card, 'CURSE', options));
     }
@@ -1906,6 +1914,9 @@ export class GameShellComponent {
           combatCurseIntents.map((intent) => ({
             id: intent.target.type === 'PLAYER' ? intent.target.playerId : '',
             label: this.playerName(intent.target.type === 'PLAYER' ? intent.target.playerId : ''),
+            playerColor: this.playerColor(
+              intent.target.type === 'PLAYER' ? intent.target.playerId : '',
+            ),
           })),
         ),
       );
@@ -2038,6 +2049,9 @@ export class GameShellComponent {
         };
     }
     return { label, picker: { title, card, kind, options } };
+  }
+  private playerColor(playerId: string): GameView['players'][number]['color'] {
+    return this.game().players.find((player) => player.playerId === playerId)?.color;
   }
   private openPickerForCards(
     title: string,

@@ -9,7 +9,8 @@ The sources have the following priority:
 
 1. `GameView`, `AvailableIntentView`, and the existing engine rules determine
    what the player can see and do.
-2. `docs/PRODUCT.md` and `docs/GAME_RULES.md` determine product behavior.
+2. `docs/PRODUCT.md` and the authoritative `docs/v2-game-design.md` determine
+   product and gameplay intent.
 3. [`reference/combat-mobile.png`](reference/combat-mobile.png) determines the
    visual direction: a dark fantasy table, framed cards, warm metal, and a clear
    theatrical focus on the current encounter.
@@ -134,13 +135,9 @@ actual gradient backgrounds.
 - Prefer a small local SVG icon set with consistent stroke and a text label.
 - Emoji are not the final icon system because rendering differs across phones.
 - Never use icon-only actions without an accessible name.
-- Player avatars are selected by the player in the lobby from the available
-  local avatar images. The lobby must show the selected avatar with a clear
-  selected/focus state and allow changing it before the match starts. The
-  selected avatar is public and must be shown consistently in the lobby,
-  player rail, character summary, and player detail sheet. Use a stable local
-  fallback if an asset cannot be loaded; do not use remote image URLs or
-  fictional portraits that are not part of the avatar catalog.
+- Each player selects one unique lobby color. It is public cosmetic identity and
+  must be shown consistently in the lobby, player rail, character summary, and
+  target pickers; it does not affect game rules.
 - Card art is addressed only through `GameCardView.artKey` and the existing
   local asset pipeline.
 
@@ -163,25 +160,23 @@ The stage may change between turn start, Door reveal, combat, reaction, escape,
 blocking decision, cleanup, and victory. The surrounding shell should remain
 stable so controls do not jump unpredictably.
 
-## Lobby avatar selection
+## Lobby color selection
 
-The lobby includes an avatar picker as part of each player's pre-game identity.
-The player chooses one avatar from the bundled local catalog; the choice is
-available to all players through the public lobby state and is included in the
-player identity used by the game UI. The picker must:
+The lobby includes a color picker as part of each player's pre-game identity.
+The player chooses one unused color; the choice is available to all players
+through public lobby state and is included in game UI identity. The picker must:
 
-- make the current selection obvious with a visible border, label, or check;
+- make the current selection and unavailable colors obvious with a visible
+  border, label, or check;
 - support keyboard navigation, screen-reader names, and touch targets of at
   least `44px`;
 - allow the player to change the selection until the match starts;
-- show the selected avatar in every lobby player row, including on reconnect;
-- use the same crop, aspect ratio, and fallback treatment as the in-game player
-  rail and character summary;
+- show the selected color in every lobby player row, including on reconnect;
+- use the same color treatment in the in-game player rail and character summary;
 - avoid uploads, remote URLs, and dependence on Internet access.
 
-The avatar is cosmetic only. It must not affect Sex, role, cards, rules, or any
-other gameplay calculation. If the catalog or selected id is invalid, the
-server keeps the player on a valid fallback avatar and the UI remains usable.
+Color is cosmetic only. It must not affect Sex, role, cards, rules, or any
+other gameplay calculation.
 
 Only the stage is flexible in the vertical grid. Fixed regions should have a
 compact-height variant for short viewports. If space is limited, reduce

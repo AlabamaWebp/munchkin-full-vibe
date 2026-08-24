@@ -26,6 +26,7 @@ describe('LobbyService', () => {
       players: [{ name: 'Ada', isHost: true }],
     });
     expect(result.state.players[0]).not.toHaveProperty('socketId');
+    expect(result.state.players[0]?.color).toBe('PINK');
   });
 
   it('rejects an empty player name without creating a room', () => {
@@ -97,6 +98,38 @@ describe('LobbyService', () => {
         playerName: 'Overflow',
       }),
     ).toMatchObject({ acknowledgement: { error: { code: 'ROOM_FULL' } } });
+  });
+
+  it('assigns distinct colors and rejects selecting a color used by another player', () => {
+    const host = service.createRoom('socket-host', { playerName: 'Ada' });
+    const guest = service.joinRoom('socket-guest', {
+      roomCode: 'ABCD',
+      playerName: 'Grace',
+    });
+    if (!host.success || !guest.success)
+      throw new Error('Expected room setup to succeed.');
+
+    expect(guest.state.players.map((player) => player.color)).toEqual([
+      'PINK',
+      'BLUE',
+    ]);
+    expect(
+      service.setPlayerColor('socket-guest', {
+        roomCode: 'ABCD',
+        playerId: guest.acknowledgement.playerId,
+        color: 'PINK',
+      }),
+    ).toMatchObject({ acknowledgement: { error: { code: 'COLOR_TAKEN' } } });
+    expect(
+      service.setPlayerColor('socket-guest', {
+        roomCode: 'ABCD',
+        playerId: guest.acknowledgement.playerId,
+        color: 'RED',
+      }),
+    ).toMatchObject({
+      success: true,
+      state: { players: [{ color: 'PINK' }, { color: 'RED' }] },
+    });
   });
 
   it('allows the host to start a one-player game and closes the room to joins', () => {

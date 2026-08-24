@@ -12,7 +12,13 @@ import { unavailableReason } from './game-ui.model';
       <div class="hand-header">
         <button type="button" class="character-summary" (click)="characterOpened.emit()">
           <span class="flex gap10">
-            <span class="summary-initial">{{ game().self.name.charAt(0) }}</span>
+            <span
+              class="summary-initial"
+              [class]="
+                'summary-initial player-color-' + (game().self.color?.toLowerCase() ?? 'default')
+              "
+              >{{ game().self.name.charAt(0) }}</span
+            >
             <span
               ><small>ВАШ ГЕРОЙ · УР. {{ game().self.level }}</small
               ><strong>{{ game().self.name }}</strong
@@ -109,6 +115,32 @@ import { unavailableReason } from './game-ui.model';
       font:
         900 1.2rem Georgia,
         serif;
+    }
+    .player-color-pink {
+      --player-color: #ee78ab;
+    }
+    .player-color-blue {
+      --player-color: #4d9de0;
+    }
+    .player-color-red {
+      --player-color: #e15151;
+    }
+    .player-color-yellow {
+      --player-color: #f0c84b;
+    }
+    .player-color-green {
+      --player-color: #59ad70;
+    }
+    .player-color-black {
+      --player-color: #101010;
+    }
+    .summary-initial.player-color-pink,
+    .summary-initial.player-color-blue,
+    .summary-initial.player-color-red,
+    .summary-initial.player-color-yellow,
+    .summary-initial.player-color-green,
+    .summary-initial.player-color-black {
+      border-color: var(--player-color);
     }
     .character-summary small {
       display: block;

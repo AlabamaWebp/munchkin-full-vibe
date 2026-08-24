@@ -8,6 +8,7 @@ import type {
   PlayerId,
 } from "./identifiers.js";
 import type { PlayerSex } from "./cards.js";
+import type { PlayerColor } from "./game-state.js";
 
 export type CardTarget =
   | {
@@ -41,6 +42,7 @@ export type GameCommand =
       readonly type: "ADD_PLAYER";
       readonly name: string;
       readonly sex: PlayerSex;
+      readonly color?: PlayerColor;
     })
   | (PlayerCommand & {
       readonly type: "START_GAME";

@@ -54,7 +54,9 @@
         <ul class="player-list" [attr.aria-label]="t('players')">
           @for (player of room.players; track player.playerId) {
             <li [class.offline]="!player.connected">
-              <span class="avatar">{{ player.name.charAt(0).toUpperCase() }}</span
+              <span class="avatar" [class]="'avatar player-color-' + player.color.toLowerCase()">{{
+                player.name.charAt(0).toUpperCase()
+              }}</span
               ><strong>{{ player.name }}</strong>
               @if (player.playerId === playerId()) {
                 <small>{{ t('you') }}</small>
@@ -84,6 +86,24 @@
             >
               Женский
             </button>
+          </div>
+          <div class="color-picker" aria-label="Цвет игрока">
+            <span>Цвет аватара</span>
+            <div>
+              @for (color of playerColors; track color) {
+                <button
+                  type="button"
+                  [class]="'player-color-' + color.toLowerCase()"
+                  [class.active]="self.color === color"
+                  [attr.aria-pressed]="self.color === color"
+                  [disabled]="pending() || !colorAvailable(color)"
+                  (click)="setColor(color)"
+                >
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  {{ colorLabel(color) }}
+                </button>
+              }
+            </div>
           </div>
         }
         @if (isHost() && !hasStarted()) {

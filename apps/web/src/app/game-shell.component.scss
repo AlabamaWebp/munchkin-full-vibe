@@ -207,6 +207,45 @@ app-hand-dock {
   display: grid;
   gap: 0.15rem;
 }
+.target-avatar {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  margin-right: 0.55rem;
+  place-items: center;
+  vertical-align: middle;
+  border: 3px solid #e0b660;
+  border-radius: 50%;
+  color: #2b1b0d;
+  background: radial-gradient(circle at 35% 30%, #e0b660, #66411d 60%, #21140c);
+  font-weight: 900;
+}
+.player-color-pink {
+  --player-color: #ee78ab;
+}
+.player-color-blue {
+  --player-color: #4d9de0;
+}
+.player-color-red {
+  --player-color: #e15151;
+}
+.player-color-yellow {
+  --player-color: #f0c84b;
+}
+.player-color-green {
+  --player-color: #59ad70;
+}
+.player-color-black {
+  --player-color: #101010;
+}
+.target-avatar.player-color-pink,
+.target-avatar.player-color-blue,
+.target-avatar.player-color-red,
+.target-avatar.player-color-yellow,
+.target-avatar.player-color-green,
+.target-avatar.player-color-black {
+  border-color: var(--player-color);
+}
 .option-list button small {
   color: #cbb99c;
   font-size: 0.68rem;

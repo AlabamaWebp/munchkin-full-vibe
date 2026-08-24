@@ -16,6 +16,16 @@ export const LobbyStatus = { LOBBY: "LOBBY", STARTED: "STARTED" } as const;
 export type LobbyStatus = (typeof LobbyStatus)[keyof typeof LobbyStatus];
 export type GameMode = "BALANCED" | "CLASSIC_CHAOS";
 export type PlayerSex = "MALE" | "FEMALE";
+export type PlayerColor =
+  "PINK" | "BLUE" | "RED" | "YELLOW" | "GREEN" | "BLACK";
+export const PLAYER_COLORS: readonly PlayerColor[] = [
+  "PINK",
+  "BLUE",
+  "RED",
+  "YELLOW",
+  "GREEN",
+  "BLACK",
+];
 export type CardSetId = "CORE" | "COMPANIONS" | "ARSENAL" | "DUAL_IDENTITY";
 
 export interface LobbyPlayerView {
@@ -24,6 +34,7 @@ export interface LobbyPlayerView {
   readonly isHost: boolean;
   readonly connected: boolean;
   readonly sex?: PlayerSex | null;
+  readonly color: PlayerColor;
 }
 
 export interface LobbyState {
@@ -56,6 +67,9 @@ export interface ResumeSessionPayload {
 export interface SetPlayerSexPayload extends StartLobbyPayload {
   readonly sex: PlayerSex;
 }
+export interface SetPlayerColorPayload extends StartLobbyPayload {
+  readonly color: PlayerColor;
+}
 export interface SetLobbySettingsPayload extends StartLobbyPayload {
   readonly mode: GameMode;
   readonly enabledSetIds: readonly CardSetId[];
@@ -73,6 +87,7 @@ export type LobbyErrorCode =
   | "ROOM_NOT_FOUND"
   | "GAME_NOT_FINISHED"
   | "SEX_REQUIRED"
+  | "COLOR_TAKEN"
   | "INVALID_GAME_SETTINGS";
 
 export interface LobbyActionSuccess {
@@ -231,6 +246,7 @@ export interface GamePlayerView {
   readonly playerId: string;
   readonly name: string;
   readonly sex?: PlayerSex;
+  readonly color?: PlayerColor;
   readonly level: number;
   readonly handCount: number;
   readonly equipment: readonly GameCardView[];
@@ -843,6 +859,10 @@ export interface ClientToServerEvents {
   ) => void;
   "lobby:set-sex": (
     payload: SetPlayerSexPayload,
+    acknowledge: (response: LobbyActionAck) => void,
+  ) => void;
+  "lobby:set-color": (
+    payload: SetPlayerColorPayload,
     acknowledge: (response: LobbyActionAck) => void,
   ) => void;
   "lobby:set-settings": (

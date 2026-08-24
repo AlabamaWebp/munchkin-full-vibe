@@ -2,9 +2,11 @@ import { Component, HostListener, computed, effect, inject, signal } from '@angu
 import { FormsModule } from '@angular/forms';
 import {
   APPLICATION_NAME,
+  PLAYER_COLORS,
   type CardSetId,
   type GameMode,
   type PlayerSex,
+  type PlayerColor,
 } from '@munchkin-lan/contracts';
 import { GameShellComponent } from './game-shell.component';
 import { LobbyClient } from './lobby-client';
@@ -38,19 +40,20 @@ export class App {
   protected readonly hasStarted = this.lobbyClient.hasStarted;
   protected readonly allPlayersHaveSex = computed(() => {
     const room = this.lobby();
-    return room !== null && room.players.every((player) => player.sex !== null && player.sex !== undefined);
+    return (
+      room !== null &&
+      room.players.every((player) => player.sex !== null && player.sex !== undefined)
+    );
   });
   protected readonly canStartGame = computed(
     () => this.isHost() && !this.hasStarted() && !this.pending() && this.allPlayersHaveSex(),
   );
   protected readonly optionalSets = ['COMPANIONS', 'ARSENAL', 'DUAL_IDENTITY'] as const;
+  protected readonly playerColors = PLAYER_COLORS;
 
   constructor() {
     effect((onCleanup) => {
-      document.documentElement.classList.toggle(
-        'game-active',
-        this.game() !== null,
-      );
+      document.documentElement.classList.toggle('game-active', this.game() !== null);
       onCleanup(() => document.documentElement.classList.remove('game-active'));
     });
   }
@@ -66,6 +69,24 @@ export class App {
   }
   protected setSex(sex: PlayerSex): void {
     this.lobbyClient.setSex(sex);
+  }
+  protected setColor(color: PlayerColor): void {
+    this.lobbyClient.setColor(color);
+  }
+  protected colorAvailable(color: PlayerColor): boolean {
+    const room = this.lobby();
+    const selfId = this.playerId();
+    return !room?.players.some((player) => player.playerId !== selfId && player.color === color);
+  }
+  protected colorLabel(color: PlayerColor): string {
+    return {
+      PINK: 'Розовый',
+      BLUE: 'Синий',
+      RED: 'Красный',
+      YELLOW: 'Жёлтый',
+      GREEN: 'Зелёный',
+      BLACK: 'Чёрный',
+    }[color];
   }
   protected setMode(mode: GameMode): void {
     const settings = this.lobby()?.settings;
