@@ -518,7 +518,7 @@ describe('GameShellComponent', () => {
         ],
       }),
     ).nativeElement as HTMLElement;
-    expect(root.textContent).toContain('Grace помогает · получит 2');
+    expect(root.textContent).toContain('Grace помогает · получит 2 сокровища');
     expect(root.textContent).toContain('нужна ваша реакция');
     Array.from(root.querySelectorAll('button'))
       .find((button) => button.textContent?.trim().startsWith('Пас'))!
@@ -570,7 +570,7 @@ describe('GameShellComponent', () => {
         playerId: 'p1',
         zone: 'HAND',
         count: 1,
-        sourceCard: monster,
+        sourceCard: { ...monster, definitionId: 'corridor-crab', name: 'Corridor Crab' },
         selectableCardIds: ['a', 'b'],
         selectableCards: [a, b],
         expiresAtEpochMs: 10_000,
@@ -591,6 +591,7 @@ describe('GameShellComponent', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('[data-stage="BLOCKING_DECISION"]')).not.toBeNull();
     expect(root.querySelector('.decision-count')?.textContent).toContain('Выбрано 0 из 1');
+    expect(root.querySelector('.decision-sheet')?.textContent).toContain('Коридорный краб');
     root.querySelector<HTMLButtonElement>('.decision-card-artwork')!.click();
     fixture.detectChanges();
     expect(root.querySelector('.card-details')?.textContent).toContain('A useful effect');

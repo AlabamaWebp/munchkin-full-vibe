@@ -40,6 +40,12 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-24: added a fixed, development-only browser-QA scenario endpoint,
+  guarded out of production, for reconstructing authoritative blocker, Curse,
+  equipment, combat, escape, ability, and finished states. The targeted pass
+  also localized decision-source and exact-Monster-picker names and uses the
+  winner's selected Sex for the Russian results verb.
+- 2026-08-24: browser-based UI audit corrected Russian immediate-event, charity, help-reward, and completed-escape copy. Completed escape attempts now project and render their authoritative combatant id, so helper results are distinguishable and Angular can use a stable attempt key.
 - 2026-08-24: refined in-game information architecture around the authoritative
   `GameView`: pending decisions now project visual candidate-card metadata only
   to the addressed player; equipped item projections nest enhancer cards and

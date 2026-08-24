@@ -130,7 +130,7 @@ import { LocalizationService } from './localization';
           @if (combat.helpAgreement; as agreement) {
             <span class="agreement"
               >{{ playerName(agreement.helperId) }} помогает · получит
-              {{ agreement.promisedTreasures }}</span
+              {{ agreement.promisedTreasures }} {{ treasureLabel(agreement.promisedTreasures) }}</span
             >
           } @else if (combat.helperId) {
             <span>{{ playerName(combat.helperId) }} помогает</span>
@@ -552,6 +552,17 @@ export class CombatStageComponent {
   }
   protected playerName(id: string): string {
     return this.game().players.find((player) => player.playerId === id)?.name ?? 'Игрок';
+  }
+  protected treasureLabel(count: number): string {
+    const lastTwo = count % 100;
+    const last = count % 10;
+    return lastTwo >= 11 && lastTwo <= 14
+      ? 'сокровищ'
+      : last === 1
+        ? 'сокровище'
+        : last >= 2 && last <= 4
+          ? 'сокровища'
+          : 'сокровищ';
   }
   protected cardName(card: GameCardView): string {
     return this.localization.cardName(card);

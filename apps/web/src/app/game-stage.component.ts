@@ -125,9 +125,10 @@ import { LocalizationService } from './localization';
               } @else if (game().lastRunAwayResult; as result) {
                 <h2>Результат побега</h2>
                 <div class="attempts">
-                  @for (attempt of result.attempts; track attempt.encounterId) {
+                  @for (attempt of result.attempts; track attempt.combatantId + attempt.encounterId) {
                     <span [class.failed]="!attempt.escaped">
-                      {{ attempt.monster.name }} · d6 {{ attempt.roll }} ·
+                      {{ playerName(attempt.combatantId) }} · {{ cardName(attempt.monster) }} ·
+                      d6 {{ attempt.roll }} ·
                       {{ attempt.escaped ? 'успех' : 'неудача' }}
                       @if (attempt.badStuffApplied) {
                         · Непотребство применено
@@ -210,7 +211,7 @@ import { LocalizationService } from './localization';
             <section class="message victory results" aria-label="Результаты завершённой партии">
               <p class="eyebrow">ПАРТИЯ ЗАВЕРШЕНА</p>
               @if (winner(); as matchWinner) {
-                <h2>{{ matchWinner.name }} победил</h2>
+                <h2>{{ matchWinner.name }} {{ winnerVerb(matchWinner.sex) }}</h2>
               } @else {
                 <h2>Матч завершён</h2>
               }
@@ -538,6 +539,9 @@ export class GameStageComponent {
   protected readonly winner = computed(
     () => this.game().players.find((player) => player.playerId === this.game().winnerId) ?? null,
   );
+  protected winnerVerb(sex: GameView['players'][number]['sex']): string {
+    return sex === 'FEMALE' ? 'победила' : 'победил';
+  }
   protected readonly focusedReceipt = computed(() => {
     const event = this.stageCardEvent();
     if (event === null) return null;

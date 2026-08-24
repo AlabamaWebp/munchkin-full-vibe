@@ -731,6 +731,25 @@ export class GameService {
       : createGameView(state, parsePlayerId(playerId));
   }
 
+  /** Development-only browser-QA entry point. Never exposed by gameplay commands. */
+  replaceForDevelopment(roomCode: string, state: GameState): boolean {
+    if (process.env.NODE_ENV === 'production' || !this.games.has(roomCode))
+      return false;
+    this.games.set(roomCode, state);
+    this.scheduleNextDeadline(roomCode);
+    return true;
+  }
+
+  developmentRoomCodes(): readonly string[] {
+    return process.env.NODE_ENV === 'production' ? [] : [...this.games.keys()];
+  }
+
+  stateForDevelopment(roomCode: string): GameState | null {
+    return process.env.NODE_ENV === 'production'
+      ? null
+      : (this.games.get(roomCode) ?? null);
+  }
+
   processDeadlines(roomCode: string, notify = true): boolean {
     const state = this.games.get(roomCode);
     if (state === undefined) return false;

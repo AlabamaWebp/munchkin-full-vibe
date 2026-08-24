@@ -1053,7 +1053,13 @@ describe('createGameView', () => {
       lastRunAwayResult: {
         playerId,
         attempts: [
-          { encounterId, roll: 5, escaped: true, badStuffApplied: false },
+          {
+            combatantId: playerId,
+            encounterId,
+            roll: 5,
+            escaped: true,
+            badStuffApplied: false,
+          },
         ],
       },
     });

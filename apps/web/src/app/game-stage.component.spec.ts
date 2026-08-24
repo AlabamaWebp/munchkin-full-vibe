@@ -140,6 +140,42 @@ describe('GameStageComponent', () => {
     );
   });
 
+  it('uses the Russian catalog name in completed escape results', async () => {
+    await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
+    TestBed.inject(LocalizationService).setLocale('ru');
+    const fixture = TestBed.createComponent(GameStageComponent);
+    const monster = {
+      ...card('hallway-minotaur', 'Hallway Minotaur'),
+      definitionId: 'hallway-minotaur',
+      type: 'MONSTER' as const,
+      deck: 'DOOR' as const,
+    };
+    fixture.componentRef.setInput('game', {
+      ...game([]),
+      phase: 'END_TURN',
+      lastRunAwayResult: {
+        playerId: 'p1',
+        attempts: [
+          {
+            combatantId: 'p1',
+            encounterId: 'encounter-1',
+            monster,
+            roll: 1,
+            escaped: false,
+            badStuffApplied: true,
+          },
+        ],
+      },
+    });
+    fixture.componentRef.setInput('stage', 'RUN_AWAY_SEQUENCE');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Ada · Коридорный минотавр · d6 1 · неудача',
+    );
+    expect(fixture.nativeElement.textContent).not.toContain('Hallway Minotaur');
+  });
+
   it('shows simultaneous combat rewards in recipient tabs, with only the owner card revealed', async () => {
     await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
     const fixture = TestBed.createComponent(GameStageComponent);
@@ -252,5 +288,12 @@ describe('GameStageComponent', () => {
     fixture.componentRef.setInput('isHost', true);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('.lifecycle-actions button')).toHaveLength(2);
+
+    fixture.componentRef.setInput('game', {
+      ...finished,
+      players: [{ ...player, playerId: 'p2', name: 'Ада', sex: 'FEMALE', level: 10 }],
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Ада победила');
   });
 });

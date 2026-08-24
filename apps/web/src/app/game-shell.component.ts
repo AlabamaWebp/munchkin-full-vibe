@@ -181,7 +181,7 @@ interface CardUse {
               <p>
                 {{
                   decision.type === 'DISCARD_CARDS'
-                    ? 'Выберите ровно ' + decision.count + '. Причина: ' + decision.sourceCard.name
+                    ? 'Выберите ровно ' + decision.count + '. Причина: ' + cardName(decision.sourceCard)
                     : 'Этот выбор нужен, чтобы продолжить игру.'
                 }}
               </p>
@@ -671,11 +671,11 @@ interface CardUse {
                   <article class="breakdown-monster">
                     <app-card-artwork
                       [artKey]="monster.monster.artKey"
-                      [label]="monster.monster.name"
+                      [label]="cardName(monster.monster)"
                       [compact]="true"
                     />
                     <div class="breakdown-monster-details">
-                      <strong>{{ monster.monster.name }}</strong>
+                      <strong>{{ cardName(monster.monster) }}</strong>
                       <span
                         >Сила <b>{{ monster.currentStrength }}</b></span
                       >
@@ -693,11 +693,11 @@ interface CardUse {
                         >
                           <app-card-artwork
                             [artKey]="played.card.artKey"
-                            [label]="played.card.name"
+                            [label]="cardName(played.card)"
                             [compact]="true"
                           />
                           <span
-                            ><strong>{{ played.card.name }}</strong
+                            ><strong>{{ cardName(played.card) }}</strong
                             ><small
                               >Сила {{ signed(played.strengthModifier) }} · сокровища
                               {{ signed(played.treasureModifier) }}</small
@@ -973,7 +973,9 @@ export class GameShellComponent {
   );
   protected readonly locale = this.localization.locale;
   protected readonly stage = computed(() => selectStage(this.game()));
-  protected readonly allEvents = computed(() => presentEvents(this.game()));
+  protected readonly allEvents = computed(() =>
+    presentEvents(this.game(), (card) => this.cardName(card)),
+  );
   protected readonly recentEvents = computed(() => {
     const stageSequences = new Set(stageExplainedEventSequences(this.game()));
     return this.allEvents()
@@ -1043,7 +1045,7 @@ export class GameShellComponent {
           {
             id: 'GIVE_CHARITY' as const,
             label: 'Раздать милостыню',
-            hint: `Отдать ${this.charityIntent()!.count} карт`,
+            hint: `Отдать ${this.localization.cardsCount(this.charityIntent()!.count)}`,
           },
         ]),
   ]);
@@ -2249,12 +2251,14 @@ export class GameShellComponent {
           'MONSTER',
           monsterIntents.map((intent) => ({
             id: intent.target.type === 'MONSTER' ? intent.target.encounterId : '',
-            label:
-              game.combat?.monsters.find(
+            label: (() => {
+              const target = game.combat?.monsters.find(
                 (monster) =>
                   monster.encounterId ===
                   (intent.target.type === 'MONSTER' ? intent.target.encounterId : ''),
-              )?.monster.name ?? 'Монстр',
+              );
+              return target === undefined ? 'Монстр' : this.cardName(target.monster);
+            })(),
             facts: (() => {
               const target = game.combat?.monsters.find(
                 (monster) =>

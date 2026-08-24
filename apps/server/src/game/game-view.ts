@@ -1696,6 +1696,7 @@ export function createGameView(
         : {
             playerId: state.lastRunAwayResult.playerId,
             attempts: state.lastRunAwayResult.attempts.map((attempt) => ({
+              combatantId: attempt.combatantId,
               encounterId: attempt.encounterId,
               monster: cardView(state, {
                 instanceId: attempt.monsterCardId,

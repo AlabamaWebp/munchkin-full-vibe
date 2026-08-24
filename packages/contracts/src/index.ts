@@ -890,6 +890,7 @@ export interface GameView {
   readonly lastRunAwayResult: {
     readonly playerId: string;
     readonly attempts: readonly {
+      readonly combatantId: string;
       readonly encounterId: string;
       readonly monster: GameCardView;
       readonly roll: number;

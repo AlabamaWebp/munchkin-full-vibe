@@ -217,6 +217,33 @@ describe('game UI state mapper', () => {
     expect(events[0]?.summary).toContain('Clockwork Yak');
     expect(events[0]?.priority).toBe('IMPORTANT');
   });
+  it('uses the supplied localized card name for immediate event presentation', () => {
+    const events = presentEvents(
+      view({
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'DOOR_RESOLUTION',
+              type: 'DOOR_KICKED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              card: monster,
+              priority: 'IMPORTANT',
+              summaryCode: 'DOOR_KICKED',
+              requiresViewerAction: false,
+            },
+          ],
+          routine: [],
+        },
+      }),
+      () => 'Заводской як',
+    );
+
+    expect(events[0]?.summary).toBe('Ada открыл Заводской як');
+  });
   it('keeps a combat Treasure reward as one typed presentation outcome', () => {
     const rewards = presentEvents(
       view({

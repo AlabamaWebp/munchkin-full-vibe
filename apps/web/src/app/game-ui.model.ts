@@ -121,7 +121,10 @@ function combinedDrawReceipt(
   };
 }
 
-export function presentEvents(game: GameView): readonly PresentedEvent[] {
+export function presentEvents(
+  game: GameView,
+  cardName: (card: GameCardView) => string = (card) => card.name,
+): readonly PresentedEvent[] {
   const visible = [
     ...(game.presentation.blocking === null ? [] : [game.presentation.blocking]),
     ...game.presentation.important,
@@ -137,7 +140,7 @@ export function presentEvents(game: GameView): readonly PresentedEvent[] {
     .map((entry) => ({
       entry,
       priority: entry.priority,
-      summary: eventSummary(game, entry),
+      summary: eventSummary(game, entry, cardName),
     }))
     .filter((event) => event.summary.length > 0);
 }
@@ -169,34 +172,39 @@ export function stageExplainedEventSequences(game: GameView): readonly number[] 
   return latestStageCardEvent(game)?.receipts.map((receipt) => receipt.entry.sequence) ?? [];
 }
 
-function eventSummary(game: GameView, entry: GameLogEntryView): string {
+function eventSummary(
+  game: GameView,
+  entry: GameLogEntryView,
+  cardName: (card: GameCardView) => string = (card) => card.name,
+): string {
   const player = playerName(game, entry.playerId);
   const target = game.players.find(
     (candidate) => candidate.playerId === entry.targetPlayerId,
   )?.name;
-  const card = entry.card?.name ?? entry.cards?.[0]?.name;
+  const card = entry.card === undefined ? entry.cards?.[0] : entry.card;
+  const cardLabel = card === undefined ? undefined : cardName(card);
   switch (entry.type) {
     case 'TURN_STARTED':
       return `Ход: ${player}`;
     case 'DOOR_KICKED':
-      return `${player} открыл ${card ?? 'дверь'}`;
+      return `${player} открыл ${cardLabel ?? 'дверь'}`;
     case 'CARD_ADDED_TO_HAND':
-      return `${player} получил ${card ?? 'карту'} в открытую`;
+      return `${player} получил ${cardLabel ?? 'карту'} в открытую`;
     case 'CARD_DRAWN':
       return `${player} получил ${deckCardsLabel(
         entry.deck ?? entry.hiddenCard?.deck ?? 'TREASURE',
         entry.hiddenCard?.count ?? 1,
       )} в закрытую`;
     case 'LOOKED_FOR_TROUBLE':
-      return `${player} нашёл неприятности: ${card ?? 'монстр'}`;
+      return `${player} нашёл неприятности: ${cardLabel ?? 'монстр'}`;
     case 'CURSE_RESOLVED':
-      return `Проклятие ${card ?? ''}${target ? ` → ${target}` : ''}`.trim();
+      return `Проклятие ${cardLabel ?? ''}${target ? ` → ${target}` : ''}`.trim();
     case 'COMBAT_STARTED':
-      return `${player} вступил в бой${card ? `: ${card}` : ''}`;
+      return `${player} вступил в бой${cardLabel ? `: ${cardLabel}` : ''}`;
     case 'CARD_PLAYED':
-      return `${player} сыграл ${card ?? 'карту'}${target ? ` на игрока ${target}` : ''}`;
+      return `${player} сыграл ${cardLabel ?? 'карту'}${target ? ` на игрока ${target}` : ''}`;
     case 'ROLE_ABILITY_USED':
-      return `${player} применил способность ${card ?? 'роли'}${entry.amount === undefined ? '' : ` (${entry.amount >= 0 ? '+' : ''}${entry.amount})`}`;
+      return `${player} применил способность ${cardLabel ?? 'роли'}${entry.amount === undefined ? '' : ` (${entry.amount >= 0 ? '+' : ''}${entry.amount})`}`;
     case 'CARDS_DISCARDED':
       return `${player} сбросил ${entry.count ?? 0} карт`;
     case 'HELP_OFFERED':
@@ -212,7 +220,7 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     case 'RUN_AWAY_ATTEMPTED':
       return `${player}: побег ${entry.escaped ? 'успешен' : 'не удался'}`;
     case 'BAD_STUFF_APPLIED':
-      return `Применено Непотребство${card ? `: ${card}` : ''}`;
+      return `Применено Непотребство${cardLabel ? `: ${cardLabel}` : ''}`;
     case 'LEVEL_GAINED':
       return `${player} получил ур. ${entry.amount ?? 1}`;
     case 'LEVEL_LOST':
@@ -227,7 +235,7 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
       return `${player} нашёл снаряжение`;
     case 'SCAVENGED_CARD':
       return entry.hiddenCard === undefined
-        ? `${player} получил ${card ?? 'карту'} в закрытую`
+        ? `${player} получил ${cardLabel ?? 'карту'} в закрытую`
         : `${player} получил карту сокровища в закрытую`;
     case 'PLAYER_DIED':
       return `${player} погиб`;
@@ -236,21 +244,21 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
     case 'GAME_FINISHED':
       return `${player} победил`;
     case 'ITEM_EQUIPPED':
-      return `${player} надел ${card ?? 'предмет'}`;
+      return `${player} надел ${cardLabel ?? 'предмет'}`;
     case 'ITEM_UNEQUIPPED':
-      return `${player} снял ${card ?? 'предмет'}`;
+      return `${player} снял ${cardLabel ?? 'предмет'}`;
     case 'ROLE_PLAYED':
-      return `${player} выбрал ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${card ?? 'роль'}`;
+      return `${player} выбрал ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${cardLabel ?? 'роль'}`;
     case 'ROLE_DISCARDED':
-      return `${player} сбросил ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${card ?? 'роль'}`;
+      return `${player} сбросил ${entry.role === 'CLASS' ? 'класс' : 'расу'}: ${cardLabel ?? 'роль'}`;
     case 'ROLE_PERMISSION_PLAYED':
-      return `${player} активировал разрешение роли: ${card ?? 'карту'}`;
+      return `${player} активировал разрешение роли: ${cardLabel ?? 'карту'}`;
     case 'ROLE_PERMISSION_DISCARDED':
-      return `${player} сбросил разрешение роли: ${card ?? 'карту'}`;
+      return `${player} сбросил разрешение роли: ${cardLabel ?? 'карту'}`;
     case 'CARDS_SOLD':
       return `${player} продал карты`;
     case 'ITEM_TRADED':
-      return `${player} передал ${card ?? 'предмет'}${target ? ` игроку ${target}` : ''}`;
+      return `${player} передал ${cardLabel ?? 'предмет'}${target ? ` игроку ${target}` : ''}`;
     case 'CHARITY_RESOLVED':
       return `${player} раздал милостыню`;
     default:
