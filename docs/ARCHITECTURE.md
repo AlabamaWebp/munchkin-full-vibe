@@ -82,6 +82,10 @@ the engine. This includes side-neutral combat effects and the three reusable
 role-ability primitives. Calculated power is derived at execution/projection
 time.
 
+Card-set display metadata lives with the public lobby contracts, so clients show
+human-readable names/descriptions while game configuration retains stable ids.
+`CORE` therefore remains the internal mandatory id while displaying as “Нейро 1”.
+
 Role ability usage is a generic JSON-safe player ledger scoped to a turn number
 or combat id; there is no per-role state machine. The projection supplies exact
 cost-card ids, targets, combat addresses, and reaction-window addresses.

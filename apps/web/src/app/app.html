@@ -129,24 +129,20 @@
             </div>
             <span class="settings-hint">Наборы карт</span>
             <div class="settings-options sets">
-              @for (setId of optionalSets; track setId) {
+              @for (set of optionalSets; track set.id) {
                 <button
                   type="button"
-                  [class.active]="room.settings?.enabledSetIds?.includes(setId)"
-                  [attr.aria-pressed]="room.settings?.enabledSetIds?.includes(setId)"
-                  (click)="toggleSet(setId)"
+                  [class.active]="room.settings?.enabledSetIds?.includes(set.id)"
+                  [attr.aria-pressed]="room.settings?.enabledSetIds?.includes(set.id)"
+                  [attr.aria-label]="set.name + '. ' + set.description"
+                  (click)="toggleSet(set.id)"
                 >
-                  {{
-                    setId === 'COMPANIONS'
-                      ? 'Спутники'
-                      : setId === 'ARSENAL'
-                        ? 'Арсенал'
-                        : 'Двойная роль'
-                  }}
+                  <strong>{{ set.name }}</strong>
+                  <small>{{ set.description }}</small>
                 </button>
               }
             </div>
-            <small>Основа включена всегда. Настройки блокируются после старта.</small>
+            <small>{{ coreSet.name }} включён всегда. Настройки блокируются после старта.</small>
           </fieldset>
         } @else if (room.settings; as settings) {
           <p class="settings-readonly">

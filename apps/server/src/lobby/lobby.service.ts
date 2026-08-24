@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   LOBBY_MAX_PLAYERS,
+  CARD_SET_DISPLAY_METADATA,
   PLAYER_COLORS,
   LobbyStatus,
   ROOM_CODE_LENGTH,
@@ -323,7 +324,7 @@ export class LobbyService {
       !Array.isArray(payload.enabledSetIds)
     )
       return failure('INVALID_GAME_SETTINGS', 'Choose valid game settings.');
-    const valid = new Set(['CORE', 'COMPANIONS', 'ARSENAL', 'DUAL_IDENTITY']);
+    const valid = new Set(CARD_SET_DISPLAY_METADATA.map((set) => set.id));
     const ids = payload.enabledSetIds;
     if (
       !ids.includes('CORE') ||

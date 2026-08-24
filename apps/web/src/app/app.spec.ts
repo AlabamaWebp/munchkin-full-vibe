@@ -164,6 +164,10 @@ describe('App lobby', () => {
       .find((button) => button.textContent?.includes('Спутники'))!
       .click();
     expect(client.setSettings).toHaveBeenCalledWith('BALANCED', ['CORE', 'COMPANIONS']);
+    expect(root.textContent).toContain('Нейро 1');
+    expect(root.textContent).toContain('Классическое фэнтези');
+    expect(root.textContent).toContain('Ошибки духовенства');
+    expect(root.textContent).toContain('Седло и свита');
   });
 
   it('renders live combat from the GameView signal through the approved game shell', () => {

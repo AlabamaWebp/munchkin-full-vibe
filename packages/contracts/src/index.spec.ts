@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   APPLICATION_NAME,
+  CARD_SET_DISPLAY_METADATA,
   LobbyStatus,
   ROOM_CODE_LENGTH,
   type LobbyState,
@@ -11,6 +12,26 @@ import {
 describe("shared contracts", () => {
   it("exposes the application identity", () => {
     expect(APPLICATION_NAME).toBe("Munchkin LAN");
+  });
+
+  it("keeps one human-readable display entry for every stable selectable set", () => {
+    expect(CARD_SET_DISPLAY_METADATA.map((set) => set.id)).toEqual([
+      "CORE",
+      "COMPANIONS",
+      "ARSENAL",
+      "DUAL_IDENTITY",
+      "CLASSIC_FANTASY",
+      "CLERICAL_ERRORS",
+      "STEED_HIRELINGS",
+    ]);
+    expect(CARD_SET_DISPLAY_METADATA.filter((set) => set.mandatory)).toEqual([
+      expect.objectContaining({ id: "CORE", name: "Нейро 1" }),
+    ]);
+    expect(
+      CARD_SET_DISPLAY_METADATA.every(
+        (set) => set.name.length > 0 && set.description.length > 0,
+      ),
+    ).toBe(true);
   });
 
   it("represents a public lobby without transport identities", () => {

@@ -14,6 +14,9 @@ export const CardSetId = {
   COMPANIONS: "COMPANIONS",
   ARSENAL: "ARSENAL",
   DUAL_IDENTITY: "DUAL_IDENTITY",
+  CLASSIC_FANTASY: "CLASSIC_FANTASY",
+  CLERICAL_ERRORS: "CLERICAL_ERRORS",
+  STEED_HIRELINGS: "STEED_HIRELINGS",
 } as const;
 export type CardSetId = (typeof CardSetId)[keyof typeof CardSetId];
 export type CardTier = 1 | 2 | 3;

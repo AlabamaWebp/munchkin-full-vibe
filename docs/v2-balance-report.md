@@ -51,6 +51,26 @@ Equipment averages follow authored slot costs: Tier-1 groups average +1 to +2; T
 
 The UI uses the existing deterministic placeholder for these stable `artKey` values; no artwork was generated in this milestone.
 
+## 2026-08-24 catalog-expansion appendix
+
+The preceding report remains the dated V2 baseline. After adding the original
+Classic Fantasy, Clerical Errors, and Steed & Hirelings optional packs, the same
+20,000-scenario / three-seed harness was run with every selectable set enabled:
+165 definitions and 362 physical cards.
+
+The configured weighted tier profiles and the Balanced starter guarantee remained
+intact: usable starting Equipment was 100% for all seeds. The most material
+movement is intentional new-content pressure, not a validation change: weak
+level-1 solo beatability was **57.7–58.0%** (previously 68.6–69.0%), early
+permanent-loss rate was **3.8%** (previously 2.2–2.5%), and no-plausible-recovery
+rate was **7.8–8.0%** (previously 6.2–6.5%). Average gold per won combat remained
+**798–813**, and the two-sale-level rate was **6.9–7.3%**.
+
+These are material balance regressions for an all-packs game and are recorded
+for live playtesting rather than hidden by changing the harness thresholds.
+Validate first-level all-pack combat pressure and early Curse/Equipment loss in
+3–6-player sessions before tuning card copy counts or strengths.
+
 - Core: `dust-parliament`, `paper-mimic`, `lost-sock-swarm`, `cupboard-specter`, `hallway-minotaur`, `mirror-duelist-male`, `mirror-duelist-female`, `map-eater`, `rust-choir`, `grave-lantern`, `midnight-auditor`, `library-colossus`, `curse-hollow-pockets`, `curse-wrong-turn`, `curse-echoing-doubt`, `curse-total-recall`, `curse-collapsing-wardrobe`, `scrap-knights`, `lantern-wardens`, `brassborn`, `nightglimmers`, `tin-kettle-helm`, `mapmakers-sandals`, `pocket-cudgel`, `folding-buckler`, `echo-mail`, `mossy-maul`, `cometglass-sabre`, `leviathan-hide-coat`, `oracular-stilts`, `crown-of-last-words`, `emergency-drawbridge`, `door-cache`, `treasure-rumor`, `quiet-respite`, `spare-change-map`, `two-pocket-plan`, `grand-expedition-map`.
 - Companions: `eager-intern`, `lantern-scout`, `scrap-squire`, `stubborn-pony`, `archive-apprentice`, `graveyard-guide`, `clockwork-goat`, `mossback-elk`, `deadline-ostrich`, `veteran-retainer`, `comet-stag`, `leviathan-skipper`.
 - Arsenal: `sharpening-chorus`, `balanced-pommel`, `hexproof-cap`, `beast-hunters-vest`, `construct-cracker`, `smoke-pellet`, `moonsteel-edge`, `thunder-weight`, `undead-surveyors-goggles`, `arcane-grounding-boots`, `defensive-umbrella`, `escape-route-boots`, `comet-core`, `wardens-aegis`, `last-second-ramp`, `monster-compass`.

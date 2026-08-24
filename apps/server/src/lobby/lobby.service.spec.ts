@@ -1,4 +1,8 @@
-import { LOBBY_MAX_PLAYERS, LobbyStatus } from '@munchkin-lan/contracts';
+import {
+  CARD_SET_DISPLAY_METADATA,
+  LOBBY_MAX_PLAYERS,
+  LobbyStatus,
+} from '@munchkin-lan/contracts';
 import { LobbyService } from './lobby.service';
 import { RoomCodeService } from './room-code.service';
 
@@ -129,6 +133,52 @@ describe('LobbyService', () => {
     ).toMatchObject({
       success: true,
       state: { players: [{ color: 'PINK' }, { color: 'RED' }] },
+    });
+  });
+
+  it('accepts every advertised optional pack and freezes that selection on start and reconnect', () => {
+    const created = service.createRoom('socket-host', { playerName: 'Ada' });
+    if (!created.success) throw new Error('Expected room creation to succeed.');
+    const enabledSetIds = CARD_SET_DISPLAY_METADATA.map((set) => set.id);
+    const configured = service.setSettings('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+      mode: 'CLASSIC_CHAOS',
+      enabledSetIds,
+    });
+    expect(configured).toMatchObject({
+      success: true,
+      state: { settings: { mode: 'CLASSIC_CHAOS', enabledSetIds } },
+    });
+    service.setPlayerSex('socket-host', {
+      roomCode: 'ABCD',
+      playerId: created.acknowledgement.playerId,
+      sex: 'FEMALE',
+    });
+    expect(
+      service.startRoom('socket-host', {
+        roomCode: 'ABCD',
+        playerId: created.acknowledgement.playerId,
+      }).success,
+    ).toBe(true);
+    expect(
+      service.setSettings('socket-host', {
+        roomCode: 'ABCD',
+        playerId: created.acknowledgement.playerId,
+        mode: 'BALANCED',
+        enabledSetIds: ['CORE'],
+      }),
+    ).toMatchObject({
+      acknowledgement: { error: { code: 'GAME_ALREADY_STARTED' } },
+    });
+    service.disconnect('socket-host');
+    const resumed = service.resumeSession('socket-host-new', {
+      roomCode: 'ABCD',
+      sessionToken: created.acknowledgement.sessionToken,
+    });
+    expect(resumed).toMatchObject({
+      success: true,
+      state: { settings: { mode: 'CLASSIC_CHAOS', enabledSetIds } },
     });
   });
 

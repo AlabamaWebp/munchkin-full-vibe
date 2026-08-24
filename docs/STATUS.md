@@ -15,7 +15,8 @@ single-origin production packaging and real-device validation remain.
   deterministic random/clock injection, full player-specific `GameView`
   synchronization, audience-filtered history, available intents, unavailable
   card reasons, expected actor, and event presentation priority.
-- Core catalog plus optional Companions, Arsenal, and Dual Identity sets;
+- Core catalog (shown as **Нейро 1**) plus optional Companions, Arsenal, Dual
+  Identity, Classic Fantasy, Clerical Errors, and Steed & Hirelings sets;
   explicit definitions/copies, tiers, tags, original art keys, RU/EN localized
   presentation, typed effects/conditions/modifiers, equipment restrictions,
   attachments, companions, roles, Curse protection, and economy data.
@@ -39,6 +40,12 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-24: expanded the selectable catalog with three original optional
+  fantasy-inspired packs: Classic Fantasy, Clerical Errors, and Steed &
+  Hirelings. Their mechanics reuse the role, attachment, companion, protection,
+  and combat-target primitives; lobby display metadata keeps `CORE` stable while
+  presenting it as “Нейро 1”. Catalog/setup/lobby/reconnect coverage now includes
+  the expanded selection.
 - 2026-08-24: refined the V2 card-rule model so Details receives complete typed
   behavior and duration metadata, selected ordinary combat boosts can target
   either players or exact Monster encounters, and Core Classes/Races use three
@@ -60,6 +67,9 @@ single-origin production packaging and real-device validation remain.
 
 ## Next evidence to collect
 
-1. Execute real 3–6 player LAN playtests and record balance/UX defects.
+1. Execute real 3–6 player LAN playtests and record balance/UX defects. Prioritize
+   the deterministic all-packs signal: lower weak level-1 solo beatability and
+   higher early permanent-loss/recovery pressure are documented in the balance
+   report appendix and require real multiplayer validation before catalog tuning.
 2. Package the one-origin NestJS-served production build and test LAN joining.
 3. Add regression coverage for defects found in those sessions.

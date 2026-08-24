@@ -2,6 +2,7 @@ import { Component, HostListener, computed, effect, inject, signal } from '@angu
 import { FormsModule } from '@angular/forms';
 import {
   APPLICATION_NAME,
+  CARD_SET_DISPLAY_METADATA,
   PLAYER_COLORS,
   type CardSetId,
   type GameMode,
@@ -48,7 +49,8 @@ export class App {
   protected readonly canStartGame = computed(
     () => this.isHost() && !this.hasStarted() && !this.pending() && this.allPlayersHaveSex(),
   );
-  protected readonly optionalSets = ['COMPANIONS', 'ARSENAL', 'DUAL_IDENTITY'] as const;
+  protected readonly coreSet = CARD_SET_DISPLAY_METADATA.find((set) => set.mandatory)!;
+  protected readonly optionalSets = CARD_SET_DISPLAY_METADATA.filter((set) => !set.mandatory);
   protected readonly playerColors = PLAYER_COLORS;
 
   constructor() {
@@ -92,7 +94,8 @@ export class App {
     const settings = this.lobby()?.settings;
     this.lobbyClient.setSettings(mode, settings?.enabledSetIds ?? ['CORE']);
   }
-  protected toggleSet(setId: Exclude<CardSetId, 'CORE'>): void {
+  protected toggleSet(setId: CardSetId): void {
+    if (setId === 'CORE') return;
     const settings = this.lobby()?.settings;
     const enabled = new Set<CardSetId>(settings?.enabledSetIds ?? ['CORE']);
     if (enabled.has(setId)) enabled.delete(setId);

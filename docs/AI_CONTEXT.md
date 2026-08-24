@@ -123,9 +123,11 @@ current `AvailableIntentView`.
 - An ordinary Class/Race may have one passive and one active ability. Active
   abilities reuse discard-for-combat, discard-for-Run-Away, and discard-to-draw
   primitives; one JSON-safe turn/combat-scoped usage ledger serves every role.
-- Card sets: mandatory `CORE`; optional `COMPANIONS`, `ARSENAL`, and
-  `DUAL_IDENTITY`. Start config selects `BALANCED` or `CLASSIC_CHAOS` and set
-  ids; disabled-set definitions and physical copies are removed at game creation.
+- Card sets: mandatory stable `CORE` (player-facing “Нейро 1”); optional
+  `COMPANIONS`, `ARSENAL`, `DUAL_IDENTITY`, `CLASSIC_FANTASY`,
+  `CLERICAL_ERRORS`, and `STEED_HIRELINGS`. Start config selects `BALANCED` or
+  `CLASSIC_CHAOS` and set ids; disabled-set definitions and physical copies are
+  removed at game creation.
 - Balanced draws select from the present physical pile with tier profiles;
   Classic Chaos draws from shuffled piles. Door and Treasure recycle their own
   discard only when necessary. Complete multi-card requests preflight available

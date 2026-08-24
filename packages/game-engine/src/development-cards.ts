@@ -138,6 +138,7 @@ interface MonsterData {
   tags?: CardDefinition["tags"];
   bad: NonNullable<CardDefinition["monster"]>["badStuff"];
   modifiers?: readonly ConditionalModifierDefinition[];
+  setId?: CardSetId;
 }
 function m(x: MonsterData): Entry {
   const badText = x.bad.map(effectText).join(" and ");
@@ -149,7 +150,7 @@ function m(x: MonsterData): Entry {
     {
       id: x.id,
       artKey: `door.monster.${x.id}`,
-      setId: CardSetId.CORE,
+      setId: x.setId ?? CardSetId.CORE,
       tier: x.tier,
       name: x.name,
       description: `Strength ${x.strength}${abilityText.length > 0 ? `; ${abilityText}` : ""}. Bad Stuff: ${badText}.`,
@@ -270,12 +271,14 @@ function c(
   severity: "EARLY" | "MID" | "LATE",
   effects: CardDefinition["effects"],
   type: typeof CardType.CURSE | typeof CardType.COMBAT_CURSE = CardType.CURSE,
+  setId: CardSetId = CardSetId.CORE,
+  copies = 2,
 ): Entry {
   return e(
     {
       id: idValue,
       artKey: `door.curse.${idValue}`,
-      setId: CardSetId.CORE,
+      setId,
       tier,
       name,
       description: `${effects.map(effectText).join("; ")}.`,
@@ -292,7 +295,7 @@ function c(
       effects,
       curse: { severity },
     },
-    2,
+    copies,
   );
 }
 
@@ -1207,12 +1210,14 @@ function companion(
   tier: 1 | 2 | 3,
   bonus: number,
   modifier?: ConditionalModifierDefinition,
+  setId: CardSetId = CardSetId.COMPANIONS,
+  copies = 2,
 ): Entry {
   return e(
     {
       id: idValue,
       artKey: `treasure.companion.${idValue}`,
-      setId: CardSetId.COMPANIONS,
+      setId,
       tier,
       name,
       description: `+${bonus} companion.${modifier === undefined ? "" : ` ${modifierText(modifier)}`}`,
@@ -1230,7 +1235,7 @@ function companion(
         ...(modifier === undefined ? {} : { modifier }),
       },
     },
-    2,
+    copies,
   );
 }
 const companions: readonly Entry[] = [
@@ -1323,12 +1328,13 @@ function attachment(
   copies: number,
   bonus: number,
   tags: readonly ("WEAPON" | "BLADE" | "BLUNT" | "MAGIC")[] = ["WEAPON"],
+  setId: CardSetId = CardSetId.ARSENAL,
 ): Entry {
   return e(
     {
       id: idValue,
       artKey: `treasure.attachment.${idValue}`,
-      setId: CardSetId.ARSENAL,
+      setId,
       tier,
       name,
       description: `Attach to matching weapon for +${bonus}.`,
@@ -1608,6 +1614,567 @@ const dualIdentity: readonly Entry[] = [
   ),
 ];
 
+/** Original fantasy-role pack; its mechanics deliberately use the shared role and combat primitives. */
+const classicFantasy: readonly Entry[] = [
+  m({
+    id: "barrow-tax-collector",
+    name: "Barrow Tax Collector",
+    tier: 1,
+    copies: 2,
+    strength: 4,
+    treasures: 1,
+    tags: ["UNDEAD"],
+    bad: [{ type: "DISCARD_RANDOM_CARDS", zone: "HAND", count: 1 }],
+    setId: CardSetId.CLASSIC_FANTASY,
+  }),
+  m({
+    id: "granite-troll",
+    name: "Granite Troll",
+    tier: 2,
+    copies: 2,
+    strength: 9,
+    treasures: 2,
+    tags: ["BEAST"],
+    bad: [{ type: "DISCARD_CHOSEN_CARDS", zone: "EQUIPMENT", count: 1 }],
+    modifiers: [
+      condition("COMBAT_POWER", 2, [
+        {
+          type: "EQUIPPED_HAS_TAG",
+          anyOf: ["BLUNT"],
+          atLeast: 1,
+          scope: "OWNER",
+        },
+      ]),
+    ],
+    setId: CardSetId.CLASSIC_FANTASY,
+  }),
+  m({
+    id: "sunken-court-wyrm",
+    name: "Sunken Court Wyrm",
+    tier: 3,
+    copies: 1,
+    strength: 16,
+    treasures: 4,
+    levels: 2,
+    tags: ["ARCANE", "BEAST"],
+    bad: [{ type: "LOSE_LEVEL", amount: 2 }],
+    setId: CardSetId.CLASSIC_FANTASY,
+  }),
+  c(
+    "curse-oath-tangle",
+    "Curse! Oath Tangle",
+    1,
+    "EARLY",
+    [{ type: "DISCARD_ROLE", role: "CLASS" }],
+    CardType.CURSE,
+    CardSetId.CLASSIC_FANTASY,
+  ),
+  c(
+    "curse-mudbound-boots",
+    "Combat Curse! Mudbound Boots",
+    2,
+    "MID",
+    [{ type: "COMBAT_BONUS", amount: -4 }],
+    CardType.COMBAT_CURSE,
+    CardSetId.CLASSIC_FANTASY,
+  ),
+  r(
+    "oathbound-vanguard",
+    "Oathbound Vanguard",
+    "CLASS",
+    condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["UNDEAD"] },
+    ]),
+    CardSetId.CLASSIC_FANTASY,
+    1,
+    2,
+    {
+      type: "COMBAT_BONUS",
+      amount: 3,
+      target: "PLAYERS",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
+  ),
+  r(
+    "hedge-conclave",
+    "Hedge Conclave",
+    "CLASS",
+    condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["ARCANE"] },
+    ]),
+    CardSetId.CLASSIC_FANTASY,
+    1,
+    2,
+    {
+      type: "DRAW_CARDS",
+      deck: DeckType.DOOR,
+      count: 1,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_TURN",
+    },
+  ),
+  r(
+    "riverkin",
+    "Riverkin",
+    "RACE",
+    { type: "RUN_AWAY_ROLL", amount: 1, conditions: [] },
+    CardSetId.CLASSIC_FANTASY,
+    1,
+    2,
+    {
+      type: "RUN_AWAY_BONUS",
+      amount: 2,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
+  ),
+  r(
+    "stonefolk",
+    "Stonefolk",
+    "RACE",
+    {
+      type: "EQUIPMENT_TAG_BONUS",
+      amountPerCard: 1,
+      maxCards: 2,
+      tags: ["ARMOR"],
+      conditions: [],
+    },
+    CardSetId.CLASSIC_FANTASY,
+    1,
+    2,
+  ),
+  q({
+    id: "amberwood-bow",
+    name: "Amberwood Bow",
+    tier: 1,
+    copies: 2,
+    slot: EquipmentSlot.HANDS,
+    hands: 1,
+    bonus: 2,
+    gold: 450,
+    tags: ["WEAPON", "MAGIC"],
+    setId: CardSetId.CLASSIC_FANTASY,
+    starter: false,
+  }),
+  q({
+    id: "lantern-scale-coat",
+    name: "Lantern-Scale Coat",
+    tier: 2,
+    copies: 2,
+    slot: EquipmentSlot.BODY,
+    bonus: 3,
+    gold: 650,
+    tags: ["ARMOR"],
+    modifier: condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["ARCANE"] },
+    ]),
+    setId: CardSetId.CLASSIC_FANTASY,
+    starter: false,
+  }),
+  q({
+    id: "cairn-cleaver",
+    name: "Cairn Cleaver",
+    tier: 3,
+    copies: 1,
+    slot: EquipmentSlot.HANDS,
+    hands: 2,
+    bonus: 5,
+    gold: 950,
+    tags: ["WEAPON", "BLADE"],
+    setId: CardSetId.CLASSIC_FANTASY,
+    starter: false,
+  }),
+  a({
+    id: "banner-of-daring",
+    name: "Banner of Daring",
+    type: CardType.TEMPORARY_BONUS,
+    tier: 1,
+    copies: 2,
+    gold: 200,
+    setId: CardSetId.CLASSIC_FANTASY,
+    play: players,
+    effects: [{ type: "COMBAT_BONUS", amount: 3 }],
+  }),
+  a({
+    id: "sorcerers-gale",
+    name: "Sorcerer's Gale",
+    type: CardType.TEMPORARY_BONUS,
+    tier: 2,
+    copies: 2,
+    gold: 350,
+    setId: CardSetId.CLASSIC_FANTASY,
+    play: combatSide,
+    effects: [{ type: "COMBAT_SIDE_BONUS", amount: 4 }],
+  }),
+  a({
+    id: "rally-the-giant",
+    name: "Rally the Giant",
+    type: CardType.MONSTER_MODIFIER,
+    tier: 2,
+    copies: 2,
+    gold: 300,
+    setId: CardSetId.CLASSIC_FANTASY,
+    play: monsterTarget,
+    effects: [{ type: "MODIFY_MONSTER", strength: 3, treasures: 1 }],
+  }),
+  a({
+    id: "old-road-cache",
+    name: "Old Road Cache",
+    type: CardType.UTILITY,
+    tier: 1,
+    copies: 2,
+    deck: DeckType.DOOR,
+    setId: CardSetId.CLASSIC_FANTASY,
+    play: ownTurn,
+    effects: [{ type: "DRAW_CARDS", deck: DeckType.TREASURE, count: 1 }],
+  }),
+];
+
+/** Original music-and-workshop pack, centered on role variety and item enhancers. */
+const clericalErrors: readonly Entry[] = [
+  m({
+    id: "choir-looting-gargoyle",
+    name: "Choir-Looting Gargoyle",
+    tier: 1,
+    copies: 2,
+    strength: 5,
+    treasures: 2,
+    tags: ["CONSTRUCT"],
+    bad: [{ type: "DISCARD_CHOSEN_CARDS", zone: "HAND", count: 1 }],
+    setId: CardSetId.CLERICAL_ERRORS,
+  }),
+  m({
+    id: "bell-tower-wraith",
+    name: "Bell Tower Wraith",
+    tier: 2,
+    copies: 2,
+    strength: 10,
+    treasures: 3,
+    tags: ["UNDEAD"],
+    bad: [{ type: "DISCARD_ROLE", role: "RACE" }],
+    setId: CardSetId.CLERICAL_ERRORS,
+  }),
+  m({
+    id: "organ-grinder-hydra",
+    name: "Organ-Grinder Hydra",
+    tier: 3,
+    copies: 1,
+    strength: 15,
+    treasures: 4,
+    levels: 2,
+    tags: ["BEAST", "ARCANE"],
+    bad: [{ type: "DISCARD_CHOSEN_CARDS", zone: "EQUIPMENT", count: 2 }],
+    setId: CardSetId.CLERICAL_ERRORS,
+  }),
+  c(
+    "curse-cracked-hymnal",
+    "Curse! Cracked Hymnal",
+    1,
+    "EARLY",
+    [{ type: "DISCARD_RANDOM_CARDS", zone: "HAND", count: 2 }],
+    CardType.CURSE,
+    CardSetId.CLERICAL_ERRORS,
+  ),
+  r(
+    "hearth-cantors",
+    "Hearth Cantors",
+    "CLASS",
+    condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["UNDEAD"] },
+    ]),
+    CardSetId.CLERICAL_ERRORS,
+    1,
+    2,
+    {
+      type: "COMBAT_BONUS",
+      amount: 2,
+      target: "PLAYERS",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
+  ),
+  r(
+    "candle-scribes",
+    "Candle Scribes",
+    "CLASS",
+    { type: "RUN_AWAY_ROLL", amount: 1, conditions: [] },
+    CardSetId.CLERICAL_ERRORS,
+    1,
+    2,
+    {
+      type: "DRAW_CARDS",
+      deck: DeckType.TREASURE,
+      count: 1,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_TURN",
+    },
+  ),
+  r(
+    "tinker-gnomes",
+    "Tinker Gnomes",
+    "RACE",
+    {
+      type: "EQUIPMENT_TAG_BONUS",
+      amountPerCard: 1,
+      maxCards: 2,
+      tags: ["WEAPON"],
+      conditions: [],
+    },
+    CardSetId.CLERICAL_ERRORS,
+    1,
+    2,
+  ),
+  r(
+    "moss-gnomes",
+    "Moss Gnomes",
+    "RACE",
+    condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["BEAST"] },
+    ]),
+    CardSetId.CLERICAL_ERRORS,
+    1,
+    2,
+    {
+      type: "RUN_AWAY_BONUS",
+      amount: 2,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
+  ),
+  q({
+    id: "chimeblade",
+    name: "Chimeblade",
+    tier: 2,
+    copies: 2,
+    slot: EquipmentSlot.HANDS,
+    hands: 1,
+    bonus: 3,
+    gold: 650,
+    tags: ["WEAPON", "BLADE", "MAGIC"],
+    setId: CardSetId.CLERICAL_ERRORS,
+    starter: false,
+  }),
+  q({
+    id: "pocket-vestry",
+    name: "Pocket Vestry",
+    tier: 2,
+    copies: 2,
+    slot: EquipmentSlot.BODY,
+    bonus: 2,
+    gold: 600,
+    tags: ["ARMOR", "MAGIC"],
+    modifier: cancelCurse,
+    setId: CardSetId.CLERICAL_ERRORS,
+    starter: false,
+  }),
+  attachment(
+    "resonant-rivet",
+    "Resonant Rivet",
+    1,
+    2,
+    2,
+    ["WEAPON"],
+    CardSetId.CLERICAL_ERRORS,
+  ),
+  attachment(
+    "saints-polish",
+    "Saint's Polish",
+    2,
+    2,
+    3,
+    ["MAGIC"],
+    CardSetId.CLERICAL_ERRORS,
+  ),
+  a({
+    id: "encore-of-courage",
+    name: "Encore of Courage",
+    type: CardType.TEMPORARY_BONUS,
+    tier: 1,
+    copies: 2,
+    gold: 250,
+    setId: CardSetId.CLERICAL_ERRORS,
+    play: players,
+    effects: [{ type: "COMBAT_BONUS", amount: 3 }],
+  }),
+  a({
+    id: "misfiled-prophecy",
+    name: "Misfiled Prophecy",
+    type: CardType.MONSTER_MODIFIER,
+    tier: 2,
+    copies: 2,
+    gold: 300,
+    setId: CardSetId.CLERICAL_ERRORS,
+    play: monsterTarget,
+    effects: [{ type: "MODIFY_MONSTER", strength: -3, treasures: -1 }],
+  }),
+  a({
+    id: "backstage-passage",
+    name: "Backstage Passage",
+    type: CardType.UTILITY,
+    tier: 1,
+    copies: 2,
+    deck: DeckType.DOOR,
+    setId: CardSetId.CLERICAL_ERRORS,
+    play: ownTurn,
+    effects: [{ type: "DRAW_CARDS", deck: DeckType.DOOR, count: 1 }],
+  }),
+];
+
+/** Original companion-focused pack; Hirelings and mounts use the existing public containers. */
+const steedHirelings: readonly Entry[] = [
+  m({
+    id: "bridle-chewing-ogre",
+    name: "Bridle-Chewing Ogre",
+    tier: 1,
+    copies: 2,
+    strength: 6,
+    treasures: 2,
+    tags: ["BEAST"],
+    bad: [{ type: "DISCARD_CHOSEN_CARDS", zone: "EQUIPMENT", count: 1 }],
+    setId: CardSetId.STEED_HIRELINGS,
+  }),
+  m({
+    id: "stable-ghost",
+    name: "Stable Ghost",
+    tier: 2,
+    copies: 2,
+    strength: 10,
+    treasures: 3,
+    tags: ["UNDEAD"],
+    bad: [{ type: "DISCARD_ROLE", role: "CLASS" }],
+    setId: CardSetId.STEED_HIRELINGS,
+  }),
+  m({
+    id: "thunderhoof-giant",
+    name: "Thunderhoof Giant",
+    tier: 3,
+    copies: 1,
+    strength: 17,
+    treasures: 4,
+    levels: 2,
+    tags: ["BEAST"],
+    bad: [{ type: "DEATH" }],
+    setId: CardSetId.STEED_HIRELINGS,
+  }),
+  c(
+    "curse-loose-stirrup",
+    "Combat Curse! Loose Stirrup",
+    1,
+    "EARLY",
+    [{ type: "COMBAT_BONUS", amount: -3 }],
+    CardType.COMBAT_CURSE,
+    CardSetId.STEED_HIRELINGS,
+  ),
+  companion(
+    "mule-cartographer",
+    "Mule Cartographer",
+    "HIRELING",
+    1,
+    1,
+    undefined,
+    CardSetId.STEED_HIRELINGS,
+  ),
+  companion(
+    "reed-runner",
+    "Reed Runner",
+    "MOUNT",
+    1,
+    2,
+    { type: "RUN_AWAY_ROLL", amount: 1, conditions: [] },
+    CardSetId.STEED_HIRELINGS,
+  ),
+  companion(
+    "saddle-sage",
+    "Saddle Sage",
+    "HIRELING",
+    2,
+    2,
+    condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["ARCANE"] },
+    ]),
+    CardSetId.STEED_HIRELINGS,
+  ),
+  companion(
+    "iron-mane-ram",
+    "Iron-Mane Ram",
+    "MOUNT",
+    2,
+    3,
+    condition("COMBAT_POWER", 2, [
+      { type: "MONSTER_HAS_TAG", anyOf: ["CONSTRUCT"] },
+    ]),
+    CardSetId.STEED_HIRELINGS,
+  ),
+  companion(
+    "dawn-courier",
+    "Dawn Courier",
+    "HIRELING",
+    3,
+    3,
+    { type: "RUN_AWAY_ROLL", amount: 1, conditions: [] },
+    CardSetId.STEED_HIRELINGS,
+  ),
+  companion(
+    "skybridge-elk",
+    "Skybridge Elk",
+    "MOUNT",
+    3,
+    4,
+    undefined,
+    CardSetId.STEED_HIRELINGS,
+  ),
+  q({
+    id: "trailward-saddlebag",
+    name: "Trailward Saddlebag",
+    tier: 1,
+    copies: 2,
+    slot: EquipmentSlot.BODY,
+    bonus: 2,
+    gold: 450,
+    tags: ["ARMOR"],
+    setId: CardSetId.STEED_HIRELINGS,
+    starter: false,
+  }),
+  a({
+    id: "mounted-charge",
+    name: "Mounted Charge",
+    type: CardType.TEMPORARY_BONUS,
+    tier: 2,
+    copies: 2,
+    gold: 350,
+    setId: CardSetId.STEED_HIRELINGS,
+    play: players,
+    effects: [{ type: "COMBAT_BONUS", amount: 4 }],
+  }),
+  a({
+    id: "spook-the-herd",
+    name: "Spook the Herd",
+    type: CardType.MONSTER_MODIFIER,
+    tier: 2,
+    copies: 2,
+    gold: 350,
+    setId: CardSetId.STEED_HIRELINGS,
+    play: monsterTarget,
+    effects: [{ type: "MODIFY_MONSTER", strength: 4, treasures: 1 }],
+  }),
+  a({
+    id: "waystation-gossip",
+    name: "Waystation Gossip",
+    type: CardType.UTILITY,
+    tier: 1,
+    copies: 2,
+    deck: DeckType.DOOR,
+    setId: CardSetId.STEED_HIRELINGS,
+    play: ownTurn,
+    effects: [{ type: "DRAW_CARDS", deck: DeckType.TREASURE, count: 1 }],
+  }),
+];
+
 const catalog: readonly Entry[] = [
   ...coreMonsters,
   ...coreCurses,
@@ -1619,6 +2186,9 @@ const catalog: readonly Entry[] = [
   ...companions,
   ...arsenal,
   ...dualIdentity,
+  ...classicFantasy,
+  ...clericalErrors,
+  ...steedHirelings,
 ];
 
 export function validateProductionCardDefinitions(
@@ -1730,7 +2300,28 @@ export function validateProductionCardDefinitions(
     );
 }
 
+function validateProductionCatalog(entries: readonly Entry[]): void {
+  const definitionIds = new Set<string>();
+  const artKeys = new Set<string>();
+  const errors: string[] = [];
+  for (const entry of entries) {
+    if (!Number.isSafeInteger(entry.copies) || entry.copies < 1)
+      errors.push(`${entry.definition.id}: invalid physical copy count`);
+    if (definitionIds.has(entry.definition.id))
+      errors.push(`${entry.definition.id}: duplicate definition id`);
+    if (artKeys.has(entry.definition.artKey))
+      errors.push(`${entry.definition.id}: duplicate art key`);
+    definitionIds.add(entry.definition.id);
+    artKeys.add(entry.definition.artKey);
+  }
+  if (errors.length > 0)
+    throw new TypeError(
+      `Invalid production card copies:\n${errors.join("\n")}`,
+    );
+}
+
 export function createDevelopmentCardSet(): CardSet {
+  validateProductionCatalog(catalog);
   const definitions = catalog.map<CardDefinition>((item) => ({
     ...item.definition,
     id: parseCardDefinitionId(item.definition.id),

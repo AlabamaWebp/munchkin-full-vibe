@@ -523,7 +523,7 @@ describe("V2 production catalog rule metadata", () => {
       definitions
         .filter((definition) => definition.play?.target === "COMBAT_SIDE")
         .map((definition) => definition.id),
-    ).toEqual(["bottled-applause", "borrowed-thunder"]);
+    ).toEqual(["bottled-applause", "borrowed-thunder", "sorcerers-gale"]);
     expect(
       definitions
         .filter((definition) => definition.setId === CardSetId.CORE)

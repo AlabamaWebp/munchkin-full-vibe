@@ -15,12 +15,7 @@ const reports = seeds.map((seed) =>
   simulateBalance({
     seed,
     iterations,
-    enabledSetIds: [
-      CardSetId.CORE,
-      CardSetId.COMPANIONS,
-      CardSetId.ARSENAL,
-      CardSetId.DUAL_IDENTITY,
-    ],
+    enabledSetIds: Object.values(CardSetId),
   }),
 );
 

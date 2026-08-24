@@ -10,9 +10,10 @@ remain authoritative for what is implemented today.
 - A room supports 1–6 players (3–6 is the intended social game). The host starts
   after every player has chosen `MALE` or `FEMALE`; each player also has a unique
   cosmetic lobby color.
-- The host selects `BALANCED` or `CLASSIC_CHAOS` and enabled card sets. `CORE`
-  is mandatory; Companions, Arsenal, and Dual Identity are optional. The start
-  snapshot becomes immutable game configuration.
+- The host selects `BALANCED` or `CLASSIC_CHAOS` and enabled card sets. Stable
+  internal `CORE` is shown to players as **Нейро 1** and is mandatory. Companions,
+  Arsenal, Dual Identity, Classic Fantasy, Clerical Errors, and Steed & Hirelings
+  are optional. The start snapshot becomes immutable game configuration.
 - Victory is level 10. The engine changes the match to `FINISHED`, records the
   winner, and rejects later gameplay. The host may rematch the same roster or
   return the room to lobby.
@@ -39,6 +40,12 @@ effect, timing, target, or type-specific rules do not agree.
 Physical copies retain separate instance identities. Door and Treasure decks are
 independent; draws are atomic, recycle only the matching discard when needed,
 and disclose no hidden identity while recycling.
+
+The optional Classic Fantasy, Clerical Errors, and Steed & Hirelings packs are
+original project content inspired only by broad fantasy-card-game interactions.
+They contain no copied Munchkin artwork or card text. Their roles, item enhancers,
+combat interference, Hirelings, and mounts use the same typed mechanics as the
+rest of the production catalog; all cards remain Door or Treasure cards.
 
 ## Player build and economy
 

@@ -30,6 +30,9 @@ describe("V2 production card catalog", () => {
       COMPANIONS: [12, 24],
       ARSENAL: [16, 36],
       DUAL_IDENTITY: [12, 24],
+      CLASSIC_FANTASY: [16, 30],
+      CLERICAL_ERRORS: [15, 29],
+      STEED_HIRELINGS: [14, 27],
     } as const;
     for (const setId of Object.values(CardSetId)) {
       const ids = new Set(
@@ -59,6 +62,20 @@ describe("V2 production card catalog", () => {
     for (const definition of definitions)
       for (const restriction of definition.equipment?.restrictions ?? [])
         expect(ids.has(restriction.definitionId), definition.id).toBe(true);
+  });
+
+  it("gives every physical copy a deck matching its authored definition", () => {
+    const byId = new Map(
+      definitions.map((definition) => [definition.id, definition]),
+    );
+    for (const card of cardSet.doorDeck)
+      expect(byId.get(card.definitionId)?.deck, card.instanceId).toBe(
+        DeckType.DOOR,
+      );
+    for (const card of cardSet.treasureDeck)
+      expect(byId.get(card.definitionId)?.deck, card.instanceId).toBe(
+        DeckType.TREASURE,
+      );
   });
 
   it("matches the authored Core category and tier curve", () => {
@@ -153,6 +170,76 @@ describe("V2 production card catalog", () => {
     }
   });
 
+  it("starts every supported player count in both modes with all selectable packs", () => {
+    for (const mode of ["BALANCED", "CLASSIC_CHAOS"] as const) {
+      for (let playerCount = 1; playerCount <= 6; playerCount += 1) {
+        const random = createSeededRandomSource(
+          playerCount * 100 + mode.length,
+        );
+        let state = createGame({
+          id: parseGameId(`setup-${mode}-${playerCount}`),
+          config: { mode, enabledSetIds: Object.values(CardSetId) },
+        });
+        for (let playerIndex = 0; playerIndex < playerCount; playerIndex += 1) {
+          const added = executeCommand(
+            state,
+            {
+              type: "ADD_PLAYER",
+              actorId: parsePlayerId(`setup-player-${playerIndex}`),
+              name: `Player ${playerIndex}`,
+              sex: "FEMALE",
+            },
+            { random },
+          );
+          expect(added.success).toBe(true);
+          if (!added.success) throw new Error(added.error.message);
+          state = added.state;
+        }
+        const started = executeCommand(
+          state,
+          { type: "START_GAME", actorId: state.players[0]!.id },
+          { random },
+        );
+        expect(started.success).toBe(true);
+        if (!started.success) throw new Error(started.error.message);
+        expect(
+          started.state.players.every((player) => player.hand.length === 8),
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("authors the new packs through existing roles, attachments, companions, and combat targets", () => {
+    const set = (setId: CardSetId) =>
+      definitions.filter((card) => card.setId === setId);
+    expect(
+      set(CardSetId.CLASSIC_FANTASY).filter((card) => card.role !== undefined),
+    ).toHaveLength(4);
+    expect(
+      set(CardSetId.CLERICAL_ERRORS).filter(
+        (card) => card.attachment !== undefined,
+      ),
+    ).toHaveLength(2);
+    expect(
+      set(CardSetId.STEED_HIRELINGS).filter(
+        (card) => card.companion !== undefined,
+      ),
+    ).toHaveLength(6);
+    for (const definition of [
+      ...set(CardSetId.CLASSIC_FANTASY),
+      ...set(CardSetId.CLERICAL_ERRORS),
+      ...set(CardSetId.STEED_HIRELINGS),
+    ])
+      expect(
+        definition.effects.length > 0 ||
+          definition.role ||
+          definition.companion ||
+          definition.equipment ||
+          definition.monster ||
+          definition.attachment,
+      ).toBeTruthy();
+  });
+
   it("filters disabled expansions out of GameState", () => {
     const core = createGame({ id: parseGameId("core-catalog") });
     expect(
@@ -164,10 +251,39 @@ describe("V2 production card catalog", () => {
       id: parseGameId("expanded-catalog"),
       config: { mode: "BALANCED", enabledSetIds: Object.values(CardSetId) },
     });
-    expect(expanded.cardDefinitions).toHaveLength(120);
+    expect(expanded.cardDefinitions).toHaveLength(165);
     expect(
       new Set(expanded.cardDefinitions.map((definition) => definition.setId)),
     ).toEqual(new Set(Object.values(CardSetId)));
+  });
+
+  it("includes each requested optional pack only when explicitly selected", () => {
+    for (const optionalSetId of [
+      CardSetId.CLASSIC_FANTASY,
+      CardSetId.CLERICAL_ERRORS,
+      CardSetId.STEED_HIRELINGS,
+    ]) {
+      const state = createGame({
+        id: parseGameId(`catalog-${optionalSetId}`),
+        config: {
+          mode: "BALANCED",
+          enabledSetIds: [CardSetId.CORE, optionalSetId],
+        },
+      });
+      const allowed = new Set([CardSetId.CORE, optionalSetId]);
+      expect(
+        state.cardDefinitions.every((card) => allowed.has(card.setId)),
+      ).toBe(true);
+      const definitions = new Set(state.cardDefinitions.map((card) => card.id));
+      expect(
+        [...state.doorDeck, ...state.treasureDeck].every((card) =>
+          definitions.has(card.definitionId),
+        ),
+      ).toBe(true);
+      expect(
+        state.cardDefinitions.some((card) => card.setId === optionalSetId),
+      ).toBe(true);
+    }
   });
 });
 

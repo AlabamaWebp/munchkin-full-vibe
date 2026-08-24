@@ -610,3 +610,26 @@ becoming hidden rules. Explicit side opt-in preserves existing card legality and
 encounter addressing. A small primitive set plus one usage mechanism gives roles
 tactical identities without bespoke workflows, client cooldowns, or
 non-serializable state.
+
+---
+
+## ADR-035 — Stable card-set ids with display metadata and original inspired packs
+
+`CORE` remains the stable mandatory configuration id, while shared lobby display
+metadata presents it as “Нейро 1”. Optional sets retain their stable ids in the
+immutable match snapshot; the lobby renders their human-readable names and
+descriptions rather than exposing those ids directly.
+
+The Classic Fantasy, Clerical Errors, and Steed & Hirelings packs are original
+project catalogs. They may take high-level mechanical inspiration from fantasy
+card-game categories, but use neither copied Munchkin card text nor artwork.
+They use the existing typed roles, combat effects, attachments, companions,
+conditions and protections; no additional deck or card-name rule is introduced.
+
+Reason:
+
+Configuration ids are already serialized through lobby, match, and reconnect
+paths, so a presentation migration would create needless compatibility churn.
+Separating display metadata preserves that identity while making selection clear
+to players. Limiting new content to existing primitives keeps every set
+server-authoritative, deterministic, and auditable through the catalog harness.

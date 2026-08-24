@@ -157,13 +157,13 @@ describe("game setup", () => {
     });
     expect(
       set.definitions.filter((card) => card.type === CardType.MONSTER),
-    ).toHaveLength(20);
+    ).toHaveLength(29);
     expect(
       set.definitions.filter((card) => card.type === CardType.EQUIPMENT),
-    ).toHaveLength(28);
+    ).toHaveLength(34);
     expect(
       set.definitions.filter((card) => card.type === CardType.CURSE),
-    ).toHaveLength(11);
+    ).toHaveLength(13);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
   });
 

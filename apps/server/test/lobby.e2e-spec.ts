@@ -213,6 +213,29 @@ describe('LobbyGateway (e2e)', () => {
     });
     await Promise.all([hostSexUpdated, guestSexUpdated]);
 
+    const selectedSets = [
+      'CORE',
+      'CLASSIC_FANTASY',
+      'CLERICAL_ERRORS',
+      'STEED_HIRELINGS',
+    ] as const;
+    const hostSettingsUpdated = nextLobbyState(host);
+    const guestSettingsUpdated = nextLobbyState(guest);
+    const settings = await new Promise<LobbyActionAck>((resolve) => {
+      host.emit(
+        'lobby:set-settings',
+        {
+          roomCode: initialState.roomCode,
+          playerId: created.playerId,
+          mode: 'CLASSIC_CHAOS',
+          enabledSetIds: selectedSets,
+        },
+        resolve,
+      );
+    });
+    expect(settings.success).toBe(true);
+    await Promise.all([hostSettingsUpdated, guestSettingsUpdated]);
+
     const hostStartedState = nextLobbyState(host);
     const guestStartedState = nextLobbyState(guest);
     const hostGameState = nextGameState(host);
@@ -267,6 +290,10 @@ describe('LobbyGateway (e2e)', () => {
     expect(hostView).toEqual(guestView);
     expect(gameView.viewerPlayerId).toBe(created.playerId);
     expect(gameView.self.hand).toHaveLength(8);
+    expect(gameView.config).toEqual({
+      mode: 'CLASSIC_CHAOS',
+      enabledSetIds: selectedSets,
+    });
   });
 
   async function connectClient(): Promise<TestSocket> {

@@ -26,7 +26,70 @@ export const PLAYER_COLORS: readonly PlayerColor[] = [
   "GREEN",
   "BLACK",
 ];
-export type CardSetId = "CORE" | "COMPANIONS" | "ARSENAL" | "DUAL_IDENTITY";
+export type CardSetId =
+  | "CORE"
+  | "COMPANIONS"
+  | "ARSENAL"
+  | "DUAL_IDENTITY"
+  | "CLASSIC_FANTASY"
+  | "CLERICAL_ERRORS"
+  | "STEED_HIRELINGS";
+
+/**
+ * Presentation-only metadata for stable card-set identifiers. The match config
+ * keeps ids, while lobby clients use this catalog rather than showing raw ids.
+ */
+export interface CardSetDisplayMetadata {
+  readonly id: CardSetId;
+  readonly name: string;
+  readonly description: string;
+  readonly mandatory: boolean;
+}
+
+export const CARD_SET_DISPLAY_METADATA: readonly CardSetDisplayMetadata[] = [
+  {
+    id: "CORE",
+    name: "Нейро 1",
+    description: "Обязательная базовая колода для каждой партии.",
+    mandatory: true,
+  },
+  {
+    id: "COMPANIONS",
+    name: "Спутники",
+    description: "Дополнительные наёмники и ездовые спутники.",
+    mandatory: false,
+  },
+  {
+    id: "ARSENAL",
+    name: "Арсенал",
+    description: "Снаряжение, усилители оружия и защита.",
+    mandatory: false,
+  },
+  {
+    id: "DUAL_IDENTITY",
+    name: "Двойная роль",
+    description: "Дополнительные места для классов и рас.",
+    mandatory: false,
+  },
+  {
+    id: "CLASSIC_FANTASY",
+    name: "Классическое фэнтези",
+    description: "Оригинальные героические роли, чудовища и сокровища.",
+    mandatory: false,
+  },
+  {
+    id: "CLERICAL_ERRORS",
+    name: "Ошибки духовенства",
+    description: "Певчие, гномы и ловкие усилители предметов.",
+    mandatory: false,
+  },
+  {
+    id: "STEED_HIRELINGS",
+    name: "Седло и свита",
+    description: "Ездовые животные, наёмники и рискованные схватки.",
+    mandatory: false,
+  },
+] as const;
 
 export interface LobbyPlayerView {
   readonly playerId: string;
