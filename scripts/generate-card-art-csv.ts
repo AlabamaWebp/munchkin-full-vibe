@@ -25,7 +25,7 @@ const typeStyle: Partial<Record<CardDefinition["type"], string>> = {
 };
 
 const mechanical =
-  /\d|\b(?:bonus|penalty|strength|level|levels|treasure|treasures|card|cards|draw|discard|combat|equipment slot|gold)\b/i;
+  /\d|\b(?:bonus|penalty|strength|level|levels|treasure|treasures|card|cards|draw|discard|combat|equipment slot|gold|bad stuff|death|cancels|matching|active|attach|second|companion|run away|curse)\b/i;
 
 function visualDescription(card: CardDefinition): string {
   const useful = card.description
@@ -45,7 +45,17 @@ function outputType(type: CardDefinition["type"]): string {
 }
 
 const cards = createDevelopmentCardSet().definitions;
-const header = ["id", "name", "type", "description", "prompt"];
+const header = [
+  "id",
+  "artKey",
+  "name",
+  "type",
+  "deck",
+  "setId",
+  "tier",
+  "description",
+  "prompt",
+];
 const rows = cards.map((card) => {
   const description = visualDescription(card);
   const style =
@@ -54,8 +64,12 @@ const rows = cards.map((card) => {
   const prompt = `${baseStyle} ${style} Card: ${card.name}. ${description}`;
   return [
     String(card.id),
+    card.artKey,
     card.name,
     outputType(card.type),
+    card.deck.toLowerCase(),
+    card.setId.toLowerCase(),
+    String(card.tier),
     description,
     prompt,
   ]
