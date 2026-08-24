@@ -6,6 +6,7 @@ import { LobbyClient, type ConnectionState } from './lobby-client';
 
 class MockLobbyClient {
   readonly connection = signal<ConnectionState>('CONNECTED').asReadonly();
+  readonly isHost = signal(false).asReadonly();
   readonly sendGameCommand = vi.fn();
   readonly sendGameCommands = vi.fn();
   readonly rematch = vi.fn();

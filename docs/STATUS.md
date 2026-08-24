@@ -39,6 +39,10 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-24: repaired deadline-resolved combat completion so a level-10 reward
+  now shares the engine's authoritative finish transition with normal commands;
+  the finished view renders server-projected final standings and host-only
+  rematch/return-to-lobby controls.
 - 2026-08-23: added selectable unique lobby/player colors, preserved into the
   authoritative player projection and used across lobby, HUD, own-character,
   and Curse-target UI.

@@ -538,12 +538,23 @@ describe('createGameView', () => {
       players: state.players.map((entry) => ({ ...entry, isDead: true })),
     };
     expect(createGameView(dead, playerId).availableIntents).toEqual([]);
-    expect(
-      createGameView(
-        { ...state, status: 'FINISHED', phase: 'FINISHED', winnerId: playerId },
-        playerId,
-      ).availableIntents,
-    ).toEqual([]);
+    const finished = createGameView(
+      { ...state, status: 'FINISHED', phase: 'FINISHED', winnerId: playerId },
+      playerId,
+    );
+    expect(finished).toMatchObject({
+      status: 'FINISHED',
+      phase: 'FINISHED',
+      winnerId: playerId,
+      players: [
+        {
+          playerId,
+          level: state.players[0]!.level,
+          combatPower: expect.any(Number),
+        },
+      ],
+    });
+    expect(finished.availableIntents).toEqual([]);
   });
 
   it('projects the exact hand Monsters available for LOOK_FOR_TROUBLE and its public event', () => {

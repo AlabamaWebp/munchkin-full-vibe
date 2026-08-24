@@ -81,9 +81,12 @@ interface CardUse {
       <app-game-stage
         [game]="game()"
         [stage]="stage()"
+        [isHost]="isHost()"
         (cardOpened)="selectedCard.set($event)"
         (breakdownOpened)="breakdownOpen.set(true)"
         (helpOpened)="openHelp()"
+        (rematchRequested)="rematch()"
+        (returnToLobbyRequested)="returnToLobby()"
       />
       <app-action-dock
         [actions]="primaryActions()"
@@ -672,7 +675,7 @@ interface CardUse {
               <button type="button" (click)="toggleLocale()">
                 Язык: {{ locale() === 'ru' ? 'Русский' : 'English' }}
               </button>
-              @if (game().status === 'FINISHED') {
+              @if (game().status === 'FINISHED' && isHost()) {
                 <button type="button" (click)="rematch()">Играть снова</button
                 ><button type="button" (click)="returnToLobby()">В лобби</button>
               }
@@ -853,6 +856,7 @@ export class GameShellComponent {
   readonly error = input<UserFacingError | null>(null);
   readonly connectionOverride = input<ConnectionState | null>(null);
   protected readonly connection = this.lobbyClient.connection;
+  protected readonly isHost = this.lobbyClient.isHost;
   protected readonly connectionState = computed(
     () => this.connectionOverride() ?? this.connection(),
   );

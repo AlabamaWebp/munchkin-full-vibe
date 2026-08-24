@@ -727,7 +727,9 @@ The main Stage has one state at a time:
 6. `RUN_AWAY_SEQUENCE` — current combatant/encounter and completed result matrix;
 7. `BLOCKING_DECISION` — discard, Curse defense, or role retention;
 8. `TURN_CLEANUP` — hand limit/charity and End Turn;
-9. `FINISHED` — winner and host lifecycle actions.
+9. `FINISHED` — authoritative winner and final player level/combat-power
+   standings. Only the host receives rematch and return-to-lobby controls;
+   other players remain on the same results view while waiting.
 
 Server state selects the Stage state. Local UI state may select a focused
 encounter or open a sheet, but may not invent a gameplay phase. On reconnect, a

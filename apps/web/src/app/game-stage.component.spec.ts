@@ -115,7 +115,9 @@ describe('GameStageComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.hidden-card-art')?.textContent).toContain('?');
-    expect(fixture.nativeElement.textContent).toContain('Карта из колоды сокровищ получена закрытой');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Карта из колоды сокровищ получена закрытой',
+    );
     expect(fixture.nativeElement.querySelector('.event-card-art')).toBeNull();
   });
 
@@ -176,9 +178,7 @@ describe('GameStageComponent', () => {
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.textContent).toContain('Ada получил 1 сокровище');
     expect(tabs[1]?.textContent).toContain('Grace получил 1 сокровище');
-    expect(fixture.nativeElement.textContent).toContain(
-      'Ada получил 1 карту сокровищ в закрытую',
-    );
+    expect(fixture.nativeElement.textContent).toContain('Ada получил 1 карту сокровищ в закрытую');
     expect(fixture.nativeElement.querySelector('.event-card h3')?.textContent).toContain(
       'Copper Compass',
     );
@@ -223,9 +223,33 @@ describe('GameStageComponent', () => {
     fixture.componentRef.setInput('stage', 'POST_DOOR_CHOICE');
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain(
-      'Ada получил 2 карты дверей в закрытую',
-    );
+    expect(fixture.nativeElement.textContent).toContain('Ada получил 2 карты дверей в закрытую');
     expect(fixture.nativeElement.querySelectorAll('.card-tabs button')).toHaveLength(2);
+  });
+
+  it('renders server-projected final standings and only exposes lifecycle controls to the host', async () => {
+    await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(GameStageComponent);
+    const finished: GameView = {
+      ...game([]),
+      status: 'FINISHED',
+      phase: 'FINISHED',
+      winnerId: 'p2',
+      players: [player, { ...player, playerId: 'p2', name: 'Grace', level: 10, combatPower: 14 }],
+    };
+    fixture.componentRef.setInput('game', finished);
+    fixture.componentRef.setInput('stage', 'FINISHED');
+    fixture.componentRef.setInput('isHost', false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Grace победил');
+    expect(fixture.nativeElement.textContent).toContain('Уровень 10');
+    expect(fixture.nativeElement.textContent).toContain('Сила 14');
+    expect(fixture.nativeElement.textContent).toContain('Ожидание решения ведущего');
+    expect(fixture.nativeElement.querySelector('.lifecycle-actions')).toBeNull();
+
+    fixture.componentRef.setInput('isHost', true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.lifecycle-actions button')).toHaveLength(2);
   });
 });

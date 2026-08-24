@@ -160,6 +160,11 @@ The stage may change between turn start, Door reveal, combat, reaction, escape,
 blocking decision, cleanup, and victory. The surrounding shell should remain
 stable so controls do not jump unpredictably.
 
+The finished stage is a results surface rather than a generic game-over notice.
+It shows the authoritative winner plus every player's projected final level and
+combat power. Only the host sees rematch and return-to-lobby controls;
+non-hosts see the same results while waiting for the host's lifecycle decision.
+
 ## Lobby color selection
 
 The lobby includes a color picker as part of each player's pre-game identity.

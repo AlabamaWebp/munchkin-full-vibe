@@ -1,5 +1,8 @@
 import { GameService } from './game.service';
 import {
+  GamePhase,
+  GameStatus,
+  parsePlayerId,
   parsePendingDecisionId,
   type GameState,
 } from '@munchkin-lan/game-engine';
@@ -49,6 +52,111 @@ describe('GameService equipment transport', () => {
         code: 'GAME_NOT_FINISHED',
         message: 'The game is not finished.',
       },
+    });
+  });
+
+  it('replaces only a finished match with a fresh game for the same roster', () => {
+    const service = new GameService();
+    const players = [
+      { playerId: 'player-1', name: 'Ada' },
+      { playerId: 'player-2', name: 'Grace' },
+    ];
+    expect(service.startGame('REMATCH', players)).toEqual({ success: true });
+    const games = (service as unknown as { games: Map<string, GameState> })
+      .games;
+    const finished = games.get('REMATCH')!;
+    games.set('REMATCH', {
+      ...finished,
+      status: GameStatus.FINISHED,
+      phase: GamePhase.FINISHED,
+      activePlayerId: parsePlayerId('player-1'),
+      winnerId: parsePlayerId('player-1'),
+      players: finished.players.map((player) => ({
+        ...player,
+        level: player.id === parsePlayerId('player-1') ? 10 : 7,
+      })),
+    });
+
+    expect(service.rematch('REMATCH', players)).toEqual({ success: true });
+    const rematch = games.get('REMATCH')!;
+    expect(rematch).not.toBe(finished);
+    expect(rematch).toMatchObject({
+      status: GameStatus.IN_PROGRESS,
+      phase: GamePhase.TURN_START,
+      winnerId: null,
+      turnNumber: 1,
+      players: [
+        { id: parsePlayerId('player-1'), name: 'Ada', level: 1 },
+        { id: parsePlayerId('player-2'), name: 'Grace', level: 1 },
+      ],
+    });
+  });
+
+  it('removes a finished game without altering the room-owned roster', () => {
+    const service = new GameService();
+    const players = [
+      { playerId: 'player-1', name: 'Ada' },
+      { playerId: 'player-2', name: 'Grace' },
+    ];
+    expect(service.startGame('LOBBY', players)).toEqual({ success: true });
+    const games = (service as unknown as { games: Map<string, GameState> })
+      .games;
+    const current = games.get('LOBBY')!;
+    games.set('LOBBY', {
+      ...current,
+      status: GameStatus.FINISHED,
+      phase: GamePhase.FINISHED,
+      winnerId: parsePlayerId('player-1'),
+    });
+
+    expect(service.removeFinishedGame('LOBBY')).toEqual({ success: true });
+    expect(service.getView('LOBBY', 'player-1')).toBeNull();
+    expect(players).toEqual([
+      { playerId: 'player-1', name: 'Ada' },
+      { playerId: 'player-2', name: 'Grace' },
+    ]);
+  });
+
+  it('returns the same finished standings whenever a player reconnects for a view', () => {
+    const service = new GameService();
+    const players = [
+      { playerId: 'player-1', name: 'Ada' },
+      { playerId: 'player-2', name: 'Grace' },
+    ];
+    expect(service.startGame('RESULTS', players)).toEqual({ success: true });
+    const games = (service as unknown as { games: Map<string, GameState> })
+      .games;
+    const started = games.get('RESULTS')!;
+    games.set('RESULTS', {
+      ...started,
+      status: GameStatus.FINISHED,
+      phase: GamePhase.FINISHED,
+      activePlayerId: parsePlayerId('player-1'),
+      winnerId: parsePlayerId('player-1'),
+      players: started.players.map((player) => ({
+        ...player,
+        level: player.id === parsePlayerId('player-1') ? 10 : 8,
+      })),
+    });
+
+    const firstView = service.getView('RESULTS', 'player-1');
+    const reconnectView = service.getView('RESULTS', 'player-2');
+    expect(firstView).toMatchObject({
+      status: 'FINISHED',
+      phase: 'FINISHED',
+      winnerId: 'player-1',
+      players: [
+        { playerId: 'player-1', level: 10, combatPower: expect.any(Number) },
+        { playerId: 'player-2', level: 8, combatPower: expect.any(Number) },
+      ],
+      availableIntents: [],
+    });
+    expect(reconnectView).toMatchObject({
+      status: firstView?.status,
+      phase: firstView?.phase,
+      winnerId: firstView?.winnerId,
+      players: firstView?.players,
+      availableIntents: [],
     });
   });
 

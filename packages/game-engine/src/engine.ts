@@ -1915,14 +1915,31 @@ function discardRole(
       "The role is not active for the actor.",
     );
   const definition = findDefinition(state, card);
-  const role = definition.type === CardType.CLASS ? "CLASS" : definition.type === CardType.RACE ? "RACE" : null;
+  const role =
+    definition.type === CardType.CLASS
+      ? "CLASS"
+      : definition.type === CardType.RACE
+        ? "RACE"
+        : null;
   if (role === null)
-    return fail(state, "CARD_NOT_PLAYABLE", "Only a Class or Race can be discarded as a role.");
+    return fail(
+      state,
+      "CARD_NOT_PLAYABLE",
+      "Only a Class or Race can be discarded as a role.",
+    );
   let nextState = updatePlayer(state, actorId, (current) => ({
     ...current,
     ...(role === "CLASS"
-      ? { classCards: current.classCards.filter((candidate) => candidate.instanceId !== cardId) }
-      : { raceCards: current.raceCards.filter((candidate) => candidate.instanceId !== cardId) }),
+      ? {
+          classCards: current.classCards.filter(
+            (candidate) => candidate.instanceId !== cardId,
+          ),
+        }
+      : {
+          raceCards: current.raceCards.filter(
+            (candidate) => candidate.instanceId !== cardId,
+          ),
+        }),
   }));
   nextState = addToDiscard(nextState, [card]);
   const revalidated = revalidatePlayerEquipment(nextState, actorId);
@@ -4675,7 +4692,47 @@ export function processExpiredState(
     working = resolved.state;
     events.push(...resolved.events);
   }
-  return appendResultEvents(state, succeed(working, events));
+  return appendResultEvents(
+    state,
+    finishForWinningLevel(state, succeed(working, events)),
+  );
+}
+
+function finishForWinningLevel(
+  previousState: GameState,
+  result: CommandResult,
+): CommandResult {
+  if (!result.success || result.state.status !== GameStatus.IN_PROGRESS)
+    return result;
+  const winner = result.state.players.find((player) => {
+    const previousLevel =
+      previousState.players.find((previous) => previous.id === player.id)
+        ?.level ?? 0;
+    return previousLevel < WINNING_LEVEL && player.level >= WINNING_LEVEL;
+  });
+  if (winner === undefined) return result;
+  return succeed(
+    {
+      ...result.state,
+      status: GameStatus.FINISHED,
+      phase: GamePhase.FINISHED,
+      activePlayerId: winner.id,
+      combat: null,
+      lastRunAwayResult: null,
+      pendingDecision: null,
+      curseResponse: null,
+      winnerId: winner.id,
+    },
+    [
+      ...result.events,
+      {
+        type: "GAME_FINISHED",
+        visibility: "PUBLIC",
+        winnerId: winner.id,
+        winningLevel: WINNING_LEVEL,
+      },
+    ],
+  );
 }
 
 export function executeCommand(
@@ -4697,37 +4754,5 @@ export function executeCommand(
     throw error;
   }
 
-  if (result.success && result.state.status === GameStatus.IN_PROGRESS) {
-    const winner = result.state.players.find((player) => {
-      const previousLevel =
-        state.players.find((previous) => previous.id === player.id)?.level ?? 0;
-      return previousLevel < WINNING_LEVEL && player.level >= WINNING_LEVEL;
-    });
-    if (winner !== undefined) {
-      result = succeed(
-        {
-          ...result.state,
-          status: GameStatus.FINISHED,
-          phase: GamePhase.FINISHED,
-          activePlayerId: winner.id,
-          combat: null,
-          lastRunAwayResult: null,
-          pendingDecision: null,
-          curseResponse: null,
-          winnerId: winner.id,
-        },
-        [
-          ...result.events,
-          {
-            type: "GAME_FINISHED",
-            visibility: "PUBLIC",
-            winnerId: winner.id,
-            winningLevel: WINNING_LEVEL,
-          },
-        ],
-      );
-    }
-  }
-
-  return appendResultEvents(state, result);
+  return appendResultEvents(state, finishForWinningLevel(state, result));
 }

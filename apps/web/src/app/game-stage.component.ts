@@ -49,17 +49,17 @@ import { LocalizationService } from './localization';
               </article>
             } @else if (focusedStageCard(); as focused) {
               @if (receipt.cards.length > 1) {
-              <div class="card-tabs" aria-label="Карты последнего действия">
-                @for (card of receipt.cards; track card.instanceId) {
-                  <button
-                    type="button"
-                    [class.active]="focused.instanceId === card.instanceId"
-                    (click)="focusedStageCardId.set(card.instanceId)"
-                  >
-                    {{ cardName(card) }}
-                  </button>
-                }
-              </div>
+                <div class="card-tabs" aria-label="Карты последнего действия">
+                  @for (card of receipt.cards; track card.instanceId) {
+                    <button
+                      type="button"
+                      [class.active]="focused.instanceId === card.instanceId"
+                      (click)="focusedStageCardId.set(card.instanceId)"
+                    >
+                      {{ cardName(card) }}
+                    </button>
+                  }
+                </div>
               }
               <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
               <h2 class="event-summary">{{ stageSummary(receipt.summary, receipt.cards) }}</h2>
@@ -87,104 +87,156 @@ import { LocalizationService } from './localization';
         }
       } @else {
         @switch (stage()) {
-        @case ('COMBAT_OPEN') {
-          <app-combat-stage
-            [game]="game()"
-            (breakdownOpened)="breakdownOpened.emit()"
-            (helpOpened)="helpOpened.emit()"
-            (cardOpened)="cardOpened.emit($event)"
-          />
-        }
-        @case ('COMBAT_REACTION') {
-          <app-combat-stage
-            [game]="game()"
-            [reactionMode]="true"
-            (breakdownOpened)="breakdownOpened.emit()"
-            (cardOpened)="cardOpened.emit($event)"
-          />
-        }
-        @case ('RUN_AWAY_SEQUENCE') {
-          <div class="run-away">
-            <p class="eyebrow">ПОБЕГ</p>
-            @if (game().combat?.runAway; as runAway) {
-              <h2>{{ playerName(runAway.currentCombatantId) }} убегает</h2>
-              <p>От: {{ encounterName(runAway.currentEncounterId) }}</p>
-              <div class="attempts">
-                @for (
-                  attempt of runAway.attempts;
-                  track attempt.combatantId + attempt.encounterId
-                ) {
-                  <span [class.failed]="attempt.outcome === 'FAILED'">
-                    {{ playerName(attempt.combatantId) }} ·
-                    {{ encounterName(attempt.encounterId) }} ·
-                    {{ attempt.roll === null ? '—' : 'd6 ' + attempt.roll }} ·
-                    {{ outcome(attempt.outcome) }}
-                  </span>
-                }
-              </div>
-            } @else if (game().lastRunAwayResult; as result) {
-              <h2>Результат побега</h2>
-              <div class="attempts">
-                @for (attempt of result.attempts; track attempt.encounterId) {
-                  <span [class.failed]="!attempt.escaped">
-                    {{ attempt.monster.name }} · d6 {{ attempt.roll }} ·
-                    {{ attempt.escaped ? 'успех' : 'неудача' }}
-                    @if (attempt.badStuffApplied) {
-                      · Непотребство применено
-                    }
-                  </span>
-                }
-              </div>
-            }
-          </div>
-        }
-        @case ('BLOCKING_DECISION') {
-          <div class="message blocking">
-            <p class="eyebrow">ВАЖНЫЙ ВЫБОР</p>
-            <h2>
-              {{
-                game().pendingDecision?.playerId === game().viewerPlayerId
-                  ? 'Нужно ваше решение'
-                  : playerName(game().pendingDecision?.playerId ?? null) + ' выбирает'
-              }}
-            </h2>
-            <p>{{ decisionCopy() }}</p>
-          </div>
-        }
-        @case ('DOOR_REVEAL') {
-          <div class="message"><h2>Дверь открывается…</h2></div>
-        }
-        @case ('POST_DOOR_CHOICE') {
-          <div class="message">
-            <p class="eyebrow">КОМНАТА ИССЛЕДОВАНА</p>
-            <h2>Что дальше?</h2>
-            <p>Выберите одно доступное действие внизу.</p>
-          </div>
-        }
-        @case ('TURN_CLEANUP') {
-          <div class="message">
-            <p class="eyebrow">ЗАВЕРШЕНИЕ ХОДА</p>
-            <h2>{{ game().self.handCount > 5 ? 'Слишком много карт' : 'Можно завершать ход' }}</h2>
-            <p>
-              {{
-                game().self.handCount > 5
-                  ? 'Оставьте не больше пяти карт или раздайте милостыню.'
-                  : 'Проверьте снаряжение и передайте ход.'
-              }}
-            </p>
-          </div>
-        }
-        @case ('TURN_READY') {
-          @if (game().self.isDead) {
+          @case ('COMBAT_OPEN') {
+            <app-combat-stage
+              [game]="game()"
+              (breakdownOpened)="breakdownOpened.emit()"
+              (helpOpened)="helpOpened.emit()"
+              (cardOpened)="cardOpened.emit($event)"
+            />
+          }
+          @case ('COMBAT_REACTION') {
+            <app-combat-stage
+              [game]="game()"
+              [reactionMode]="true"
+              (breakdownOpened)="breakdownOpened.emit()"
+              (cardOpened)="cardOpened.emit($event)"
+            />
+          }
+          @case ('RUN_AWAY_SEQUENCE') {
+            <div class="run-away">
+              <p class="eyebrow">ПОБЕГ</p>
+              @if (game().combat?.runAway; as runAway) {
+                <h2>{{ playerName(runAway.currentCombatantId) }} убегает</h2>
+                <p>От: {{ encounterName(runAway.currentEncounterId) }}</p>
+                <div class="attempts">
+                  @for (
+                    attempt of runAway.attempts;
+                    track attempt.combatantId + attempt.encounterId
+                  ) {
+                    <span [class.failed]="attempt.outcome === 'FAILED'">
+                      {{ playerName(attempt.combatantId) }} ·
+                      {{ encounterName(attempt.encounterId) }} ·
+                      {{ attempt.roll === null ? '—' : 'd6 ' + attempt.roll }} ·
+                      {{ outcome(attempt.outcome) }}
+                    </span>
+                  }
+                </div>
+              } @else if (game().lastRunAwayResult; as result) {
+                <h2>Результат побега</h2>
+                <div class="attempts">
+                  @for (attempt of result.attempts; track attempt.encounterId) {
+                    <span [class.failed]="!attempt.escaped">
+                      {{ attempt.monster.name }} · d6 {{ attempt.roll }} ·
+                      {{ attempt.escaped ? 'успех' : 'неудача' }}
+                      @if (attempt.badStuffApplied) {
+                        · Непотребство применено
+                      }
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          }
+          @case ('BLOCKING_DECISION') {
             <div class="message blocking">
-              <p class="eyebrow">СОСТОЯНИЕ ПЕРСОНАЖА</p>
-              <h2>Вы мертвы</h2>
+              <p class="eyebrow">ВАЖНЫЙ ВЫБОР</p>
+              <h2>
+                {{
+                  game().pendingDecision?.playerId === game().viewerPlayerId
+                    ? 'Нужно ваше решение'
+                    : playerName(game().pendingDecision?.playerId ?? null) + ' выбирает'
+                }}
+              </h2>
+              <p>{{ decisionCopy() }}</p>
+            </div>
+          }
+          @case ('DOOR_REVEAL') {
+            <div class="message"><h2>Дверь открывается…</h2></div>
+          }
+          @case ('POST_DOOR_CHOICE') {
+            <div class="message">
+              <p class="eyebrow">КОМНАТА ИССЛЕДОВАНА</p>
+              <h2>Что дальше?</h2>
+              <p>Выберите одно доступное действие внизу.</p>
+            </div>
+          }
+          @case ('TURN_CLEANUP') {
+            <div class="message">
+              <p class="eyebrow">ЗАВЕРШЕНИЕ ХОДА</p>
+              <h2>
+                {{ game().self.handCount > 5 ? 'Слишком много карт' : 'Можно завершать ход' }}
+              </h2>
               <p>
-                Потерянное уже применено сервером. В начале своего хода вы вернётесь и получите
-                новые закрытые карты.
+                {{
+                  game().self.handCount > 5
+                    ? 'Оставьте не больше пяти карт или раздайте милостыню.'
+                    : 'Проверьте снаряжение и передайте ход.'
+                }}
               </p>
             </div>
-          } @else {
+          }
+          @case ('TURN_READY') {
+            @if (game().self.isDead) {
+              <div class="message blocking">
+                <p class="eyebrow">СОСТОЯНИЕ ПЕРСОНАЖА</p>
+                <h2>Вы мертвы</h2>
+                <p>
+                  Потерянное уже применено сервером. В начале своего хода вы вернётесь и получите
+                  новые закрытые карты.
+                </p>
+              </div>
+            } @else {
+              <div class="message">
+                <p class="eyebrow">НАЧАЛО ХОДА</p>
+                <h2>
+                  {{
+                    game().activePlayerId === game().viewerPlayerId
+                      ? 'Ваш ход'
+                      : 'Ходит ' + playerName(game().activePlayerId)
+                  }}
+                </h2>
+                <p>
+                  {{
+                    game().activePlayerId === game().viewerPlayerId
+                      ? 'Откройте дверь, когда будете готовы.'
+                      : 'Следите за событиями и готовьте карты.'
+                  }}
+                </p>
+              </div>
+            }
+          }
+          @case ('FINISHED') {
+            <section class="message victory results" aria-label="Результаты завершённой партии">
+              <p class="eyebrow">ПАРТИЯ ЗАВЕРШЕНА</p>
+              @if (winner(); as matchWinner) {
+                <h2>{{ matchWinner.name }} победил</h2>
+              } @else {
+                <h2>Матч завершён</h2>
+              }
+              <p>Итоговые уровни и боевая сила зафиксированы сервером.</p>
+              <ol class="results-list">
+                @for (player of game().players; track player.playerId) {
+                  <li [class.winner]="player.playerId === game().winnerId">
+                    <span>{{ player.name }}</span>
+                    <b>Уровень {{ player.level }}</b>
+                    <small>Сила {{ player.combatPower }}</small>
+                  </li>
+                }
+              </ol>
+              @if (isHost()) {
+                <div class="lifecycle-actions">
+                  <button type="button" (click)="rematchRequested.emit()">Сыграть ещё раз</button>
+                  <button type="button" (click)="returnToLobbyRequested.emit()">В лобби</button>
+                </div>
+              } @else {
+                <p class="waiting-host">
+                  Ожидание решения ведущего: новая партия или возврат в лобби.
+                </p>
+              }
+            </section>
+          }
+          @default {
             <div class="message">
               <p class="eyebrow">НАЧАЛО ХОДА</p>
               <h2>
@@ -203,33 +255,6 @@ import { LocalizationService } from './localization';
               </p>
             </div>
           }
-        }
-        @case ('FINISHED') {
-          <div class="message victory">
-            <p class="eyebrow">ПОБЕДА</p>
-            <h2>{{ playerName(game().winnerId) }}</h2>
-            <p>Достиг победного уровня.</p>
-          </div>
-        }
-        @default {
-          <div class="message">
-            <p class="eyebrow">НАЧАЛО ХОДА</p>
-            <h2>
-              {{
-                game().activePlayerId === game().viewerPlayerId
-                  ? 'Ваш ход'
-                  : 'Ходит ' + playerName(game().activePlayerId)
-              }}
-            </h2>
-            <p>
-              {{
-                game().activePlayerId === game().viewerPlayerId
-                  ? 'Откройте дверь, когда будете готовы.'
-                  : 'Следите за событиями и готовьте карты.'
-              }}
-            </p>
-          </div>
-        }
         }
       }
     </section>
@@ -269,6 +294,58 @@ import { LocalizationService } from './localization';
     .message.victory {
       border-color: #d8b252;
       background: radial-gradient(circle, #59461e, #1d1b13 72%);
+    }
+    .message.results {
+      align-content: center;
+      overflow: auto;
+    }
+    .results-list {
+      display: grid;
+      width: min(100%, 22rem);
+      margin: 0.3rem auto;
+      padding: 0;
+      gap: 0.25rem;
+      list-style: none;
+      text-align: left;
+    }
+    .results-list li {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 0.45rem;
+      align-items: baseline;
+      padding: 0.42rem 0.5rem;
+      border-radius: 0.5rem;
+      background: rgba(0, 0, 0, 0.22);
+      font-size: 0.75rem;
+    }
+    .results-list li.winner {
+      color: #ffe29a;
+      background: rgba(216, 178, 82, 0.25);
+    }
+    .results-list span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .results-list small {
+      color: #bdc9c0;
+    }
+    .lifecycle-actions {
+      display: flex;
+      justify-content: center;
+      gap: 0.45rem;
+    }
+    .lifecycle-actions button {
+      padding: 0.5rem 0.7rem;
+      border: 1px solid #d8b252;
+      border-radius: 0.5rem;
+      color: #fff0bf;
+      background: #3b2d13;
+      font-weight: 800;
+    }
+    .waiting-host {
+      max-width: 20rem;
     }
     .eyebrow {
       margin: 0;
@@ -406,7 +483,9 @@ import { LocalizationService } from './localization';
       background:
         radial-gradient(circle at 30% 25%, rgba(228, 183, 93, 0.2), transparent 35%),
         repeating-linear-gradient(45deg, #332313, #332313 0.5rem, #21170e 0.5rem, #21170e 1rem);
-      font: 900 clamp(3rem, 18vw, 5rem)/1 Georgia, serif;
+      font:
+        900 clamp(3rem, 18vw, 5rem)/1 Georgia,
+        serif;
       text-shadow: 0 0.2rem 0.5rem #000;
     }
     .event-card > p {
@@ -447,12 +526,18 @@ export class GameStageComponent {
   private readonly localization = inject(LocalizationService);
   readonly game = input.required<GameView>();
   readonly stage = input.required<GameStageKind>();
+  readonly isHost = input(false);
   readonly cardOpened = output<GameCardView>();
   readonly breakdownOpened = output<void>();
   readonly helpOpened = output<void>();
+  readonly rematchRequested = output<void>();
+  readonly returnToLobbyRequested = output<void>();
   protected readonly focusedStageCardId = signal<string | null>(null);
   protected readonly focusedReceiptSequence = signal<number | null>(null);
   protected readonly stageCardEvent = computed(() => latestStageCardEvent(this.game()));
+  protected readonly winner = computed(
+    () => this.game().players.find((player) => player.playerId === this.game().winnerId) ?? null,
+  );
   protected readonly focusedReceipt = computed(() => {
     const event = this.stageCardEvent();
     if (event === null) return null;
@@ -476,9 +561,7 @@ export class GameStageComponent {
     );
   });
   protected showsStageCard(): boolean {
-    return ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE', 'TURN_CLEANUP'].includes(
-      this.stage(),
-    );
+    return ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE', 'TURN_CLEANUP'].includes(this.stage());
   }
   protected cardZone(card: GameCardView): string {
     return card.deck === 'DOOR' ? 'КАРТА ДВЕРИ' : 'КАРТА СОКРОВИЩА';

@@ -310,6 +310,59 @@ describe("V2 blocker regressions", () => {
     expect(repeated.events).toEqual([]);
   });
 
+  it("finishes a multi-level combat reward from level nine when reactions expire", () => {
+    const original = game([monsterDefinition], {
+      phase: GamePhase.DOOR_RESOLUTION,
+      players: [player(heroId, { level: 9 }), player(targetId)],
+      combat: {
+        ...combat(),
+        monsters: [
+          {
+            ...combat().monsters[0]!,
+            baseLevelRewards: 2,
+          },
+        ],
+        reactionWindow: {
+          windowId: 1,
+          declaredAtRevision: 4,
+          claimantId: heroId,
+          confirmedPlayerIds: [heroId],
+          eligiblePlayerIds: [heroId, targetId],
+          expiresAtEpochMs: 2_000,
+        },
+      },
+    });
+
+    const expired = processExpiredState(original, {
+      random,
+      clock: { now: () => 2_000 },
+    });
+
+    expect(expired.success).toBe(true);
+    expect(expired.state).toMatchObject({
+      status: GameStatus.FINISHED,
+      phase: GamePhase.FINISHED,
+      winnerId: heroId,
+      combat: null,
+    });
+    expect(
+      expired.state.players.find((player) => player.id === heroId)?.level,
+    ).toBe(10);
+    expect(expired.events).toContainEqual(
+      expect.objectContaining({ type: "GAME_FINISHED", winnerId: heroId }),
+    );
+    expect(
+      executeCommand(
+        expired.state,
+        { type: "END_TURN", actorId: heroId },
+        { random },
+      ),
+    ).toMatchObject({
+      success: false,
+      error: { code: "COMMAND_NOT_AVAILABLE" },
+    });
+  });
+
   it("expires pending choices and help offers with deterministic safe defaults", () => {
     const curse = definition("choice-curse", {
       type: CardType.CURSE,
