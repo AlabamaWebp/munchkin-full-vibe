@@ -122,7 +122,7 @@ function combinedDrawReceipt(
 }
 
 export function presentEvents(game: GameView): readonly PresentedEvent[] {
-  return [
+  const visible = [
     ...(game.presentation.blocking === null ? [] : [game.presentation.blocking]),
     ...game.presentation.important,
     ...game.presentation.routine,
@@ -132,12 +132,41 @@ export function presentEvents(game: GameView): readonly PresentedEvent[] {
         entries.findIndex((candidate) => candidate.sequence === entry.sequence) === index,
     )
     .sort((left, right) => left.sequence - right.sequence)
+    .filter((entry, _index, entries) => !isSupersededReward(entry, entries));
+  return visible
     .map((entry) => ({
       entry,
       priority: entry.priority,
       summary: eventSummary(game, entry),
     }))
     .filter((event) => event.summary.length > 0);
+}
+
+/**
+ * A combat reward records both its public count and its private card receipt.
+ * The receipt is the richer history item, so suppress only the redundant
+ * aggregate presentation; the authoritative events remain untouched.
+ */
+function isSupersededReward(
+  entry: GameLogEntryView,
+  entries: readonly GameLogEntryView[],
+): boolean {
+  return (
+    entry.type === 'TREASURE_GAINED' &&
+    entries.some(
+      (candidate) =>
+        candidate.type === 'COMBAT_REWARD_CARDS' &&
+        candidate.playerId === entry.playerId &&
+        candidate.turnNumber === entry.turnNumber &&
+        candidate.phase === entry.phase &&
+        candidate.count === entry.count,
+    )
+  );
+}
+
+/** Event sequences already explained by the persistent stage card surface. */
+export function stageExplainedEventSequences(game: GameView): readonly number[] {
+  return latestStageCardEvent(game)?.receipts.map((receipt) => receipt.entry.sequence) ?? [];
 }
 
 function eventSummary(game: GameView, entry: GameLogEntryView): string {

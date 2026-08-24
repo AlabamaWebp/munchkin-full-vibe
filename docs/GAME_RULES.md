@@ -55,6 +55,11 @@ restrictions. Power is derived from level, equipment/attachments, roles,
 companions, active effects, and eligible Makeshift Tools—not stored or supplied
 by a client.
 
+An equipped item's public projection includes the enhancer cards attached to
+that host and its resolved current contribution. Details present typed passive
+or conditional modifiers alongside those attachments; clients do not parse card
+description text or recompute the total.
+
 Class and Race are public role arrays with a normal capacity of one. A typed
 permission card can expand a role capacity; loss of permission can require a
 serialized choice of which role to retain. Hirelings and mounts occupy their own

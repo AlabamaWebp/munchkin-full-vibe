@@ -27,7 +27,12 @@ import { CompactGameCardComponent } from './compact-game-card.component';
 import { EquipmentLayoutComponent } from './equipment-layout.component';
 import { FocusTrapDirective } from './focus-trap.directive';
 import { GameStageComponent } from './game-stage.component';
-import { presentEvents, selectStage, unavailableReason } from './game-ui.model';
+import {
+  presentEvents,
+  selectStage,
+  stageExplainedEventSequences,
+  unavailableReason,
+} from './game-ui.model';
 import { HandDockComponent } from './hand-dock.component';
 import { LobbyClient, type ConnectionState, type UserFacingError } from './lobby-client';
 import { LocalizationService } from './localization';
@@ -180,15 +185,42 @@ interface CardUse {
                     : 'Этот выбор нужен, чтобы продолжить игру.'
                 }}
               </p>
+              @if (decision.playerId === game().viewerPlayerId) {
+                <p class="decision-count" aria-live="polite">
+                  Выбрано {{ decisionSelection().length }} из
+                  {{ decision.type === 'DISCARD_CARDS' ? decision.count : 1 }}
+                </p>
+              }
               <div class="picker-grid">
                 @for (card of decisionCards(); track card.instanceId) {
-                  <button
-                    type="button"
+                  <article
+                    class="decision-card"
                     [class.selected]="decisionSelection().includes(card.instanceId)"
-                    (click)="toggleDecision(card.instanceId)"
                   >
-                    {{ card.name }}
-                  </button>
+                    <button
+                      type="button"
+                      class="decision-card-artwork"
+                      [attr.aria-label]="'Подробнее: ' + cardName(card)"
+                      (click)="selectedCard.set(card)"
+                    >
+                      <app-card-artwork
+                        [artKey]="card.artKey"
+                        [label]="cardName(card)"
+                        [compact]="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="decision-card-select"
+                      [attr.aria-pressed]="decisionSelection().includes(card.instanceId)"
+                      (click)="toggleDecision(card.instanceId)"
+                    >
+                      <span>{{ cardName(card) }}</span>
+                      <small>
+                        {{ decisionSelection().includes(card.instanceId) ? 'Выбрано' : 'Выбрать' }}
+                      </small>
+                    </button>
+                  </article>
                 }
               </div>
             </div>
@@ -498,6 +530,34 @@ interface CardUse {
             <div class="sheet-scroll card-details">
               <app-card-artwork [artKey]="card.artKey" [label]="cardName(card)" />
               <p>{{ cardDescription(card) }}</p>
+              @if (card.equipped; as equipped) {
+                <section class="equipment-detail" aria-label="Улучшения снаряжения">
+                  <strong>Итоговый вклад: {{ signed(equipped.resolvedCombatBonus) }} силы</strong>
+                  @if (card.equipment?.modifier) {
+                    <span class="passive-effect-chip">Пассивный эффект</span>
+                  }
+                  @if (equipped.attachments.length > 0) {
+                    <h3>Прикреплённые усилители</h3>
+                    @for (attachment of equipped.attachments; track attachment.card.instanceId) {
+                      <button
+                        type="button"
+                        class="equipment-attachment"
+                        (click)="selectedCard.set(attachment.card)"
+                      >
+                        <app-card-artwork
+                          [artKey]="attachment.card.artKey"
+                          [label]="cardName(attachment.card)"
+                          [compact]="true"
+                        />
+                        <span
+                          ><b>{{ cardName(attachment.card) }}</b
+                          ><small>+{{ attachment.combatBonus }} силы</small></span
+                        >
+                      </button>
+                    }
+                  }
+                </section>
+              }
               @for (fact of cardFacts(card); track fact) {
                 <span>{{ fact }}</span>
               }
@@ -914,7 +974,13 @@ export class GameShellComponent {
   protected readonly locale = this.localization.locale;
   protected readonly stage = computed(() => selectStage(this.game()));
   protected readonly allEvents = computed(() => presentEvents(this.game()));
-  protected readonly recentEvents = computed(() => this.allEvents().slice(-5).reverse());
+  protected readonly recentEvents = computed(() => {
+    const stageSequences = new Set(stageExplainedEventSequences(this.game()));
+    return this.allEvents()
+      .filter((event) => !stageSequences.has(event.entry.sequence))
+      .slice(-5)
+      .reverse();
+  });
   protected readonly playableIds = computed(() => this.collectPlayableIds());
   protected readonly sortedHand = computed(() =>
     [...this.game().self.hand].sort(
@@ -1553,12 +1619,7 @@ export class GameShellComponent {
 
   protected decisionCards(): readonly GameCardView[] {
     const decision = this.game().pendingDecision;
-    if (!decision) return [];
-    const pool =
-      decision.type === 'DISCARD_CARDS' && decision.zone === 'EQUIPMENT'
-        ? this.game().self.equipment
-        : this.game().self.hand;
-    return pool.filter((card) => decision.selectableCardIds.includes(card.instanceId));
+    return decision?.selectableCards ?? [];
   }
   protected toggleDecision(id: string): void {
     const decision = this.game().pendingDecision;
@@ -1631,6 +1692,13 @@ export class GameShellComponent {
         `Слот: ${this.slotLabel(card.equipment.slot)}`,
         `Руки: ${card.equipment.hands}`,
       );
+    if (card.equipped) {
+      facts.push(`Итоговый вклад: ${this.signed(card.equipped.resolvedCombatBonus)} силы`);
+      if (card.equipped.attachments.length)
+        facts.push(
+          `Усилители: ${card.equipped.attachments.map((attachment) => `${this.cardName(attachment.card)} (+${attachment.combatBonus})`).join(', ')}`,
+        );
+    }
     if (card.effects.length > 0)
       facts.push(...card.effects.map((effect) => `Эффект: ${this.cardEffectLabel(effect)}`));
     for (const modifier of card.monster?.modifiers ?? [])

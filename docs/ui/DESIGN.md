@@ -209,6 +209,12 @@ Tapping it opens full history. `GameLogEntryView` contains sequence, turn, phase
 and visibility but no wall-clock timestamp, so the UI must not show invented
 "minutes ago" labels.
 
+When the stage is already presenting a card receipt, the nearby recent-events
+surface skips that exact event sequence and shows the next distinct useful
+event. Typed reward count and private-receipt events map to one player-facing
+reward item. This is presentation filtering only: it never removes authoritative
+events from the serialized history.
+
 ### Stage
 
 Owns the dominant card or decision. The stage is not a scroll container. Long
@@ -227,6 +233,13 @@ the rest through a clearly labeled bounded sheet.
 Shows self level, total projected combat power, compact public role/equipment
 facts, and hand count. Tapping it opens the existing detailed character sheet.
 It is a summary, not an alternative equipment rules implementation.
+
+Equipped items show an enhancement marker when they host attachment cards and a
+passive marker when typed conditional behavior is present. Opening the normal
+card Details sheet shows attached card artwork/names, each attachment's projected
+contribution, and the host's server-resolved contribution. Blocking card choices
+use the same local card artwork and a separate info affordance from selection;
+only the decision owner receives those private candidate-card details.
 
 ### Hand dock
 

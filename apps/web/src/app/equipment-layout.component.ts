@@ -59,9 +59,22 @@ export interface EquipmentLayoutLabels {
       @if (twoHandedCard(); as card) {
         <div class="slot hands two-handed">
           <small>{{ labels().leftHand }} + {{ labels().rightHand }}</small>
-          <button type="button" (click)="cardOpened.emit(card)">
+          <button
+            type="button"
+            [class.enhanced]="isEnhanced(card)"
+            [class.passive]="hasPassiveEffect(card)"
+            (click)="cardOpened.emit(card)"
+          >
             <strong>{{ cardName()(card) }}</strong
-            ><span>{{ labels().twoHanded }}</span>
+            ><span>{{ labels().twoHanded }} · {{ resolvedBonus(card) }}</span>
+            @if (isEnhanced(card)) {
+              <small class="chip enhanced-chip"
+                >Усилено · {{ card.equipped!.attachments.length }}</small
+              >
+            }
+            @if (hasPassiveEffect(card)) {
+              <small class="chip passive-chip">Пассив</small>
+            }
           </button>
         </div>
       } @else {
@@ -77,9 +90,22 @@ export interface EquipmentLayoutLabels {
     </div>
     <ng-template #slot let-card="card">
       @if (card) {
-        <button type="button" (click)="cardOpened.emit(card)">
+        <button
+          type="button"
+          [class.enhanced]="isEnhanced(card)"
+          [class.passive]="hasPassiveEffect(card)"
+          (click)="cardOpened.emit(card)"
+        >
           <strong>{{ cardName()(card) }}</strong
-          ><span>+{{ cardCombatBonus(card) }}</span>
+          ><span>{{ resolvedBonus(card) }}</span>
+          @if (isEnhanced(card)) {
+            <small class="chip enhanced-chip"
+              >Усилено · {{ card.equipped!.attachments.length }}</small
+            >
+          }
+          @if (hasPassiveEffect(card)) {
+            <small class="chip passive-chip">Пассив</small>
+          }
         </button>
       } @else {
         <span class="empty">{{ labels().empty }}</span>
@@ -181,6 +207,29 @@ export interface EquipmentLayoutLabels {
       color: #efc66d;
       white-space: nowrap;
     }
+    button.enhanced {
+      border-left: 3px solid #efc66d;
+    }
+    button.passive {
+      box-shadow: inset 0 0 0 1px rgba(106, 190, 164, 0.62);
+    }
+    .chip {
+      display: inline-flex;
+      width: fit-content;
+      padding: 0.12rem 0.3rem;
+      border-radius: 999px;
+      font-size: 0.58rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .enhanced-chip {
+      color: #30200b;
+      background: #efc66d;
+    }
+    .passive-chip {
+      color: #d0f3e6;
+      background: #245849;
+    }
     .empty {
       display: grid;
       min-height: 2.75rem;
@@ -216,6 +265,19 @@ export class EquipmentLayoutComponent {
 
   cardCombatBonus(card: GameCardView): number {
     return card.equipment?.combatBonus ?? card.companion?.combatBonus ?? 0;
+  }
+
+  resolvedBonus(card: GameCardView): string {
+    const bonus = card.equipped?.resolvedCombatBonus ?? this.cardCombatBonus(card);
+    return `${bonus >= 0 ? '+' : ''}${bonus}`;
+  }
+
+  isEnhanced(card: GameCardView): boolean {
+    return (card.equipped?.attachments.length ?? 0) > 0;
+  }
+
+  hasPassiveEffect(card: GameCardView): boolean {
+    return card.equipment?.modifier !== undefined || card.companion?.modifier !== undefined;
   }
 
   roleCards(role: 'CLASS' | 'RACE'): readonly GameCardView[] {

@@ -144,6 +144,9 @@ describe('GameShellComponent', () => {
       }),
     );
     expect((other.nativeElement as HTMLElement).textContent).toContain('Ходит Grace');
+    expect(
+      (other.nativeElement as HTMLElement).querySelector('.turn-line strong')?.textContent,
+    ).toContain('Ходит Grace');
   });
 
   it('keeps an empty action dock silent on the viewer’s turn', () => {
@@ -326,6 +329,101 @@ describe('GameShellComponent', () => {
     expect(events).toHaveLength(5);
   });
 
+  it('uses the next distinct event when the stage already shows a played card', () => {
+    const played = card({ instanceId: 'played', name: 'Visible play' });
+    const root = render(
+      base({
+        phase: 'POST_DOOR',
+        gameLog: [
+          {
+            sequence: 1,
+            turnNumber: 1,
+            phase: 'POST_DOOR',
+            type: 'CARD_PLAYED',
+            visibility: 'PUBLIC',
+            playerId: 'p1',
+            card: played,
+          },
+        ],
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'POST_DOOR',
+              type: 'CARD_PLAYED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              card: played,
+              priority: 'IMPORTANT',
+              summaryCode: 'CARD_PLAYED',
+              requiresViewerAction: false,
+            },
+            {
+              sequence: 2,
+              turnNumber: 1,
+              phase: 'POST_DOOR',
+              type: 'TURN_STARTED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              priority: 'IMPORTANT',
+              summaryCode: 'TURN_STARTED',
+              requiresViewerAction: false,
+            },
+          ],
+          routine: [],
+        },
+      }),
+    ).nativeElement as HTMLElement;
+
+    expect(root.querySelector('app-game-stage')?.textContent).toContain('Visible play');
+    expect(root.querySelector('app-recent-events')?.textContent).not.toContain('Visible play');
+    expect(root.querySelector('app-recent-events')?.textContent).toContain('Ход: Ada');
+  });
+
+  it('shows authoritative enhancement and passive facts on equipped item details', () => {
+    const enhancer = card({
+      instanceId: 'enhancer',
+      name: 'Polished Pommel',
+      type: 'ATTACHMENT',
+      attachment: { allowedTags: ['BLADE'], combatBonus: 2 },
+    });
+    const weapon = card({
+      instanceId: 'weapon',
+      name: 'Quiet Rapier',
+      type: 'EQUIPMENT',
+      equipment: {
+        slot: 'HANDS',
+        hands: 1,
+        combatBonus: 2,
+        restrictions: [],
+        value: 300,
+        modifier: { type: 'COMBAT_POWER', amount: 1, conditions: [] },
+      },
+      equipped: {
+        resolvedCombatBonus: 5,
+        attachments: [{ card: enhancer, combatBonus: 2 }],
+      },
+    });
+    const self = player({ combatPower: 7, equipment: [weapon] });
+    const fixture = render(base({ players: [self], self: { ...self, hand: [] } }));
+    const root = fixture.nativeElement as HTMLElement;
+
+    root.querySelector<HTMLButtonElement>('.player')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.equipment-grid .hands')?.textContent).toContain('Усилено');
+    expect(root.querySelector('.equipment-grid .hands')?.textContent).toContain('Пассив');
+    expect(root.textContent).toContain('сила 7');
+    root.querySelector<HTMLButtonElement>('.equipment-grid .hands button')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.equipment-detail')?.textContent).toContain(
+      'Итоговый вклад: +5 силы',
+    );
+    expect(root.querySelector('.equipment-detail')?.textContent).toContain('Polished Pommel');
+    expect(root.querySelector('.equipment-detail')?.textContent).toContain('Пассивный эффект');
+  });
+
   it('shows winning/losing score difference, multi-monster focus, reward and visible Bad Stuff', () => {
     const root = render(
       base({
@@ -474,6 +572,7 @@ describe('GameShellComponent', () => {
         count: 1,
         sourceCard: monster,
         selectableCardIds: ['a', 'b'],
+        selectableCards: [a, b],
         expiresAtEpochMs: 10_000,
       },
       availableIntents: [
@@ -491,8 +590,16 @@ describe('GameShellComponent', () => {
     const fixture = render(game);
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('[data-stage="BLOCKING_DECISION"]')).not.toBeNull();
-    root.querySelector<HTMLButtonElement>('.picker-grid button')!.click();
+    expect(root.querySelector('.decision-count')?.textContent).toContain('Выбрано 0 из 1');
+    root.querySelector<HTMLButtonElement>('.decision-card-artwork')!.click();
     fixture.detectChanges();
+    expect(root.querySelector('.card-details')?.textContent).toContain('A useful effect');
+    expect(root.querySelector('.decision-count')?.textContent).toContain('Выбрано 0 из 1');
+    root.querySelector<HTMLButtonElement>('[aria-label="Закрыть описание карты"]')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.decision-card-select')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.decision-count')?.textContent).toContain('Выбрано 1 из 1');
     Array.from(root.querySelectorAll<HTMLButtonElement>('.decision-sheet footer button'))
       .find((button) => button.textContent?.includes('Подтвердить'))!
       .click();

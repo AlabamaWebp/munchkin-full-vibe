@@ -3,6 +3,7 @@ import {
   latestStageCardEvent,
   presentEvents,
   selectStage,
+  stageExplainedEventSequences,
   unavailableReason,
 } from './game-ui.model';
 
@@ -215,6 +216,64 @@ describe('game UI state mapper', () => {
     const events = presentEvents(game);
     expect(events[0]?.summary).toContain('Clockwork Yak');
     expect(events[0]?.priority).toBe('IMPORTANT');
+  });
+  it('keeps a combat Treasure reward as one typed presentation outcome', () => {
+    const rewards = presentEvents(
+      view({
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'END_TURN',
+              type: 'TREASURE_GAINED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              count: 5,
+              priority: 'IMPORTANT',
+              summaryCode: 'TREASURE_GAINED',
+              requiresViewerAction: false,
+            },
+            {
+              sequence: 2,
+              turnNumber: 1,
+              phase: 'END_TURN',
+              type: 'COMBAT_REWARD_CARDS',
+              visibility: 'PRIVATE',
+              playerId: 'p1',
+              cards: [card({ instanceId: 'reward' })],
+              count: 5,
+              priority: 'IMPORTANT',
+              summaryCode: 'COMBAT_REWARD_CARDS',
+              requiresViewerAction: false,
+            },
+          ],
+          routine: [],
+        },
+      }),
+    );
+
+    expect(rewards.map((event) => event.entry.type)).toEqual(['COMBAT_REWARD_CARDS']);
+  });
+  it('marks the current stage card receipt so a nearby event strip can skip it', () => {
+    const stageCard = card({ instanceId: 'stage-card', name: 'Visible item' });
+    const game = view({
+      phase: 'POST_DOOR',
+      gameLog: [
+        {
+          sequence: 7,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'CARD_PLAYED',
+          visibility: 'PUBLIC',
+          playerId: 'p1',
+          card: stageCard,
+        },
+      ],
+    });
+
+    expect(stageExplainedEventSequences(game)).toEqual([7]);
   });
   it('shows who a targeted curse was played on', () => {
     const events = presentEvents(

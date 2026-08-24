@@ -376,6 +376,17 @@ export interface GameCardView {
     readonly allowedDefinitionIds?: readonly string[];
     readonly combatBonus: number;
   };
+  /**
+   * Present only while this Equipment card is publicly equipped. Values are
+   * resolved by the server for the owning character's current game state.
+   */
+  readonly equipped?: {
+    readonly resolvedCombatBonus: number;
+    readonly attachments: readonly {
+      readonly card: GameCardView;
+      readonly combatBonus: number;
+    }[];
+  };
 }
 
 export type GameEffectView =
@@ -895,6 +906,8 @@ export interface GameView {
         readonly count: number;
         readonly sourceCard: GameCardView;
         readonly selectableCardIds: readonly string[];
+        /** Full presentation is deliberately projected only to the decision owner. */
+        readonly selectableCards?: readonly GameCardView[];
         readonly expiresAtEpochMs: number;
       }
     | {
@@ -903,6 +916,8 @@ export interface GameView {
         readonly playerId: string;
         readonly role: "CLASS" | "RACE";
         readonly selectableCardIds: readonly string[];
+        /** Full presentation is deliberately projected only to the decision owner. */
+        readonly selectableCards?: readonly GameCardView[];
         readonly expiresAtEpochMs: number;
       }
     | null;

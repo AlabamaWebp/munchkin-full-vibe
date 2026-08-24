@@ -213,6 +213,20 @@ describe('createGameView', () => {
         attachedToCardId: host.instanceId,
       },
     ]);
+    expect(view.players[0]?.equipment[0]).toMatchObject({
+      instanceId: host.instanceId,
+      equipped: {
+        resolvedCombatBonus: expect.any(Number),
+        attachments: [
+          {
+            card: expect.objectContaining({
+              instanceId: attachment.instanceId,
+            }),
+            combatBonus: 1,
+          },
+        ],
+      },
+    });
     expect(
       view.gameLog.find(
         (entry) =>
@@ -691,11 +705,24 @@ describe('createGameView', () => {
     expect(adaView.pendingDecision?.selectableCardIds).toEqual(
       state.players[0]?.hand.map((card) => card.instanceId),
     );
+    expect(adaView.pendingDecision?.selectableCards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          instanceId: state.players[0]?.hand[0]?.instanceId,
+          artKey: expect.any(String),
+          name: expect.any(String),
+        }),
+      ]),
+    );
     expect(bobView.pendingDecision).toMatchObject({
       playerId: adaId,
       count: 1,
       selectableCardIds: [],
     });
+    expect(bobView.pendingDecision?.selectableCards).toBeUndefined();
+    expect(JSON.stringify(bobView)).not.toContain(
+      state.players[0]?.hand[0]?.name ?? '__missing_private_card__',
+    );
     expect(adaView.availableIntents).toContainEqual(
       expect.objectContaining({ kind: 'RESOLVE_CARD_DISCARD' }),
     );

@@ -105,6 +105,9 @@ current `AvailableIntentView`.
 - `GameView` is the audience-filtered snapshot: public players, viewer’s full
   self state, combat/pending workflow view, allowed intents, filtered history,
   event presentation, deck counts, expected action, and unavailability reasons.
+  Pending-choice card presentation is supplied only to the addressed viewer;
+  equipped public item views include attachment relationships and a
+  server-resolved contribution for Details.
 
 ### Cards, sets, and mechanics data
 

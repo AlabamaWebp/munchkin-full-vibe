@@ -71,7 +71,12 @@ their own card identities but other hands only counts, filters private log
 events, hides future deck cards, and exposes public zones/cards. The view also
 contains all currently legal viewer actions as `AvailableIntentView`, expected
 actor information, unavailable-card reason codes, and authoritative event
-presentation priority. Angular must not recreate those permissions locally.
+presentation priority. A pending decision includes full selectable-card
+presentation only for its addressed player; observers receive no private-card
+identity. Equipped-card views nest their public attachment cards and a
+server-resolved contribution so Details can explain a host item without client
+power calculation. Angular must not recreate those permissions or relationships
+locally.
 
 ## Rules execution and time
 
@@ -90,8 +95,9 @@ Role ability usage is a generic JSON-safe player ledger scoped to a turn number
 or combat id; there is no per-role state machine. The projection supplies exact
 cost-card ids, targets, combat addresses, and reaction-window addresses.
 `GameCardView` carries the rule-bearing fields needed by Details plus a
-server-derived duration category, so Angular formats metadata but does not
-evaluate gameplay rules.
+server-derived duration category. An equipped instance additionally carries its
+attached enhancers and resolved current contribution where applicable, so
+Angular formats metadata but does not evaluate gameplay rules.
 
 Randomness comes from an injected `RandomSource`; tests provide deterministic
 sources. A `Clock` is likewise injected. Blocking reaction windows, help offers,

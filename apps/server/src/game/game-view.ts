@@ -24,6 +24,7 @@ import {
   equipmentRestriction,
   GamePhase,
   HAND_LIMIT,
+  resolveConditionalModifier,
   type CardInstance,
   type GameLogEntry,
   type GameState,
@@ -124,6 +125,69 @@ function cardView(state: GameState, card: CardInstance): GameCardView {
     ...(definition.attachment === undefined
       ? {}
       : { attachment: definition.attachment }),
+  };
+}
+
+function equippedCardView(
+  state: GameState,
+  player: GameState['players'][number],
+  card: CardInstance,
+): GameCardView {
+  const base = cardView(state, card);
+  const attachments = player.equipmentAttachments
+    .filter((attachment) => attachment.attachedToCardId === card.instanceId)
+    .map((attachment) => {
+      const attachmentView = cardView(state, attachment.card);
+      return {
+        card: attachmentView,
+        combatBonus: attachmentView.attachment?.combatBonus ?? 0,
+      };
+    });
+  const definition = state.cardDefinitions.find(
+    (candidate) => candidate.id === card.definitionId,
+  );
+  const passiveContribution =
+    definition?.equipment?.modifier === undefined
+      ? 0
+      : (state.combat === null
+          ? [undefined]
+          : state.combat.monsters.map((monster) =>
+              state.cardDefinitions.find(
+                (candidate) => candidate.id === monster.monster.definitionId,
+              ),
+            )
+        ).reduce(
+          (total, monster) =>
+            total +
+            resolveConditionalModifier(definition.equipment!.modifier!, {
+              state,
+              player,
+              monster,
+              card: definition,
+              combatSidePlayerIds:
+                state.combat === null
+                  ? undefined
+                  : [
+                      state.combat.playerId,
+                      ...(state.combat.helpAgreement === null
+                        ? []
+                        : [state.combat.helpAgreement.helperId]),
+                    ],
+            }),
+          0,
+        );
+  return {
+    ...base,
+    equipped: {
+      resolvedCombatBonus:
+        (base.equipment?.combatBonus ?? 0) +
+        attachments.reduce(
+          (total, attachment) => total + attachment.combatBonus,
+          0,
+        ) +
+        passiveContribution,
+      attachments,
+    },
   };
 }
 
@@ -1394,7 +1458,9 @@ export function createGameView(
     ...(player.color === undefined ? {} : { color: player.color }),
     level: player.level,
     handCount: player.hand.length,
-    equipment: player.equipment.map((card) => cardView(state, card)),
+    equipment: player.equipment.map((card) =>
+      equippedCardView(state, player, card),
+    ),
     equipmentAttachments: player.equipmentAttachments.map((attachment) => ({
       card: cardView(state, attachment.card),
       attachedToCardId: attachment.attachedToCardId,
@@ -1661,6 +1727,19 @@ export function createGameView(
                       : self.equipment
                     ).map((card) => card.instanceId)
                   : [],
+              ...(state.pendingDecision.playerId === viewerPlayerId
+                ? {
+                    selectableCards: (state.pendingDecision.zone === 'HAND'
+                      ? self.hand
+                      : self.equipment
+                    ).map((card) =>
+                      state.pendingDecision?.type === 'DISCARD_CARDS' &&
+                      state.pendingDecision.zone === 'EQUIPMENT'
+                        ? equippedCardView(state, self, card)
+                        : cardView(state, card),
+                    ),
+                  }
+                : {}),
               expiresAtEpochMs: state.pendingDecision.expiresAtEpochMs,
             }
           : {
@@ -1672,6 +1751,13 @@ export function createGameView(
                 state.pendingDecision.playerId === viewerPlayerId
                   ? state.pendingDecision.candidateCardIds
                   : [],
+              ...(state.pendingDecision.playerId === viewerPlayerId
+                ? {
+                    selectableCards: state.pendingDecision.candidateCardIds.map(
+                      (cardId) => requiredLogCard(state, cardId),
+                    ),
+                  }
+                : {}),
               expiresAtEpochMs: state.pendingDecision.expiresAtEpochMs,
             },
     curseResponse:

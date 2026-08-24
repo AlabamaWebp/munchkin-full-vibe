@@ -40,6 +40,13 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-24: refined in-game information architecture around the authoritative
+  `GameView`: pending decisions now project visual candidate-card metadata only
+  to the addressed player; equipped item projections nest enhancer cards and
+  server-resolved contributions; Details exposes typed passive facts. The mobile
+  shell now separates card inspection from selection, names every active player
+  in the turn bar, and filters only typed/sequence-known duplicate event
+  presentations while keeping reconnect-safe domain history intact.
 - 2026-08-24: expanded the selectable catalog with three original optional
   fantasy-inspired packs: Classic Fantasy, Clerical Errors, and Steed &
   Hirelings. Their mechanics reuse the role, attachment, companion, protection,

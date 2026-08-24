@@ -10,7 +10,7 @@ import type { ConnectionState } from './lobby-client';
       <div class="turn-line">
         <div>
           <strong>{{
-            game().activePlayerId === game().viewerPlayerId ? 'Ваш ход' : 'Бой: ' + activeName()
+            game().activePlayerId === game().viewerPlayerId ? 'Ваш ход' : 'Ходит ' + activeName()
           }}</strong>
           <span>Ход {{ game().turnNumber }} · {{ phaseLabel() }}</span>
         </div>
