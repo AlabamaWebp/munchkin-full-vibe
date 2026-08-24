@@ -39,6 +39,21 @@ describe('GameService equipment transport', () => {
         message: 'A valid card id is required.',
       },
     });
+
+    expect(
+      service.execute('ABCD', 'player-1', {
+        type: 'USE_ROLE_ABILITY',
+        roleCardId: '   ',
+        costCardIds: [],
+        target: { type: 'SELF' },
+      }),
+    ).toEqual({
+      success: false,
+      error: {
+        code: 'INVALID_TARGET',
+        message: 'A role ability requires a valid target and unique costs.',
+      },
+    });
   });
 
   it('does not replace an unfinished game with a rematch', () => {

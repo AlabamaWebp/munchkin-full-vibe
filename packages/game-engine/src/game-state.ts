@@ -62,8 +62,8 @@ export type ActiveEffect =
       readonly type: "RUN_AWAY_ROLL";
       readonly sourceDefinitionId: CardDefinitionId;
       readonly amount: number;
-      readonly expires: "END_OF_TARGET_NEXT_TURN";
-      readonly targetTurnNumber: number;
+      readonly expires: "END_OF_COMBAT" | "END_OF_TARGET_NEXT_TURN";
+      readonly targetTurnNumber?: number;
     }
   | {
       readonly type: "SLOT_LOCK";
@@ -72,6 +72,14 @@ export type ActiveEffect =
       readonly expires: "END_OF_TARGET_NEXT_TURN";
       readonly targetTurnNumber: number;
     };
+
+export interface AbilityUsageState {
+  readonly sourceCardId: CardInstanceId;
+  readonly sourceDefinitionId: CardDefinitionId;
+  readonly scope:
+    | { readonly type: "TURN"; readonly turnNumber: number }
+    | { readonly type: "COMBAT"; readonly combatId: CombatId };
+}
 
 export interface PlayerState {
   readonly id: PlayerId;
@@ -92,6 +100,8 @@ export interface PlayerState {
   readonly mountCard: CardInstance | null;
   readonly isDead: boolean;
   readonly activeEffects: readonly ActiveEffect[];
+  /** Generic serializable once-per-turn/once-per-combat usage ledger. */
+  readonly abilityUsages?: readonly AbilityUsageState[];
 }
 
 export interface CombatState {
@@ -216,6 +226,15 @@ export type CombatHistoryEntry =
       readonly side: "PLAYERS" | "MONSTER";
       readonly encounterId?: EncounterId;
       readonly targetPlayerId?: PlayerId;
+    }
+  | {
+      readonly type: "ROLE_ABILITY_USED";
+      readonly playerId: PlayerId;
+      readonly roleCardId: CardInstanceId;
+      readonly roleDefinitionId: CardDefinitionId;
+      readonly abilityType: "COMBAT_BONUS" | "RUN_AWAY_BONUS";
+      readonly side: "PLAYERS";
+      readonly amount: number;
     }
   | {
       readonly type: "MONSTER_ADDED";

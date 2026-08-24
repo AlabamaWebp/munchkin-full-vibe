@@ -274,6 +274,17 @@ export type GameEvent =
       readonly target: CardTarget | null;
     })
   | (PublicEvent & {
+      readonly type: "ROLE_ABILITY_USED";
+      readonly playerId: PlayerId;
+      readonly roleCardId: CardInstanceId;
+      readonly roleDefinitionId: CardDefinitionId;
+      readonly abilityType: "COMBAT_BONUS" | "RUN_AWAY_BONUS" | "DRAW_CARDS";
+      readonly discardedCount: number;
+      readonly amount?: number;
+      readonly deck?: DeckType;
+      readonly drawCount?: number;
+    })
+  | (PublicEvent & {
       readonly type: "ITEM_EQUIPPED";
       readonly playerId: PlayerId;
       readonly cardId: CardInstanceId;

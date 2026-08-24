@@ -14,6 +14,10 @@ import type {
   AvailableIntentView,
   GameCardView,
   GameClientCommand,
+  GameConditionView,
+  GameEffectView,
+  GameModifierView,
+  GameRoleAbilityView,
   GameView,
 } from '@munchkin-lan/contracts';
 import { ActionDockComponent, type ActionDockUtilityAction } from './action-dock.component';
@@ -48,6 +52,7 @@ interface CardUse {
   readonly label: string;
   readonly command?: GameClientCommand;
   readonly picker?: TargetPickerState;
+  readonly roleAbility?: Extract<AvailableIntentView, { readonly kind: 'USE_ROLE_ABILITY' }>;
 }
 
 @Component({
@@ -298,6 +303,52 @@ interface CardUse {
                 </button>
               }
             </div>
+          </section>
+        </div>
+      }
+
+      @if (roleAbilityIntent(); as intent) {
+        <div class="backdrop">
+          <section
+            class="sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ability-cost-title"
+          >
+            <header>
+              <div>
+                <small>ЦЕНА СПОСОБНОСТИ</small>
+                <h2 id="ability-cost-title">Сбросьте {{ intent.cost.count }} карт.</h2>
+              </div>
+              <button type="button" aria-label="Закрыть выбор" (click)="closeRoleAbility()">
+                ×
+              </button>
+            </header>
+            <div class="sheet-scroll option-list">
+              @for (cardId of intent.cost.eligibleCardIds; track cardId) {
+                <button
+                  type="button"
+                  [class.selected]="roleAbilityCostSelection().includes(cardId)"
+                  (click)="toggleRoleAbilityCost(cardId, intent.cost.count)"
+                >
+                  <strong>{{ ownCardName(cardId) }}</strong>
+                  <small>{{
+                    roleAbilityCostSelection().includes(cardId) ? 'Выбрано' : 'Нажмите для выбора'
+                  }}</small>
+                </button>
+              }
+            </div>
+            <footer>
+              <button
+                type="button"
+                class="primary"
+                [disabled]="roleAbilityCostSelection().length !== intent.cost.count"
+                (click)="confirmRoleAbility(intent)"
+              >
+                Применить способность
+              </button>
+            </footer>
           </section>
         </div>
       }
@@ -1052,6 +1103,11 @@ export class GameShellComponent {
   protected readonly charityRecipientId = signal<string | null>(null);
   protected readonly targetPicker = signal<TargetPickerState | null>(null);
   protected readonly cardUses = signal<readonly CardUse[] | null>(null);
+  protected readonly roleAbilityIntent = signal<Extract<
+    AvailableIntentView,
+    { readonly kind: 'USE_ROLE_ABILITY' }
+  > | null>(null);
+  protected readonly roleAbilityCostSelection = signal<readonly string[]>([]);
   protected readonly selectedHelperId = signal<string | null>(null);
   protected readonly helpTreasure = signal(0);
   protected readonly decisionSelection = signal<readonly string[]>([]);
@@ -1156,6 +1212,47 @@ export class GameShellComponent {
     if (use.command?.type !== 'EQUIP_ITEM') this.fullHandOpen.set(false);
     if (use.command) this.send(use.command);
     else if (use.picker) this.targetPicker.set(use.picker);
+    else if (use.roleAbility) {
+      this.roleAbilityCostSelection.set([]);
+      this.roleAbilityIntent.set(use.roleAbility);
+    }
+  }
+
+  protected toggleRoleAbilityCost(cardId: string, maximum: number): void {
+    this.roleAbilityCostSelection.update((ids) =>
+      ids.includes(cardId)
+        ? ids.filter((id) => id !== cardId)
+        : ids.length < maximum
+          ? [...ids, cardId]
+          : ids,
+    );
+  }
+
+  protected closeRoleAbility(): void {
+    this.roleAbilityIntent.set(null);
+    this.roleAbilityCostSelection.set([]);
+  }
+
+  protected confirmRoleAbility(
+    intent: Extract<AvailableIntentView, { readonly kind: 'USE_ROLE_ABILITY' }>,
+  ): void {
+    if (this.roleAbilityCostSelection().length !== intent.cost.count) return;
+    this.send({
+      type: 'USE_ROLE_ABILITY',
+      roleCardId: intent.roleCardId,
+      costCardIds: this.roleAbilityCostSelection(),
+      target: intent.target,
+      ...('combatId' in intent
+        ? {
+            combatId: intent.combatId,
+            combatRevision: intent.combatRevision,
+            ...(intent.reactionWindowId === undefined
+              ? {}
+              : { reactionWindowId: intent.reactionWindowId }),
+          }
+        : {}),
+    });
+    this.closeRoleAbility();
   }
 
   protected chooseTarget(picker: TargetPickerState, id: string): void {
@@ -1516,6 +1613,7 @@ export class GameShellComponent {
 
   protected cardFacts(card: GameCardView): readonly string[] {
     const facts: string[] = [];
+    facts.push(`Длительность: ${this.durationLabel(card.duration)}`);
     if (card.monster) {
       facts.push(
         `Сила: ${card.monster.strength ?? card.monster.level ?? 0}`,
@@ -1533,6 +1631,35 @@ export class GameShellComponent {
         `Слот: ${this.slotLabel(card.equipment.slot)}`,
         `Руки: ${card.equipment.hands}`,
       );
+    if (card.effects.length > 0)
+      facts.push(...card.effects.map((effect) => `Эффект: ${this.cardEffectLabel(effect)}`));
+    for (const modifier of card.monster?.modifiers ?? [])
+      facts.push(`Пассив монстра: ${this.modifierLabel(modifier)}`);
+    if (card.equipment?.modifier)
+      facts.push(`Пассив снаряжения: ${this.modifierLabel(card.equipment.modifier)}`);
+    if (card.companion)
+      facts.push(
+        `Спутник: +${card.companion.combatBonus} к боевой силе${card.companion.modifier ? `; ${this.modifierLabel(card.companion.modifier)}` : ''}`,
+      );
+    if (card.role?.modifier) facts.push(`Пассив роли: ${this.modifierLabel(card.role.modifier)}`);
+    if (card.role?.activeAbility)
+      facts.push(`Активная способность: ${this.roleAbilityLabel(card.role.activeAbility)}`);
+    if (card.curse)
+      facts.push(
+        `Тяжесть проклятия: ${{ EARLY: 'ранняя', MID: 'средняя', LATE: 'поздняя' }[card.curse.severity]}`,
+      );
+    if (card.curseProtection)
+      facts.push(
+        `Защита: ${card.curseProtection.mode === 'CANCEL' ? 'отменяет подходящее проклятие' : 'защищает один подходящий предмет'}${card.curseProtection.conditions?.length ? ` (${card.curseProtection.conditions.map((condition) => this.conditionLabel(condition)).join(' и ')})` : ''}`,
+      );
+    if (card.rolePermission)
+      facts.push(
+        `Постоянно разрешает ещё одну роль: ${card.rolePermission.role === 'CLASS' ? 'Класс' : 'Раса'}`,
+      );
+    if (card.attachment)
+      facts.push(
+        `Прикрепление: +${card.attachment.combatBonus}; цели с метками ${card.attachment.allowedTags.map((tag) => this.tagLabel(tag)).join(', ')}`,
+      );
     if (card.goldValue) facts.push(`Цена: ${card.goldValue}`);
     if (card.sellable === false) facts.push('Не продаётся');
     if (card.sellable === true) facts.push('Можно продать');
@@ -1548,16 +1675,106 @@ export class GameShellComponent {
       );
     return facts;
   }
+  private durationLabel(duration: GameCardView['duration']): string {
+    return (
+      {
+        ONE_SHOT: 'одноразовая',
+        END_OF_COMBAT: 'до конца боя',
+        WHILE_EQUIPPED: 'пока надето',
+        WHILE_ROLE_ACTIVE: 'пока роль активна',
+        WHILE_IN_SLOT: 'пока спутник в слоте',
+        WHILE_ATTACHED: 'пока прикреплено',
+        WHILE_IN_PLAY: 'пока карта в игре',
+        ENCOUNTER_PASSIVE: 'пассивно в столкновении',
+      } as const
+    )[duration];
+  }
+  private cardEffectLabel(effect: GameEffectView): string {
+    switch (effect.type) {
+      case 'COMBAT_BONUS':
+        return `${effect.amount >= 0 ? '+' : ''}${effect.amount} стороне игроков`;
+      case 'COMBAT_SIDE_BONUS':
+        return `${effect.amount >= 0 ? '+' : ''}${effect.amount} выбранной стороне боя`;
+      case 'MONSTER_COMBAT_BONUS':
+        return `${effect.amount >= 0 ? '+' : ''}${effect.amount} выбранному монстру`;
+      case 'MODIFY_MONSTER':
+        return `${effect.strength >= 0 ? '+' : ''}${effect.strength} силы и ${effect.treasures >= 0 ? '+' : ''}${effect.treasures} сокровищ выбранному монстру`;
+      case 'ADD_MONSTER_TO_COMBAT':
+        return 'добавляет выбранного монстра из руки в бой';
+      case 'CLONE_COMBAT_MONSTER':
+        return 'создаёт копию выбранного монстра в бою';
+      case 'GAIN_LEVEL':
+        return `получить ${effect.amount} уровень`;
+      case 'LOSE_LEVEL':
+        return `потерять ${effect.amount} уровень`;
+      case 'DRAW_CARDS':
+        return `взять ${effect.count} из колоды ${effect.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}`;
+      case 'DISCARD_RANDOM_CARDS':
+      case 'DISCARD_CHOSEN_CARDS':
+        return `${effect.type === 'DISCARD_RANDOM_CARDS' ? 'случайно ' : ''}сбросить ${effect.count} из ${effect.zone === 'HAND' ? 'руки' : 'снаряжения'}`;
+      case 'DISCARD_ROLE':
+        return `сбросить ${effect.role === 'CLASS' ? 'Класс' : 'Расу'}`;
+      case 'DEATH':
+        return 'погибнуть';
+    }
+  }
+  private conditionLabel(condition: GameConditionView): string {
+    switch (condition.type) {
+      case 'PLAYER_HAS_CLASS':
+      case 'PLAYER_HAS_RACE':
+      case 'CARD_DEFINITION_IS':
+        return `при наличии ${condition.anyOf.map((id) => this.localization.definitionName(id)).join(' или ')}`;
+      case 'PLAYER_SEX_IS':
+        return condition.sex === 'MALE' ? 'для мужчины' : 'для женщины';
+      case 'MONSTER_HAS_TAG':
+        return `против ${condition.anyOf.map((tag) => this.tagLabel(tag)).join(' или ')}`;
+      case 'EQUIPPED_HAS_TAG':
+        return `при ${condition.atLeast}+ предметах ${condition.anyOf.map((tag) => this.tagLabel(tag)).join(' или ')}`;
+      case 'CURSE_MATCHES':
+        return `для подходящего проклятия${condition.anyTag?.length ? ` (${condition.anyTag.map((tag) => this.tagLabel(tag)).join(' или ')})` : ''}`;
+    }
+  }
+  private modifierLabel(modifier: GameModifierView): string {
+    const conditions =
+      modifier.conditions.length === 0
+        ? ''
+        : `, ${modifier.conditions.map((condition) => this.conditionLabel(condition)).join(' и ')}`;
+    switch (modifier.type) {
+      case 'COMBAT_POWER':
+        return `${modifier.amount >= 0 ? '+' : ''}${modifier.amount} к боевой силе${conditions}`;
+      case 'EQUIPMENT_TAG_BONUS':
+        return `+${modifier.amountPerCard} за предмет ${modifier.tags.map((tag) => this.tagLabel(tag)).join(' или ')}, максимум ${modifier.maxCards}${conditions}`;
+      case 'RUN_AWAY_ROLL':
+        return `${modifier.amount >= 0 ? '+' : ''}${modifier.amount} к броску побега${conditions}`;
+      case 'AUTOMATIC_PROTECTION':
+        return `автоматическая защита ${modifier.protection}${conditions}`;
+    }
+  }
+  private roleAbilityLabel(ability: GameRoleAbilityView): string {
+    const cost = `сбросить ${ability.cost.count} карт из руки`;
+    if (ability.type === 'DRAW_CARDS')
+      return `${cost}, взять ${ability.count} из колоды ${ability.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}; один раз за ход`;
+    if (ability.type === 'RUN_AWAY_BONUS')
+      return `${cost}, получить ${ability.amount >= 0 ? '+' : ''}${ability.amount} к своему броску побега; один раз за бой`;
+    return `${cost}, дать ${ability.amount >= 0 ? '+' : ''}${ability.amount} стороне игроков; один раз за бой`;
+  }
   protected compactHandFacts(card: GameCardView): readonly string[] {
-    const bonusEffect = card.effects.find((effect) => effect.type === 'COMBAT_BONUS');
-    const bonus =
-      card.equipment?.combatBonus ??
-      (bonusEffect?.type === 'COMBAT_BONUS' ? bonusEffect.amount : undefined);
+    const effectBonus = card.effects.flatMap((effect) => {
+      switch (effect.type) {
+        case 'COMBAT_BONUS':
+        case 'COMBAT_SIDE_BONUS':
+        case 'MONSTER_COMBAT_BONUS':
+          return [effect.amount];
+        default:
+          return [];
+      }
+    })[0];
+    const bonus = card.equipment?.combatBonus ?? effectBonus;
     const combatValue = card.monster
       ? `Сила ${card.monster.strength ?? card.monster.level ?? 0}`
       : bonus === undefined
         ? '—'
-        : `+${bonus}`;
+        : `${bonus >= 0 ? '+' : ''}${bonus}`;
     const price = card.goldValue ?? card.equipment?.value;
     return [this.compactCardType(card), combatValue, price === undefined ? '—' : `${price}`];
   }
@@ -1612,6 +1829,7 @@ export class GameShellComponent {
     return (
       {
         TURN: 'ход',
+        POST_DOOR: 'после открытия двери',
         ACTIVE_COMBAT: 'бой',
         VICTORY_REACTION: 'реакция на победу',
         WHEN_DRAWN: 'при взятии',
@@ -1625,6 +1843,7 @@ export class GameShellComponent {
         ANY_PLAYER: 'игрока',
         COMBAT_PLAYERS: 'сторону игроков',
         COMBAT_PLAYER: 'участника боя',
+        COMBAT_SIDE: 'сторону игроков или точного монстра',
         MONSTER_ENCOUNTER: 'монстра',
         HAND_MONSTER: 'монстра из руки',
         EQUIPMENT: 'снаряжение',
@@ -1652,6 +1871,7 @@ export class GameShellComponent {
   }
   @HostListener('document:keydown.escape') protected closeTopLayer(): void {
     if (this.selectedCard()) this.selectedCard.set(null);
+    else if (this.roleAbilityIntent()) this.closeRoleAbility();
     else if (this.targetPicker()) this.targetPicker.set(null);
     else if (this.cardUses()) this.cardUses.set(null);
     else if (this.selectedPlayerId()) this.selectedPlayerId.set(null);
@@ -1802,6 +2022,10 @@ export class GameShellComponent {
     const intents = game.availableIntents.filter(
       (intent) => 'cardId' in intent && intent.cardId === card.instanceId,
     );
+    const roleAbilityIntent = game.availableIntents.find(
+      (intent): intent is Extract<AvailableIntentView, { readonly kind: 'USE_ROLE_ABILITY' }> =>
+        intent.kind === 'USE_ROLE_ABILITY' && intent.roleCardId === card.instanceId,
+    );
     const lookIntent = intents.find((intent) => intent.kind === 'LOOK_FOR_TROUBLE');
     const equipIntent = intents.find((intent) => intent.kind === 'EQUIP_ITEM');
     const unequipIntent = intents.find((intent) => intent.kind === 'UNEQUIP_ITEM');
@@ -1852,6 +2076,16 @@ export class GameShellComponent {
       uses.push({
         label: card.type === 'CLASS' ? 'Сбросить класс' : 'Сбросить расу',
         command: { type: 'DISCARD_ROLE', cardId: card.instanceId },
+      });
+    if (roleAbilityIntent)
+      uses.push({
+        label:
+          roleAbilityIntent.abilityType === 'DRAW_CARDS'
+            ? 'Обменять карты'
+            : roleAbilityIntent.abilityType === 'RUN_AWAY_BONUS'
+              ? 'Подготовить побег'
+              : 'Применить боевую способность',
+        roleAbility: roleAbilityIntent,
       });
     if (roleIntent?.kind === 'PLAY_ROLE')
       uses.push({
@@ -1938,10 +2172,11 @@ export class GameShellComponent {
         },
       });
     if (monsterIntents.length > 0) {
+      const supportsEitherSide = card.play?.target === 'COMBAT_SIDE';
       uses.push(
         this.useWithTargets(
-          'Усилить монстра',
-          'Выберите монстра',
+          supportsEitherSide ? 'Помочь монстру' : 'Сыграть на монстра',
+          supportsEitherSide ? 'Помочь какому монстру?' : 'Выберите монстра',
           card,
           'MONSTER',
           monsterIntents.map((intent) => ({
@@ -2072,6 +2307,7 @@ export class GameShellComponent {
           artKey: '',
           name: '',
           description: '',
+          duration: 'ONE_SHOT',
           type: 'OTHER',
           deck: 'DOOR',
           effects: [],

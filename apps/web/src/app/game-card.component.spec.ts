@@ -8,6 +8,7 @@ const monster: GameCardView = {
   artKey: 'door.monster.long-monster',
   name: 'Monster With An Exceptionally Long Name That Must Wrap',
   description: 'A test Monster.',
+  duration: 'ENCOUNTER_PASSIVE',
   type: 'MONSTER',
   deck: 'DOOR',
   effects: [],

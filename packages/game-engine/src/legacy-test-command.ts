@@ -22,6 +22,7 @@ export function executeCommand(
   }
   const needsAddress =
     command.type === "PLAY_CARD" ||
+    command.type === "USE_ROLE_ABILITY" ||
     command.type === "DECLARE_COMBAT_VICTORY" ||
     command.type === "PASS_COMBAT_REACTION" ||
     command.type === "RUN_AWAY" ||

@@ -95,7 +95,7 @@ export function latestStageCardEvent(game: GameView): StageCardEvent | null {
               ),
             ),
           ]
-      : [receipt(entry)];
+        : [receipt(entry)];
   const latestReceipt = receipts.at(-1) ?? receipt(entry);
   return { ...latestReceipt, receipts };
 }
@@ -107,11 +107,12 @@ function combinedDrawReceipt(
   const entry = entries.at(-1);
   if (entry === undefined) throw new Error('A card-draw receipt requires an entry.');
   const cards = entries.flatMap((candidate) =>
-    candidate.card === undefined ? candidate.cards ?? [] : [candidate.card],
+    candidate.card === undefined ? (candidate.cards ?? []) : [candidate.card],
   );
   const deck = entry.deck ?? entry.hiddenCard?.deck;
   if (deck === undefined) throw new Error('A card-draw receipt requires a deck.');
-  const count = cards.length || entries.reduce((sum, candidate) => sum + (candidate.hiddenCard?.count ?? 0), 0);
+  const count =
+    cards.length || entries.reduce((sum, candidate) => sum + (candidate.hiddenCard?.count ?? 0), 0);
   return {
     entry,
     cards,
@@ -165,6 +166,8 @@ function eventSummary(game: GameView, entry: GameLogEntryView): string {
       return `${player} вступил в бой${card ? `: ${card}` : ''}`;
     case 'CARD_PLAYED':
       return `${player} сыграл ${card ?? 'карту'}${target ? ` на игрока ${target}` : ''}`;
+    case 'ROLE_ABILITY_USED':
+      return `${player} применил способность ${card ?? 'роли'}${entry.amount === undefined ? '' : ` (${entry.amount >= 0 ? '+' : ''}${entry.amount})`}`;
     case 'CARDS_DISCARDED':
       return `${player} сбросил ${entry.count ?? 0} карт`;
     case 'HELP_OFFERED':
@@ -241,7 +244,14 @@ function deckCardsLabel(deck: 'DOOR' | 'TREASURE', count: number): string {
         : last >= 2 && last <= 4
           ? 'карты'
           : 'карт';
-  const deckName = count === 1 ? (deck === 'DOOR' ? 'двери' : 'сокровища') : deck === 'DOOR' ? 'дверей' : 'сокровищ';
+  const deckName =
+    count === 1
+      ? deck === 'DOOR'
+        ? 'двери'
+        : 'сокровища'
+      : deck === 'DOOR'
+        ? 'дверей'
+        : 'сокровищ';
   return `${count} ${noun} ${deckName}`;
 }
 

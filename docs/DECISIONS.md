@@ -571,3 +571,42 @@ Delayed LAN packets and reconnects must be harmless without moving rule logic to
 Angular. Separate stable ids preserve workflow ownership, persisted deadlines
 make waits reconstructible, and one intent/importance source prevents client and
 server permission or notification behavior from drifting.
+
+---
+
+## ADR-034 — Explainable card rules, authored combat sides, and reusable role abilities
+
+This decision intentionally refines ADR-028's separate-only temporary combat
+effects, ADR-029's catalog completeness contract, and the original V2
+one-passive-only role limit.
+
+Every production definition exposes the typed timing, target, effect and
+type-specific rule fields needed to explain its action. The player-specific card
+view includes conditions/modifiers, role abilities, protection, attachments and
+a server-derived duration category. Production catalog validation rejects an
+action whose effect and authored target disagree or whose type-specific behavior
+is missing. Angular formats these facts and projected intents; it does not infer
+legality or evaluate rules.
+
+A temporary `COMBAT_SIDE_BONUS` is the explicit opt-in for a genuinely
+side-neutral combat one-shot. Its legal targets are the player side and each
+current exact Monster encounter. Existing `COMBAT_BONUS` and
+`MONSTER_COMBAT_BONUS` remain one-sided. Every combat use carries combat id and
+revision and, during reactions, the current window id.
+
+An ordinary Class or Race may own at most one passive modifier and one active
+ability. Active abilities come from a closed reusable set: discard hand cards
+for a signed player-side combat modifier, discard for a personal Run Away
+modifier, or discard to draw authored cards. A single serializable usage ledger
+scoped by physical role card plus turn number/combat id enforces all once limits.
+The server projects exact cost-card ids and targets through
+`AvailableIntentView`; successful interventions retain their source in power
+breakdowns, events and combat history.
+
+Reason:
+
+Typed explainability prevents flavor text, names, and Angular assumptions from
+becoming hidden rules. Explicit side opt-in preserves existing card legality and
+encounter addressing. A small primitive set plus one usage mechanism gives roles
+tactical identities without bespoke workflows, client cooldowns, or
+non-serializable state.

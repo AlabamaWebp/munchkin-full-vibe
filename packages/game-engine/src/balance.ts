@@ -168,7 +168,10 @@ export function simulateBalance(
     (definition) =>
       definition.type === CardType.TEMPORARY_BONUS &&
       definition.effects.some(
-        (effect) => effect.type === "COMBAT_BONUS" && effect.amount > 0,
+        (effect) =>
+          (effect.type === "COMBAT_BONUS" ||
+            effect.type === "COMBAT_SIDE_BONUS") &&
+          effect.amount > 0,
       ),
   );
   const starters = equipment.filter(
@@ -198,7 +201,8 @@ export function simulateBalance(
         random.next() < 0.45 && positiveBonuses.length > 0
           ? positiveBonuses[random.int(positiveBonuses.length)]!.effects.reduce(
               (sum, effect) =>
-                effect.type === "COMBAT_BONUS"
+                effect.type === "COMBAT_BONUS" ||
+                effect.type === "COMBAT_SIDE_BONUS"
                   ? sum + Math.max(0, effect.amount)
                   : sum,
               0,

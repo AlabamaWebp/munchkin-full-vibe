@@ -23,6 +23,7 @@ const card = (instanceId: string, name: string): GameCardView => ({
   artKey: `test.${instanceId}`,
   name,
   description: `${name} description.`,
+  duration: 'WHILE_EQUIPPED',
   type: 'EQUIPMENT',
   deck: 'TREASURE',
   effects: [],

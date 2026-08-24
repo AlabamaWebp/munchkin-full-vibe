@@ -32,6 +32,10 @@ turn once hand-limit/charity requirements permit it.
 Definitions are data, not card-name branches. They identify deck, set, tier,
 tags, timing/target, typed effects, and any applicable equipment, Monster,
 Curse, role, companion, permission, attachment, protection, or economy data.
+The server also projects all rule-bearing conditions/modifiers and a derived
+duration category, so Details can explain an action without parsing its name or
+flavor text. Production catalog validation rejects behavior whose authored
+effect, timing, target, or type-specific rules do not agree.
 Physical copies retain separate instance identities. Door and Treasure decks are
 independent; draws are atomic, recycle only the matching discard when needed,
 and disclose no hidden identity while recycling.
@@ -50,6 +54,11 @@ serialized choice of which role to retain. Hirelings and mounts occupy their own
 public companion containers. Arsenal attachments apply only to their typed
 eligible equipment targets.
 
+An ordinary role may have at most one passive and one active ability. Active
+roles reuse discard-for-combat, discard-for-Run-Away, or discard-to-draw
+primitives. Costs and exact legal targets are projected as intents. A single
+JSON-safe usage ledger enforces once-per-turn or once-per-combat limits.
+
 Eligible positive-value Treasure can be sold under authoritative timing and
 ownership rules: every complete 1,000 gold gives one level, any remainder is
 lost, and sales cannot win the game. Trading and charity are server-authorized;
@@ -64,6 +73,12 @@ history. The player side wins only when its derived total strictly exceeds the
 combined Monster total. Temporary player bonuses, Monster modifiers, added
 Monsters, clones, and combat Curses use typed targets and the current combat
 address.
+
+Side-neutral combat boosts are explicitly authored as such and project both the
+player side and every exact Monster encounter. Player-only and Monster-only
+cards remain illegal on the other side. All choices retain combat revision and
+reaction-window stale-command protection; resulting sources appear in the
+authoritative power breakdown and combat history.
 
 An apparent win requires `DECLARE_COMBAT_VICTORY`; a reaction window lets all
 eligible players pass or intervene. The final pass atomically rechecks power and

@@ -31,6 +31,32 @@ import {
   roleCapacity,
 } from '@munchkin-lan/game-engine';
 
+function cardDuration(
+  type: GameState['cardDefinitions'][number]['type'],
+): GameCardView['duration'] {
+  switch (type) {
+    case CardType.TEMPORARY_BONUS:
+    case CardType.COMBAT_CURSE:
+      return 'END_OF_COMBAT';
+    case CardType.EQUIPMENT:
+      return 'WHILE_EQUIPPED';
+    case CardType.CLASS:
+    case CardType.RACE:
+      return 'WHILE_ROLE_ACTIVE';
+    case CardType.HIRELING:
+    case CardType.MOUNT:
+      return 'WHILE_IN_SLOT';
+    case CardType.ATTACHMENT:
+      return 'WHILE_ATTACHED';
+    case CardType.ROLE_PERMISSION:
+      return 'WHILE_IN_PLAY';
+    case CardType.MONSTER:
+      return 'ENCOUNTER_PASSIVE';
+    default:
+      return 'ONE_SHOT';
+  }
+}
+
 function cardView(state: GameState, card: CardInstance): GameCardView {
   const definition = state.cardDefinitions.find(
     (candidate) => candidate.id === card.definitionId,
@@ -46,6 +72,7 @@ function cardView(state: GameState, card: CardInstance): GameCardView {
     artKey: definition.artKey,
     name: definition.name,
     description: definition.description,
+    duration: cardDuration(definition.type),
     type: definition.type,
     deck: definition.deck,
     setId: definition.setId,
@@ -82,10 +109,21 @@ function cardView(state: GameState, card: CardInstance): GameCardView {
         }),
     ...(definition.companion === undefined
       ? {}
-      : { companion: { combatBonus: definition.companion.combatBonus } }),
+      : { companion: definition.companion }),
     ...(definition.monster === undefined
       ? {}
       : { monster: definition.monster }),
+    ...(definition.curse === undefined ? {} : { curse: definition.curse }),
+    ...(definition.curseProtection === undefined
+      ? {}
+      : { curseProtection: definition.curseProtection }),
+    ...(definition.role === undefined ? {} : { role: definition.role }),
+    ...(definition.rolePermission === undefined
+      ? {}
+      : { rolePermission: definition.rolePermission }),
+    ...(definition.attachment === undefined
+      ? {}
+      : { attachment: definition.attachment }),
   };
 }
 
@@ -372,6 +410,16 @@ function projectLogEntry(
           ? { encounterId: event.target.encounterId }
           : {}),
       };
+    case 'ROLE_ABILITY_USED':
+      return {
+        ...base,
+        playerId: event.playerId,
+        card: requiredLogCard(state, event.roleCardId),
+        abilityType: event.abilityType,
+        count: event.discardedCount,
+        ...(event.amount === undefined ? {} : { amount: event.amount }),
+        ...(event.deck === undefined ? {} : { deck: event.deck }),
+      };
     case 'ROLE_PLAYED':
     case 'ROLE_DISCARDED':
       return {
@@ -523,6 +571,7 @@ export const EVENT_IMPORTANCE = {
   SCAVENGED_CARD: 'IMPORTANT',
   ROOM_LOOTED: 'ROUTINE',
   CARD_PLAYED: 'ROUTINE',
+  ROLE_ABILITY_USED: 'IMPORTANT',
   ITEM_EQUIPPED: 'ROUTINE',
   ITEM_UNEQUIPPED: 'ROUTINE',
   ROLE_PLAYED: 'IMPORTANT',
@@ -774,8 +823,7 @@ function combatCardIntents(
     };
     if (
       definition.type === CardType.TEMPORARY_BONUS &&
-      definition.effects.length > 0 &&
-      definition.effects.every((effect) => effect.type === 'COMBAT_BONUS')
+      definition.play?.target === 'COMBAT_PLAYERS'
     )
       return [
         {
@@ -783,6 +831,25 @@ function combatCardIntents(
           id: `play:${card.instanceId}:players:${combat.revision}`,
           target: { type: 'PLAYERS' },
         },
+      ];
+    if (
+      definition.type === CardType.TEMPORARY_BONUS &&
+      definition.play?.target === 'COMBAT_SIDE'
+    )
+      return [
+        {
+          ...base,
+          id: `play:${card.instanceId}:players:${combat.revision}`,
+          target: { type: 'PLAYERS' as const },
+        },
+        ...combat.monsters.map((monster) => ({
+          ...base,
+          id: `play:${card.instanceId}:monster:${monster.encounterId}:${combat.revision}`,
+          target: {
+            type: 'MONSTER' as const,
+            encounterId: monster.encounterId,
+          },
+        })),
       ];
     if (
       definition.type === CardType.TEMPORARY_BONUS ||
@@ -837,6 +904,92 @@ function combatCardIntents(
       }));
     return [];
   });
+}
+
+function roleAbilityIntents(
+  state: GameState,
+  viewerPlayerId: PlayerId,
+  self: GameState['players'][number],
+): AvailableIntentView[] {
+  const eligibleCardIds = self.hand.map((card) => card.instanceId);
+  return [...self.classCards, ...self.raceCards].flatMap<AvailableIntentView>(
+    (roleCard) => {
+      const definition = state.cardDefinitions.find(
+        (candidate) => candidate.id === roleCard.definitionId,
+      );
+      const ability = definition?.role?.activeAbility;
+      if (ability === undefined || eligibleCardIds.length < ability.cost.count)
+        return [];
+      const alreadyUsed = (self.abilityUsages ?? []).some((usage) => {
+        if (usage.sourceCardId !== roleCard.instanceId) return false;
+        return ability.usage === 'ONCE_PER_TURN'
+          ? usage.scope.type === 'TURN' &&
+              usage.scope.turnNumber === state.turnNumber
+          : state.combat !== null &&
+              usage.scope.type === 'COMBAT' &&
+              usage.scope.combatId === state.combat.combatId;
+      });
+      if (alreadyUsed) return [];
+      const cost = { count: ability.cost.count, eligibleCardIds };
+      if (ability.type === 'DRAW_CARDS') {
+        if (!canChangeEquipment(state, viewerPlayerId) || state.combat !== null)
+          return [];
+        const availableDraws =
+          ability.deck === 'DOOR'
+            ? state.doorDeck.length + state.doorDiscard.length
+            : state.treasureDeck.length + state.treasureDiscard.length;
+        if (availableDraws < ability.count) return [];
+        return [
+          {
+            id: `role-ability:${roleCard.instanceId}:turn:${state.turnNumber}`,
+            kind: 'USE_ROLE_ABILITY',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            roleCardId: roleCard.instanceId,
+            abilityType: ability.type,
+            cost,
+            target: { type: 'SELF' },
+          },
+        ];
+      }
+      const combat = state.combat;
+      if (
+        combat === null ||
+        state.phase !== GamePhase.DOOR_RESOLUTION ||
+        combat.runAway !== null ||
+        !canPlayCombatCard(state, viewerPlayerId)
+      )
+        return [];
+      if (
+        ability.type === 'RUN_AWAY_BONUS' &&
+        ![
+          combat.playerId,
+          ...(combat.helpAgreement === null
+            ? []
+            : [combat.helpAgreement.helperId]),
+        ].includes(viewerPlayerId)
+      )
+        return [];
+      return [
+        {
+          id: `role-ability:${roleCard.instanceId}:combat:${combat.combatId}:${combat.revision}`,
+          kind: 'USE_ROLE_ABILITY',
+          reasonCode: 'OPTIONAL_CARD_PLAY',
+          roleCardId: roleCard.instanceId,
+          abilityType: ability.type,
+          cost,
+          target:
+            ability.type === 'COMBAT_BONUS'
+              ? { type: 'PLAYERS' as const }
+              : { type: 'SELF' as const },
+          combatId: combat.combatId,
+          combatRevision: combat.revision,
+          ...(combat.reactionWindow === null
+            ? {}
+            : { reactionWindowId: combat.reactionWindow.windowId }),
+        },
+      ];
+    },
+  );
 }
 
 function availableIntents(
@@ -921,9 +1074,11 @@ function availableIntents(
         expiresAtEpochMs: combat.reactionWindow.expiresAtEpochMs,
       },
       ...combatCardIntents(state, viewerPlayerId, self),
+      ...roleAbilityIntents(state, viewerPlayerId, self),
     ];
   }
   const intents: AvailableIntentView[] = [];
+  intents.push(...roleAbilityIntents(state, viewerPlayerId, self));
   const offer = combat?.helpOffer;
   if (combat !== null && offer !== null && offer !== undefined) {
     const address = {
@@ -1412,6 +1567,19 @@ export function createGameView(
                   ...(entry.targetPlayerId === undefined
                     ? {}
                     : { targetPlayerId: entry.targetPlayerId }),
+                };
+              }
+              if (entry.type === 'ROLE_ABILITY_USED') {
+                return {
+                  type: entry.type,
+                  playerId: entry.playerId,
+                  roleCard: cardView(state, {
+                    instanceId: entry.roleCardId,
+                    definitionId: entry.roleDefinitionId,
+                  }),
+                  abilityType: entry.abilityType,
+                  side: entry.side,
+                  amount: entry.amount,
                 };
               }
               if (entry.type === 'MONSTER_ADDED') {

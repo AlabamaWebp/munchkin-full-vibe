@@ -78,7 +78,16 @@ presentation priority. Angular must not recreate those permissions locally.
 Card definitions are immutable data; physical `CardInstance`s carry only an
 instance id and definition id. Typed effects, conditions, modifiers, equipment
 restrictions, roles, companions, protections, and attachments are evaluated by
-the engine. Calculated power is derived at execution/projection time.
+the engine. This includes side-neutral combat effects and the three reusable
+role-ability primitives. Calculated power is derived at execution/projection
+time.
+
+Role ability usage is a generic JSON-safe player ledger scoped to a turn number
+or combat id; there is no per-role state machine. The projection supplies exact
+cost-card ids, targets, combat addresses, and reaction-window addresses.
+`GameCardView` carries the rule-bearing fields needed by Details plus a
+server-derived duration category, so Angular formats metadata but does not
+evaluate gameplay rules.
 
 Randomness comes from an injected `RandomSource`; tests provide deterministic
 sources. A `Clock` is likewise injected. Blocking reaction windows, help offers,

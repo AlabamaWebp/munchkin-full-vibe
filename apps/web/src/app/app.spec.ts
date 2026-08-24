@@ -186,6 +186,7 @@ describe('App lobby', () => {
       artKey: 'test.monster',
       name: 'Monster',
       description: 'Test monster.',
+      duration: 'ENCOUNTER_PASSIVE' as const,
       type: 'MONSTER' as const,
       deck: 'DOOR' as const,
       effects: [],

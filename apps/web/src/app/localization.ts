@@ -1068,56 +1068,106 @@ function generatedRussianDescription(definition: CardDefinition): string {
   if (definition.attachment !== undefined)
     return `Усилитель оружия: +${definition.attachment.combatBonus} к боевой силе.`;
   if (definition.role !== undefined)
-    return russianModifierDescription(definition.role.modifier);
-  if (definition.type === 'UTILITY')
-    return russianEffectsDescription(definition.effects);
+    return [
+      russianModifierDescription(definition.role.modifier),
+      definition.role.activeAbility === undefined
+        ? ''
+        : russianRoleAbilityDescription(definition.role.activeAbility),
+    ]
+      .filter((part) => part.length > 0)
+      .join(' ');
+  if (definition.type === 'UTILITY') return russianEffectsDescription(definition.effects);
   if (definition.type === 'CURSE' || definition.type === 'COMBAT_CURSE')
     return russianEffectsDescription(definition.effects);
   return 'Сыграйте карту в указанное время и примените её эффект.';
 }
 
-function russianConditionDescription(condition: NonNullable<CardDefinition['role']>['modifier'] extends infer M
-  ? M extends { conditions: readonly (infer C)[] } ? C : never
-  : never): string {
+function russianConditionDescription(
+  condition: NonNullable<CardDefinition['role']>['modifier'] extends infer M
+    ? M extends { conditions: readonly (infer C)[] }
+      ? C
+      : never
+    : never,
+): string {
   switch (condition.type) {
-    case 'MONSTER_HAS_TAG': return `против монстров с тегом ${condition.anyOf.join(' или ')}`;
-    case 'PLAYER_SEX_IS': return condition.sex === 'MALE' ? 'если игрок мужчина' : 'если игрок женщина';
-    case 'PLAYER_HAS_CLASS': return `если выбран класс ${condition.anyOf.join(' или ')}`;
-    case 'PLAYER_HAS_RACE': return `если выбрана раса ${condition.anyOf.join(' или ')}`;
-    case 'EQUIPPED_HAS_TAG': return `если экипирован предмет с тегом ${condition.anyOf.join(' или ')}`;
-    default: return 'при выполнении условия карты';
+    case 'MONSTER_HAS_TAG':
+      return `против монстров с тегом ${condition.anyOf.join(' или ')}`;
+    case 'PLAYER_SEX_IS':
+      return condition.sex === 'MALE' ? 'если игрок мужчина' : 'если игрок женщина';
+    case 'PLAYER_HAS_CLASS':
+      return `если выбран класс ${condition.anyOf.join(' или ')}`;
+    case 'PLAYER_HAS_RACE':
+      return `если выбрана раса ${condition.anyOf.join(' или ')}`;
+    case 'EQUIPPED_HAS_TAG':
+      return `если экипирован предмет с тегом ${condition.anyOf.join(' или ')}`;
+    default:
+      return 'при выполнении условия карты';
   }
 }
 
-function russianModifierDescription(modifier: CardDefinition['role'] extends infer R
-  ? R extends { modifier?: infer M } ? M | undefined : never : never): string {
+function russianModifierDescription(
+  modifier: CardDefinition['role'] extends infer R
+    ? R extends { modifier?: infer M }
+      ? M | undefined
+      : never
+    : never,
+): string {
   if (modifier === undefined) return 'Постоянного усиления нет.';
   if (modifier.type === 'RUN_AWAY_ROLL') return `+${modifier.amount} к броскам побега.`;
   if (modifier.type === 'EQUIPMENT_TAG_BONUS')
     return `+${modifier.amountPerCard} за каждый предмет с тегом ${modifier.tags.join(' или ')} (максимум ${modifier.maxCards}).`;
-  if (modifier.type === 'AUTOMATIC_PROTECTION') return 'Автоматически отменяет подходящие ранние и средние проклятия.';
+  if (modifier.type === 'AUTOMATIC_PROTECTION')
+    return 'Автоматически отменяет подходящие ранние и средние проклятия.';
   const condition = modifier.conditions.map(russianConditionDescription).join(' и ');
   return `${modifier.amount >= 0 ? '+' : ''}${modifier.amount} к боевой силе ${condition}.`;
 }
 
+function russianRoleAbilityDescription(
+  ability: NonNullable<NonNullable<CardDefinition['role']>['activeAbility']>,
+): string {
+  const cost = `Сбросьте ${ability.cost.count} карт из руки`;
+  if (ability.type === 'DRAW_CARDS')
+    return `${cost}, чтобы взять ${ability.count} из колоды ${ability.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}; один раз за ход.`;
+  if (ability.type === 'RUN_AWAY_BONUS')
+    return `${cost}, чтобы получить ${ability.amount >= 0 ? '+' : ''}${ability.amount} к своему броску побега; один раз за бой.`;
+  return `${cost}, чтобы дать ${ability.amount >= 0 ? '+' : ''}${ability.amount} стороне игроков; один раз за бой.`;
+}
+
 function russianEffectsDescription(effects: CardDefinition['effects']): string {
-  return effects.map((effect) => {
-    switch (effect.type) {
-      case 'DRAW_CARDS': return `Возьмите ${effect.count} карту из колоды ${effect.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}.`;
-      case 'COMBAT_BONUS': return `${effect.amount >= 0 ? '+' : ''}${effect.amount} к боевой силе выбранного участника боя.`;
-      case 'MONSTER_COMBAT_BONUS': return `${effect.amount >= 0 ? '+' : ''}${effect.amount} к силе выбранного монстра.`;
-      case 'MODIFY_MONSTER': return `${effect.strength >= 0 ? '+' : ''}${effect.strength} к силе монстра и ${effect.treasures >= 0 ? '+' : ''}${effect.treasures} к его сокровищам.`;
-      case 'ADD_MONSTER_TO_COMBAT': return 'Добавьте одного монстра из своей руки в текущий бой.';
-      case 'CLONE_COMBAT_MONSTER': return 'Создайте копию выбранного монстра в текущем бою.';
-      case 'GAIN_LEVEL': return `Получите ${effect.amount} ${effect.amount === 1 ? 'уровень' : 'уровня'}.`;
-      case 'LOSE_LEVEL': return `Потеряйте ${effect.amount} ${effect.amount === 1 ? 'уровень' : 'уровня'}.`;
-      case 'DISCARD_RANDOM_CARDS': return `Случайно сбросьте ${effect.count} ${effect.zone === 'HAND' ? 'карт из руки' : 'предмета снаряжения'}.`;
-      case 'DISCARD_CHOSEN_CARDS': return `Выберите и сбросьте ${effect.count} ${effect.zone === 'HAND' ? 'карт из руки' : 'предмета снаряжения'}.`;
-      case 'DISCARD_ROLE': return `Сбросьте свою карту: ${effect.role === 'CLASS' ? 'класс' : 'расу'}.`;
-      case 'DEATH': return 'Вы погибаете.';
-      default: return 'Примените эффект карты.';
-    }
-  }).join(' ');
+  return effects
+    .map((effect) => {
+      switch (effect.type) {
+        case 'DRAW_CARDS':
+          return `Возьмите ${effect.count} карту из колоды ${effect.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}.`;
+        case 'COMBAT_BONUS':
+          return `${effect.amount >= 0 ? '+' : ''}${effect.amount} к боевой силе выбранного участника боя.`;
+        case 'COMBAT_SIDE_BONUS':
+          return `${effect.amount >= 0 ? '+' : ''}${effect.amount} к выбранной стороне боя.`;
+        case 'MONSTER_COMBAT_BONUS':
+          return `${effect.amount >= 0 ? '+' : ''}${effect.amount} к силе выбранного монстра.`;
+        case 'MODIFY_MONSTER':
+          return `${effect.strength >= 0 ? '+' : ''}${effect.strength} к силе монстра и ${effect.treasures >= 0 ? '+' : ''}${effect.treasures} к его сокровищам.`;
+        case 'ADD_MONSTER_TO_COMBAT':
+          return 'Добавьте одного монстра из своей руки в текущий бой.';
+        case 'CLONE_COMBAT_MONSTER':
+          return 'Создайте копию выбранного монстра в текущем бою.';
+        case 'GAIN_LEVEL':
+          return `Получите ${effect.amount} ${effect.amount === 1 ? 'уровень' : 'уровня'}.`;
+        case 'LOSE_LEVEL':
+          return `Потеряйте ${effect.amount} ${effect.amount === 1 ? 'уровень' : 'уровня'}.`;
+        case 'DISCARD_RANDOM_CARDS':
+          return `Случайно сбросьте ${effect.count} ${effect.zone === 'HAND' ? 'карт из руки' : 'предмета снаряжения'}.`;
+        case 'DISCARD_CHOSEN_CARDS':
+          return `Выберите и сбросьте ${effect.count} ${effect.zone === 'HAND' ? 'карт из руки' : 'предмета снаряжения'}.`;
+        case 'DISCARD_ROLE':
+          return `Сбросьте свою карту: ${effect.role === 'CLASS' ? 'класс' : 'расу'}.`;
+        case 'DEATH':
+          return 'Вы погибаете.';
+        default:
+          return 'Примените эффект карты.';
+      }
+    })
+    .join(' ');
 }
 
 export const RUSSIAN_CARDS: Readonly<Record<string, CardTranslation>> = {

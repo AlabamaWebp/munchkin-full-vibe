@@ -142,15 +142,90 @@ export type GameCardType =
 export type GameDeckType = "DOOR" | "TREASURE";
 export type GameEquipmentSlot = "HEAD" | "BODY" | "FEET" | "HANDS";
 export type GameCardPlayTiming =
-  "TURN" | "ACTIVE_COMBAT" | "VICTORY_REACTION" | "WHEN_DRAWN";
+  "TURN" | "POST_DOOR" | "ACTIVE_COMBAT" | "VICTORY_REACTION" | "WHEN_DRAWN";
 export type GameCardTarget =
   | "SELF"
   | "ANY_PLAYER"
   | "COMBAT_PLAYERS"
   | "COMBAT_PLAYER"
+  | "COMBAT_SIDE"
   | "MONSTER_ENCOUNTER"
   | "HAND_MONSTER"
   | "EQUIPMENT";
+
+export type GameConditionView =
+  | { readonly type: "PLAYER_HAS_CLASS"; readonly anyOf: readonly string[] }
+  | { readonly type: "PLAYER_HAS_RACE"; readonly anyOf: readonly string[] }
+  | { readonly type: "PLAYER_SEX_IS"; readonly sex: PlayerSex }
+  | {
+      readonly type: "MONSTER_HAS_TAG";
+      readonly anyOf: readonly ("BEAST" | "CONSTRUCT" | "ARCANE" | "UNDEAD")[];
+    }
+  | {
+      readonly type: "EQUIPPED_HAS_TAG";
+      readonly anyOf: readonly (
+        "WEAPON" | "ARMOR" | "BLADE" | "BLUNT" | "MAGIC"
+      )[];
+      readonly atLeast: number;
+      readonly scope: "OWNER" | "COMBAT_SIDE";
+    }
+  | { readonly type: "CARD_DEFINITION_IS"; readonly anyOf: readonly string[] }
+  | {
+      readonly type: "CURSE_MATCHES";
+      readonly severities?: readonly ("EARLY" | "MID" | "LATE")[];
+      readonly anyTag?: readonly ("HEX" | "TRAP")[];
+    };
+
+export type GameModifierView =
+  | {
+      readonly type: "COMBAT_POWER";
+      readonly amount: number;
+      readonly maxAmount?: number;
+      readonly conditions: readonly GameConditionView[];
+    }
+  | {
+      readonly type: "EQUIPMENT_TAG_BONUS";
+      readonly amountPerCard: number;
+      readonly maxCards: number;
+      readonly tags: readonly (
+        "WEAPON" | "ARMOR" | "BLADE" | "BLUNT" | "MAGIC"
+      )[];
+      readonly conditions: readonly GameConditionView[];
+    }
+  | {
+      readonly type: "RUN_AWAY_ROLL";
+      readonly amount: number;
+      readonly conditions: readonly GameConditionView[];
+    }
+  | {
+      readonly type: "AUTOMATIC_PROTECTION";
+      readonly protection: "CANCEL" | "PROTECT_ONE_ITEM" | "IGNORE_BAD_STUFF";
+      readonly conditions: readonly GameConditionView[];
+    };
+
+export type GameRoleAbilityView =
+  | {
+      readonly type: "COMBAT_BONUS";
+      readonly amount: number;
+      readonly target: "PLAYERS";
+      readonly cost: { readonly type: "DISCARD_HAND"; readonly count: number };
+      readonly usage: "ONCE_PER_COMBAT";
+    }
+  | {
+      readonly type: "RUN_AWAY_BONUS";
+      readonly amount: number;
+      readonly target: "SELF";
+      readonly cost: { readonly type: "DISCARD_HAND"; readonly count: number };
+      readonly usage: "ONCE_PER_COMBAT";
+    }
+  | {
+      readonly type: "DRAW_CARDS";
+      readonly deck: GameDeckType;
+      readonly count: number;
+      readonly target: "SELF";
+      readonly cost: { readonly type: "DISCARD_HAND"; readonly count: number };
+      readonly usage: "ONCE_PER_TURN";
+    };
 
 export interface GameCardView {
   readonly instanceId: string;
@@ -158,6 +233,15 @@ export interface GameCardView {
   readonly artKey: string;
   readonly name: string;
   readonly description: string;
+  readonly duration:
+    | "ONE_SHOT"
+    | "END_OF_COMBAT"
+    | "WHILE_EQUIPPED"
+    | "WHILE_ROLE_ACTIVE"
+    | "WHILE_IN_SLOT"
+    | "WHILE_ATTACHED"
+    | "WHILE_IN_PLAY"
+    | "ENCOUNTER_PASSIVE";
   readonly type: GameCardType;
   readonly deck: GameDeckType;
   readonly setId?: CardSetId;
@@ -194,9 +278,11 @@ export interface GameCardView {
     readonly value: number;
     readonly requiredClass?: string;
     readonly requiredRace?: string;
+    readonly modifier?: GameModifierView;
   };
   readonly companion?: {
     readonly combatBonus: number;
+    readonly modifier?: GameModifierView;
   };
   readonly monster?: {
     readonly strength?: number;
@@ -204,13 +290,39 @@ export interface GameCardView {
     readonly levelRewards: number;
     readonly treasureRewards: number;
     readonly badStuff: readonly GameBadStuffEffectView[];
+    readonly modifiers?: readonly GameModifierView[];
+  };
+  readonly curse?: { readonly severity: "EARLY" | "MID" | "LATE" };
+  readonly curseProtection?: {
+    readonly mode: "CANCEL" | "PROTECT_ONE_ITEM";
+    readonly conditions?: readonly GameConditionView[];
+  };
+  readonly role?: {
+    readonly role: "CLASS" | "RACE";
+    readonly modifier?: GameModifierView;
+    readonly activeAbility?: GameRoleAbilityView;
+  };
+  readonly rolePermission?: {
+    readonly role: "CLASS" | "RACE";
+    readonly additionalSlots: 1;
+  };
+  readonly attachment?: {
+    readonly allowedTags: readonly (
+      "WEAPON" | "ARMOR" | "BLADE" | "BLUNT" | "MAGIC"
+    )[];
+    readonly allowedDefinitionIds?: readonly string[];
+    readonly combatBonus: number;
   };
 }
 
 export type GameEffectView =
   | {
       readonly type:
-        "COMBAT_BONUS" | "MONSTER_COMBAT_BONUS" | "GAIN_LEVEL" | "LOSE_LEVEL";
+        | "COMBAT_BONUS"
+        | "COMBAT_SIDE_BONUS"
+        | "MONSTER_COMBAT_BONUS"
+        | "GAIN_LEVEL"
+        | "LOSE_LEVEL";
       readonly amount: number;
     }
   | {
@@ -342,6 +454,29 @@ export type AvailableIntentView =
           | { readonly type: "PLAYER"; readonly playerId: string };
         readonly reactionWindowId?: number;
       })
+  | (AvailableIntentBase &
+      CombatIntentAddress & {
+        readonly kind: "USE_ROLE_ABILITY";
+        readonly roleCardId: string;
+        readonly abilityType: "COMBAT_BONUS" | "RUN_AWAY_BONUS";
+        readonly cost: {
+          readonly count: number;
+          readonly eligibleCardIds: readonly string[];
+        };
+        readonly target:
+          { readonly type: "PLAYERS" } | { readonly type: "SELF" };
+        readonly reactionWindowId?: number;
+      })
+  | (AvailableIntentBase & {
+      readonly kind: "USE_ROLE_ABILITY";
+      readonly roleCardId: string;
+      readonly abilityType: "DRAW_CARDS";
+      readonly cost: {
+        readonly count: number;
+        readonly eligibleCardIds: readonly string[];
+      };
+      readonly target: { readonly type: "SELF" };
+    })
   | (AvailableIntentBase & {
       readonly kind: "PLAY_CARD";
       readonly cardId: string;
@@ -444,6 +579,14 @@ export type CombatHistoryView =
       readonly targetPlayerId?: string;
     }
   | {
+      readonly type: "ROLE_ABILITY_USED";
+      readonly playerId: string;
+      readonly roleCard: GameCardView;
+      readonly abilityType: "COMBAT_BONUS" | "RUN_AWAY_BONUS";
+      readonly side: "PLAYERS";
+      readonly amount: number;
+    }
+  | {
       readonly type: "MONSTER_ADDED";
       readonly playerId: string;
       readonly encounterId: string;
@@ -500,6 +643,7 @@ export type GameLogEventType =
   | "SCAVENGED_CARD"
   | "ROOM_LOOTED"
   | "CARD_PLAYED"
+  | "ROLE_ABILITY_USED"
   | "ITEM_EQUIPPED"
   | "ITEM_UNEQUIPPED"
   | "ROLE_PLAYED"
@@ -555,6 +699,7 @@ export interface GameLogEntryView {
   readonly deck?: GameDeckType;
   readonly side?: "PLAYERS" | "MONSTER";
   readonly role?: "CLASS" | "RACE";
+  readonly abilityType?: "COMBAT_BONUS" | "RUN_AWAY_BONUS" | "DRAW_CARDS";
   readonly zone?: "HAND" | "EQUIPMENT";
 }
 
@@ -752,6 +897,15 @@ export type GameClientCommand =
         | { readonly type: "MONSTER"; readonly encounterId: string }
         | { readonly type: "HAND_MONSTER"; readonly monsterCardId: string }
         | { readonly type: "EQUIPMENT"; readonly cardId: string };
+      readonly reactionWindowId?: number;
+      readonly combatId?: string;
+      readonly combatRevision?: number;
+    }
+  | {
+      readonly type: "USE_ROLE_ABILITY";
+      readonly roleCardId: string;
+      readonly costCardIds: readonly string[];
+      readonly target: { readonly type: "SELF" } | { readonly type: "PLAYERS" };
       readonly reactionWindowId?: number;
       readonly combatId?: string;
       readonly combatRevision?: number;

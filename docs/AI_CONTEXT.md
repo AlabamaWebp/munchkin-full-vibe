@@ -113,11 +113,16 @@ current `AvailableIntentView`.
 - Definitions cover deck/set/tier/tags, art key, original text, sale/trade flags,
   timing/target, typed effects, equipment, Monster/Curse, role, companion,
   permission, protection, and attachment metadata as applicable.
-- Typed effects include player/Monster combat modification, add/clone Monster,
-  level gain/loss, draws, random/chosen discards, role discard, and death.
+- Typed effects include player/Monster/exact authored-side combat modification,
+  add/clone Monster, level gain/loss, draws, random/chosen discards, role
+  discard, and death. Card views project rule-bearing metadata plus a derived
+  duration category for Details.
 - Conditions/modifiers express Sex, Class/Race, Monster tag, equipped-tag,
   specific definition, and Curse matching. Reusable modifiers cover combat
   power, equipment-tag scaling, run-away roll, and automatic protection.
+- An ordinary Class/Race may have one passive and one active ability. Active
+  abilities reuse discard-for-combat, discard-for-Run-Away, and discard-to-draw
+  primitives; one JSON-safe turn/combat-scoped usage ledger serves every role.
 - Card sets: mandatory `CORE`; optional `COMPANIONS`, `ARSENAL`, and
   `DUAL_IDENTITY`. Start config selects `BALANCED` or `CLASSIC_CHAOS` and set
   ids; disabled-set definitions and physical copies are removed at game creation.
@@ -152,6 +157,8 @@ current `AvailableIntentView`.
   roles, companions, active effects, attachments, and eligible Makeshift Tools.
   A tie loses. Combat cards use typed player-side, exact encounter, hand-Monster,
   equipment, or player targets.
+- Side-neutral boosts opt in through typed card data and project both the player
+  side and every exact encounter; one-sided boosts remain narrow.
 - Winning is declared, then opens a persisted reaction window. Eligible players
   pass or intervene using the current window/revision; a final pass atomically
   rechecks total power and reward availability before resolution.

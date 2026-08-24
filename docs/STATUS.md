@@ -39,6 +39,11 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-24: refined the V2 card-rule model so Details receives complete typed
+  behavior and duration metadata, selected ordinary combat boosts can target
+  either players or exact Monster encounters, and Core Classes/Races use three
+  reusable server-authoritative active-ability families with one generic usage
+  ledger.
 - 2026-08-24: repaired deadline-resolved combat completion so a level-10 reward
   now shares the engine's authoritative finish transition with normal commands;
   the finished view renders server-projected final standings and host-only

@@ -236,6 +236,12 @@ horizontally; it must not squeeze five cards into unreadable equal-width columns
 The full-hand sheet remains the route to filtering, sale, charity, and detailed
 selection workflows.
 
+Card Details renders server-projected typed effects, timing, targets,
+conditions/modifiers, role abilities and a duration category. Flavor copy may
+remain, but it cannot be the sole gameplay explanation. A side-neutral combat
+card presents separate “players” and exact named-Monster choices. An active role
+opens a bounded cost-card picker sourced only from its `AvailableIntentView`.
+
 ### Sheets and dialogs
 
 - Mobile: bottom sheet, maximum `100dvh` minus safe areas.

@@ -376,6 +376,13 @@ Temporary penalties live in a small typed `activeEffects` list with an explicit
 expiry such as `END_OF_COMBAT` or `END_OF_TARGET_NEXT_TURN`; V2 does not add a
 free-form status dictionary.
 
+Ordinary combat one-shots declare side legality in card data. Player-only and
+Monster-only effects retain their narrow targets. A genuinely side-neutral
+`COMBAT_SIDE_BONUS` exposes the player side plus every currently legal exact
+Monster encounter; a Monster target always carries its encounter id and never
+addresses an aggregate client-calculated Monster total. The current combat id,
+revision, and reaction-window id protect both variants from delayed commands.
+
 ## Equipment
 
 | Tier | Printed bonus | Typical value | Compensating constraints                                           |
@@ -533,15 +540,26 @@ severity.
 
 ### Roles
 
-Each Class or Race definition has at most one passive modifier. Allowed examples
-are:
+Each ordinary Class or Race definition has at most one passive modifier and at
+most one active ability. Allowed passive examples are:
 
 - `+2` against one Monster tag;
 - `+1` Run Away;
 - `+1` to matching Equipment, with an authored cap;
 - one situational Curse or Bad Stuff defense.
 
-There is no skill tree, activated ability currency, or per-role cooldown.
+Active abilities use only three reusable primitives in V2:
+
+- discard authored hand-card costs for a signed player-side combat intervention;
+- discard authored hand-card costs for a personal Run Away-roll bonus;
+- discard authored hand-card costs to draw an authored count from one deck.
+
+Every active ability declares its exact cost, target, and either
+`ONCE_PER_TURN` or `ONCE_PER_COMBAT`. One generic serializable usage ledger,
+keyed by the physical role card and current turn/combat address, enforces those
+limits. The server projects an intent with the exact eligible cost-card ids and
+target; Angular only collects the selection and sends the intention. There is no
+skill tree, ability currency, role-specific state machine, or browser cooldown.
 
 By default a player may have one Class and one Race. A public
 `ROLE_PERMISSION` card from `DUAL_IDENTITY` grants exactly one additional slot
@@ -641,8 +659,8 @@ set.
 | ----------------- | ------------------ | --------------: | ------------------------------------------------------- | --------------------------------------------------------------- |
 | Monster           | 20; `8/7/5`        |              48 | Door                                                    | strength 1–19, 1–2 levels, 1–5 Treasures                        |
 | Curse             | 12; `5/5/2`        |              24 | Door                                                    | Early/Mid/Late severity as above                                |
-| Class             | 4; `4/0/0`         |              12 | Door                                                    | one passive modifier each                                       |
-| Race              | 4; `4/0/0`         |              12 | Door                                                    | one passive modifier each                                       |
+| Class             | 4; `4/0/0`         |              12 | Door                                                    | up to one passive and one reusable active each                  |
+| Race              | 4; `4/0/0`         |              12 | Door                                                    | up to one passive and one reusable active each                  |
 | Equipment         | 20; `9/7/4`        |              45 | Treasure                                                | `+1…+7`, 200–1,200 gold                                         |
 | Combat consumable | 8; `3/3/2`         |              22 | Treasure                                                | roughly `±2…±8`, 100–700 gold                                   |
 | Monster modifier  | 6; `2/2/2`         |              14 | 4 Treasure definitions and 2 Door add/clone definitions | strength `±2…±6`, reward `-1…+2`, 200–800 gold when Treasure    |
@@ -667,7 +685,7 @@ Shown in the dock and full-hand sheet. It contains only decision-relevant facts:
 - Equipment: name, bonus, slot/hands, restriction indicator;
 - Curse: name and one-line consequence;
 - combat card: main signed value, target side, timing indicator;
-- Class/Race/companion: name and one short passive;
+- Class/Race/companion: name, one short passive, and active indicator when authored;
 - a clear playable/unavailable state.
 
 ### Focused Stage Card
@@ -681,6 +699,11 @@ level.
 Contains full text, all typed facts, source set, related cards, and resolved
 breakdown. It is independently scrollable and never required before a legal
 play.
+
+Typed facts include authored timing and target, effects and conditions, and a
+derived duration category (`ONE_SHOT`, end of combat, while equipped/attached,
+while a role or slot remains active, or encounter passive). Flavor prose may
+supplement these facts but is never the only explanation of an action.
 
 ## Mobile layout contract
 
@@ -829,8 +852,10 @@ cancel or continue. Accepted agreements have no deadline.
 
 ### Complexity control
 
-- Flat conditions, capped modifiers, one passive per role/companion, one Curse
-  response, max two Classes/Races, and one attachment per weapon are hard limits.
+- Flat conditions, capped modifiers, at most one passive and one reusable active
+  per role, one passive per companion, one generic ability-usage ledger, one
+  Curse response, max two Classes/Races, and one attachment per weapon are hard
+  limits.
 - There is no generic scripting language, counter stack, companion inventory,
   pity currency, draft, shop, or third deck.
 

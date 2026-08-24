@@ -11,6 +11,7 @@ import {
   type CardSet,
   type ConditionalModifierDefinition,
   type EquipmentDefinition,
+  type RoleActiveAbilityDefinition,
 } from "./cards.js";
 import { parseCardDefinitionId, parseCardInstanceId } from "./identifiers.js";
 
@@ -32,6 +33,10 @@ const players = {
 const monsterTarget = {
   timings: [CardPlayTiming.ACTIVE_COMBAT, CardPlayTiming.VICTORY_REACTION],
   target: CardPlayTarget.MONSTER_ENCOUNTER,
+} as const;
+const combatSide = {
+  timings: [CardPlayTiming.ACTIVE_COMBAT, CardPlayTiming.VICTORY_REACTION],
+  target: CardPlayTarget.COMBAT_SIDE,
 } as const;
 const legacyArtKeys: Readonly<Record<string, string>> = {
   "bottled-applause": "treasure.bonus.bottled-applause",
@@ -95,6 +100,8 @@ function effectText(effect: CardDefinition["effects"][number]): string {
   switch (effect.type) {
     case "COMBAT_BONUS":
       return `${effect.amount >= 0 ? "+" : ""}${effect.amount} to the adventurers`;
+    case "COMBAT_SIDE_BONUS":
+      return `${effect.amount >= 0 ? "+" : ""}${effect.amount} to the chosen combat side`;
     case "MONSTER_COMBAT_BONUS":
       return `${effect.amount >= 0 ? "+" : ""}${effect.amount} to one Monster`;
     case "MODIFY_MONSTER":
@@ -149,6 +156,10 @@ function m(x: MonsterData): Entry {
       type: CardType.MONSTER,
       deck: DeckType.DOOR,
       tags: x.tags ?? [],
+      play: {
+        timings: [CardPlayTiming.WHEN_DRAWN, CardPlayTiming.POST_DOOR],
+        target: CardPlayTarget.SELF,
+      },
       effects: [],
       monster: {
         strength: x.strength,
@@ -293,7 +304,16 @@ function r(
   setId: CardSetId = CardSetId.CORE,
   tier: 1 | 2 | 3 = 1,
   copies = 3,
+  activeAbility?: RoleActiveAbilityDefinition,
 ): Entry {
+  const activeText =
+    activeAbility === undefined
+      ? ""
+      : activeAbility.type === "DRAW_CARDS"
+        ? ` Discard ${activeAbility.cost.count} hand card(s) to draw ${activeAbility.count} ${activeAbility.deck} card(s), once per turn.`
+        : activeAbility.type === "RUN_AWAY_BONUS"
+          ? ` Discard ${activeAbility.cost.count} hand card(s) for ${activeAbility.amount >= 0 ? "+" : ""}${activeAbility.amount} to your Run Away roll, once per combat.`
+          : ` Discard ${activeAbility.cost.count} hand card(s) for ${activeAbility.amount >= 0 ? "+" : ""}${activeAbility.amount} to the player side, once per combat.`;
   return e(
     {
       id: idValue,
@@ -301,13 +321,17 @@ function r(
       setId,
       tier,
       name,
-      description: modifierText(modifier),
+      description: `${modifierText(modifier)}${activeText}`,
       type: kind === "CLASS" ? CardType.CLASS : CardType.RACE,
       deck: DeckType.DOOR,
       tags: [],
       play: ownTurn,
       effects: [],
-      role: { role: kind, modifier },
+      role: {
+        role: kind,
+        modifier,
+        ...(activeAbility === undefined ? {} : { activeAbility }),
+      },
     },
     copies,
   );
@@ -617,12 +641,34 @@ const coreRoles: readonly Entry[] = [
     condition("COMBAT_POWER", 2, [
       { type: "MONSTER_HAS_TAG", anyOf: ["ARCANE"] },
     ]),
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "DRAW_CARDS",
+      deck: DeckType.TREASURE,
+      count: 2,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 2 },
+      usage: "ONCE_PER_TURN",
+    },
   ),
-  r("cartographers-circle", "Cartographers' Circle", "CLASS", {
-    type: "RUN_AWAY_ROLL",
-    amount: 1,
-    conditions: [],
-  }),
+  r(
+    "cartographers-circle",
+    "Cartographers' Circle",
+    "CLASS",
+    { type: "RUN_AWAY_ROLL", amount: 1, conditions: [] },
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "RUN_AWAY_BONUS",
+      amount: 2,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
+  ),
   r(
     "scrap-knights",
     "Scrap Knights",
@@ -630,6 +676,16 @@ const coreRoles: readonly Entry[] = [
     condition("COMBAT_POWER", 2, [
       { type: "MONSTER_HAS_TAG", anyOf: ["CONSTRUCT"] },
     ]),
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "COMBAT_BONUS",
+      amount: 3,
+      target: "PLAYERS",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
   ),
   r(
     "lantern-wardens",
@@ -638,12 +694,34 @@ const coreRoles: readonly Entry[] = [
     condition("COMBAT_POWER", 2, [
       { type: "MONSTER_HAS_TAG", anyOf: ["UNDEAD"] },
     ]),
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "COMBAT_BONUS",
+      amount: 5,
+      target: "PLAYERS",
+      cost: { type: "DISCARD_HAND", count: 2 },
+      usage: "ONCE_PER_COMBAT",
+    },
   ),
-  r("lantern-folk", "Lantern Folk", "RACE", {
-    type: "RUN_AWAY_ROLL",
-    amount: 1,
-    conditions: [],
-  }),
+  r(
+    "lantern-folk",
+    "Lantern Folk",
+    "RACE",
+    { type: "RUN_AWAY_ROLL", amount: 1, conditions: [] },
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "DRAW_CARDS",
+      deck: DeckType.DOOR,
+      count: 1,
+      target: "SELF",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_TURN",
+    },
+  ),
   r(
     "mosskin",
     "Mosskin",
@@ -651,15 +729,24 @@ const coreRoles: readonly Entry[] = [
     condition("COMBAT_POWER", 2, [
       { type: "MONSTER_HAS_TAG", anyOf: ["BEAST"] },
     ]),
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "COMBAT_BONUS",
+      amount: 2,
+      target: "PLAYERS",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
   ),
-  r(
-    "brassborn",
-    "Brassborn",
-    "RACE",
-    condition("COMBAT_POWER", 2, [
-      { type: "MONSTER_HAS_TAG", anyOf: ["CONSTRUCT"] },
-    ]),
-  ),
+  r("brassborn", "Brassborn", "RACE", {
+    type: "EQUIPMENT_TAG_BONUS",
+    amountPerCard: 1,
+    maxCards: 2,
+    tags: ["ARMOR"],
+    conditions: [],
+  }),
   r(
     "nightglimmers",
     "Nightglimmers",
@@ -667,6 +754,16 @@ const coreRoles: readonly Entry[] = [
     condition("COMBAT_POWER", 2, [
       { type: "MONSTER_HAS_TAG", anyOf: ["UNDEAD"] },
     ]),
+    CardSetId.CORE,
+    1,
+    3,
+    {
+      type: "COMBAT_BONUS",
+      amount: -2,
+      target: "PLAYERS",
+      cost: { type: "DISCARD_HAND", count: 1 },
+      usage: "ONCE_PER_COMBAT",
+    },
   ),
 ];
 
@@ -907,8 +1004,8 @@ const coreCombat: readonly Entry[] = [
     tier: 1,
     copies: 3,
     gold: 200,
-    play: players,
-    effects: [{ type: "COMBAT_BONUS", amount: 3 }],
+    play: combatSide,
+    effects: [{ type: "COMBAT_SIDE_BONUS", amount: 3 }],
   }),
   a({
     id: "strategic-banana-peel",
@@ -957,8 +1054,8 @@ const coreCombat: readonly Entry[] = [
     tier: 3,
     copies: 2,
     gold: 500,
-    play: players,
-    effects: [{ type: "COMBAT_BONUS", amount: 6 }],
+    play: combatSide,
+    effects: [{ type: "COMBAT_SIDE_BONUS", amount: 6 }],
   }),
   a({
     id: "emergency-drawbridge",
@@ -1524,11 +1621,121 @@ const catalog: readonly Entry[] = [
   ...dualIdentity,
 ];
 
+export function validateProductionCardDefinitions(
+  definitions: readonly CardDefinition[],
+): void {
+  const errors: string[] = [];
+  const require = (
+    definition: CardDefinition,
+    conditionValue: boolean,
+    message: string,
+  ) => {
+    if (!conditionValue) errors.push(`${definition.id}: ${message}`);
+  };
+  for (const definition of definitions) {
+    require(definition, definition.artKey.trim().length > 0, "missing art key");
+    require(definition, definition.name.trim().length > 0, "missing name");
+    require(definition, definition.play !== undefined &&
+      definition.play.timings.length >
+        0, "action has no typed timing/target metadata");
+    switch (definition.type) {
+      case CardType.MONSTER:
+        require(definition, definition.monster !==
+          undefined, "missing Monster rules");
+        require(definition, definition.play?.timings.includes(
+          CardPlayTiming.POST_DOOR,
+        ) === true &&
+          definition.play.target ===
+            CardPlayTarget.SELF, "missing Look-for-Trouble timing/target metadata");
+        break;
+      case CardType.CURSE:
+      case CardType.COMBAT_CURSE:
+        require(definition, definition.curse !==
+          undefined, "missing Curse severity");
+        require(definition, definition.effects.length >
+          0, "missing Curse effects");
+        break;
+      case CardType.EQUIPMENT:
+        require(definition, definition.equipment !==
+          undefined, "missing Equipment rules");
+        break;
+      case CardType.CLASS:
+      case CardType.RACE:
+        require(definition, definition.role?.role ===
+          definition.type, "missing or mismatched role rules");
+        require(definition, definition.role?.modifier !== undefined ||
+          definition.role?.activeAbility !==
+            undefined, "role has neither a passive nor an active ability");
+        if (definition.role?.activeAbility !== undefined) {
+          const ability = definition.role.activeAbility;
+          require(definition, Number.isSafeInteger(ability.cost.count) &&
+            ability.cost.count >
+              0, "role ability has an invalid hand-card cost");
+          require(definition, ability.type === "DRAW_CARDS"
+            ? Number.isSafeInteger(ability.count) && ability.count > 0
+            : ability.amount !== 0, "role ability has no meaningful result");
+        }
+        break;
+      case CardType.HIRELING:
+      case CardType.MOUNT:
+        require(definition, definition.companion !==
+          undefined, "missing companion rules");
+        break;
+      case CardType.ROLE_PERMISSION:
+        require(definition, definition.rolePermission !==
+          undefined, "missing role-permission rules");
+        break;
+      case CardType.ATTACHMENT:
+        require(definition, definition.attachment !==
+          undefined, "missing attachment rules");
+        break;
+      case CardType.TEMPORARY_BONUS: {
+        require(definition, definition.effects.length >
+          0, "missing combat effect");
+        const effectTypes = new Set(
+          definition.effects.map((effect) => effect.type),
+        );
+        const expectedTarget = effectTypes.has("COMBAT_SIDE_BONUS")
+          ? CardPlayTarget.COMBAT_SIDE
+          : effectTypes.has("COMBAT_BONUS")
+            ? CardPlayTarget.COMBAT_PLAYERS
+            : CardPlayTarget.MONSTER_ENCOUNTER;
+        require(definition, effectTypes.size === 1 &&
+          definition.play?.target ===
+            expectedTarget, "combat effect and authored side target do not agree");
+        break;
+      }
+      case CardType.MONSTER_MODIFIER:
+      case CardType.CLONE_MONSTER:
+        require(definition, definition.play?.target ===
+          CardPlayTarget.MONSTER_ENCOUNTER &&
+          definition.effects.length >
+            0, "missing exact Monster target/effect metadata");
+        break;
+      case CardType.ADD_MONSTER:
+        require(definition, definition.play?.target ===
+          CardPlayTarget.HAND_MONSTER &&
+          definition.effects.length >
+            0, "missing hand-Monster target/effect metadata");
+        break;
+      case CardType.UTILITY:
+        require(definition, definition.effects.length >
+          0, "missing utility effects");
+        break;
+    }
+  }
+  if (errors.length > 0)
+    throw new TypeError(
+      `Invalid production card catalog:\n${errors.join("\n")}`,
+    );
+}
+
 export function createDevelopmentCardSet(): CardSet {
   const definitions = catalog.map<CardDefinition>((item) => ({
     ...item.definition,
     id: parseCardDefinitionId(item.definition.id),
   }));
+  validateProductionCardDefinitions(definitions);
   const instances = catalog.flatMap((item, index) =>
     Array.from(
       { length: item.copies },

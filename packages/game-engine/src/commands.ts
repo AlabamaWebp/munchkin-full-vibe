@@ -63,6 +63,17 @@ export type GameCommand =
       readonly combatRevision?: number;
     })
   | (PlayerCommand & {
+      readonly type: "USE_ROLE_ABILITY";
+      readonly roleCardId: CardInstanceId;
+      readonly costCardIds: readonly CardInstanceId[];
+      readonly target:
+        | { readonly type: "SELF" }
+        | { readonly type: "COMBAT"; readonly side: "PLAYERS" };
+      readonly reactionWindowId?: number;
+      readonly combatId?: CombatId;
+      readonly combatRevision?: number;
+    })
+  | (PlayerCommand & {
       readonly type: "EQUIP_ITEM";
       readonly cardId: CardInstanceId;
     })

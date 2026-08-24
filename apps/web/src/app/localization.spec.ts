@@ -9,6 +9,7 @@ const card: GameCardView = {
   artKey: 'test.dust-bunny-brigade',
   name: 'Dust Bunny Brigade',
   description: 'A surprisingly organized threat from beneath the sofa.',
+  duration: 'ENCOUNTER_PASSIVE',
   type: 'MONSTER',
   deck: 'DOOR',
   effects: [],

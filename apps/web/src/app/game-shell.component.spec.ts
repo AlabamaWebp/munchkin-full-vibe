@@ -34,6 +34,7 @@ const card = (overrides: Partial<GameCardView> = {}): GameCardView => ({
   artKey: 'test.card',
   name: 'Useful Card',
   description: 'A useful effect.',
+  duration: 'END_OF_COMBAT',
   type: 'TEMPORARY_BONUS',
   deck: 'TREASURE',
   effects: [{ type: 'COMBAT_BONUS', amount: 3 }],
@@ -855,6 +856,132 @@ describe('GameShellComponent', () => {
       .find((button) => button.textContent?.includes('Сбросить класс'))!
       .click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'DISCARD_ROLE', cardId: 'role' });
+  });
+
+  it('explains and dispatches a projected role ability with exact server-provided costs', () => {
+    const role = card({
+      instanceId: 'scrap-role',
+      definitionId: 'scrap-knights',
+      name: 'Scrap Knights',
+      type: 'CLASS',
+      duration: 'WHILE_ROLE_ACTIVE',
+      effects: [],
+      role: {
+        role: 'CLASS',
+        modifier: {
+          type: 'COMBAT_POWER',
+          amount: 2,
+          conditions: [{ type: 'MONSTER_HAS_TAG', anyOf: ['CONSTRUCT'] }],
+        },
+        activeAbility: {
+          type: 'COMBAT_BONUS',
+          amount: 3,
+          target: 'PLAYERS',
+          cost: { type: 'DISCARD_HAND', count: 1 },
+          usage: 'ONCE_PER_COMBAT',
+        },
+      },
+    });
+    const cost = card({ instanceId: 'ability-cost', name: 'Spare Map' });
+    const self = player({ handCount: 1, classCard: role, classCards: [role] });
+    const fixture = render(
+      base({
+        phase: 'DOOR_RESOLUTION',
+        players: [self],
+        self: { ...self, hand: [cost] },
+        combat: combat(),
+        availableIntents: [
+          {
+            id: 'role-ability:scrap-role',
+            kind: 'USE_ROLE_ABILITY',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            roleCardId: 'scrap-role',
+            abilityType: 'COMBAT_BONUS',
+            cost: { count: 1, eligibleCardIds: ['ability-cost'] },
+            target: { type: 'PLAYERS' },
+            combatId: 'combat-1',
+            combatRevision: 4,
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.player')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.equipment-grid .class button')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.card-details')?.textContent).toContain('пока роль активна');
+    expect(root.querySelector('.card-details')?.textContent).toContain('Активная способность');
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Применить боевую способность'))!
+      .click();
+    fixture.detectChanges();
+    expect(root.querySelector('#ability-cost-title')?.textContent).toContain('Сбросьте 1 карт');
+    root.querySelector<HTMLButtonElement>('.option-list button')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Применить способность'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'USE_ROLE_ABILITY',
+      roleCardId: 'scrap-role',
+      costCardIds: ['ability-cost'],
+      target: { type: 'PLAYERS' },
+      combatId: 'combat-1',
+      combatRevision: 4,
+    });
+  });
+
+  it('makes helping players versus an exact Monster obvious for side-neutral boosts', () => {
+    const neutral = card({
+      instanceId: 'neutral',
+      name: 'Bottled Applause',
+      play: { timings: ['ACTIVE_COMBAT', 'VICTORY_REACTION'], target: 'COMBAT_SIDE' },
+      effects: [{ type: 'COMBAT_SIDE_BONUS', amount: 3 }],
+    });
+    const self = player({ handCount: 1 });
+    const fixture = render(
+      base({
+        phase: 'DOOR_RESOLUTION',
+        players: [self],
+        self: { ...self, hand: [neutral] },
+        combat: combat({ monsters: [encounter('e1'), encounter('e2', 9)] }),
+        availableIntents: [
+          {
+            id: 'neutral:players',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'neutral',
+            target: { type: 'PLAYERS' },
+            combatId: 'combat-1',
+            combatRevision: 4,
+          },
+          ...['e1', 'e2'].map((encounterId) => ({
+            id: `neutral:${encounterId}`,
+            kind: 'PLAY_CARD' as const,
+            reasonCode: 'OPTIONAL_CARD_PLAY' as const,
+            cardId: 'neutral',
+            target: { type: 'MONSTER' as const, encounterId },
+            combatId: 'combat-1',
+            combatRevision: 4,
+          })),
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.card-action')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.card-details')?.textContent).toContain(
+      'сторону игроков или точного монстра',
+    );
+    const actions = Array.from(
+      root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'),
+    );
+    expect(actions.some((button) => button.textContent?.includes('Сыграть за игроков'))).toBe(true);
+    actions.find((button) => button.textContent?.includes('Помочь монстру'))!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('#target-title')?.textContent).toContain('Помочь какому монстру');
+    expect(root.querySelectorAll('.option-list button')).toHaveLength(2);
   });
 
   it('makes optional-set cards actionable and displays their public slots', () => {

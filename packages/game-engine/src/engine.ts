@@ -654,6 +654,7 @@ function applyEffects(
             hirelingCard: null,
             mountCard: null,
             activeEffects: [],
+            abilityUsages: [],
             isDead: true,
           }));
           nextState = addToDiscard(nextState, possessions);
@@ -1060,6 +1061,7 @@ function addPlayer(
     mountCard: null,
     isDead: false,
     activeEffects: [],
+    abilityUsages: [],
   };
 
   return succeed({ ...state, players: [...state.players, player] }, [
@@ -2014,6 +2016,269 @@ function playRolePermission(
   ]);
 }
 
+function useRoleAbility(
+  state: GameState,
+  actorId: PlayerId,
+  command: Extract<GameCommand, { readonly type: "USE_ROLE_ABILITY" }>,
+  random: RandomSource,
+  nowEpochMs: number,
+): CommandResult {
+  const actor = state.players.find((player) => player.id === actorId);
+  if (actor === undefined)
+    return fail(state, "ACTOR_NOT_FOUND", `Player ${actorId} was not found.`);
+  const roleCard = [...actor.classCards, ...actor.raceCards].find(
+    (card) => card.instanceId === command.roleCardId,
+  );
+  if (roleCard === undefined)
+    return fail(
+      state,
+      "INVALID_CARD_SELECTION",
+      "The selected role is not active for the actor.",
+    );
+  const definition = findDefinition(state, roleCard);
+  const ability = definition.role?.activeAbility;
+  if (ability === undefined)
+    return fail(state, "CARD_NOT_PLAYABLE", "The role has no active ability.");
+
+  const uniqueCostIds = new Set(command.costCardIds);
+  const costCards = actor.hand.filter((card) =>
+    uniqueCostIds.has(card.instanceId),
+  );
+  if (
+    uniqueCostIds.size !== ability.cost.count ||
+    costCards.length !== ability.cost.count
+  )
+    return fail(
+      state,
+      "INVALID_CARD_SELECTION",
+      `The ability requires exactly ${ability.cost.count} hand card(s).`,
+    );
+
+  const usedInScope = (actor.abilityUsages ?? []).some((usage) => {
+    if (usage.sourceCardId !== roleCard.instanceId) return false;
+    return ability.usage === "ONCE_PER_TURN"
+      ? usage.scope.type === "TURN" &&
+          usage.scope.turnNumber === state.turnNumber
+      : state.combat !== null &&
+          usage.scope.type === "COMBAT" &&
+          usage.scope.combatId === state.combat.combatId;
+  });
+  if (usedInScope)
+    return fail(
+      state,
+      "COMMAND_NOT_AVAILABLE",
+      "This role ability was already used in the current scope.",
+    );
+
+  if (ability.type === "DRAW_CARDS") {
+    if (
+      !canChangeEquipment(state, actorId) ||
+      state.combat !== null ||
+      command.target.type !== "SELF"
+    )
+      return fail(
+        state,
+        "INVALID_PHASE",
+        "This role ability can only be used on your turn outside combat.",
+      );
+    if (
+      command.combatId !== undefined ||
+      command.combatRevision !== undefined ||
+      command.reactionWindowId !== undefined
+    )
+      return fail(
+        state,
+        "STALE_COMBAT_STATE",
+        "The combat is no longer active.",
+      );
+
+    const draw = drawCards(state, ability.deck, ability.count, random);
+    let nextState = updatePlayer(draw.state, actorId, (player) => ({
+      ...player,
+      hand: [
+        ...player.hand.filter((card) => !uniqueCostIds.has(card.instanceId)),
+        ...draw.cards,
+      ],
+      abilityUsages: [
+        ...(player.abilityUsages ?? []).filter(
+          (usage) => usage.sourceCardId !== roleCard.instanceId,
+        ),
+        {
+          sourceCardId: roleCard.instanceId,
+          sourceDefinitionId: roleCard.definitionId,
+          scope: { type: "TURN", turnNumber: state.turnNumber },
+        },
+      ],
+    }));
+    nextState = addToDiscard(nextState, costCards);
+    return succeed(nextState, [
+      ...draw.events,
+      {
+        type: "ROLE_ABILITY_USED",
+        visibility: "PUBLIC",
+        playerId: actorId,
+        roleCardId: roleCard.instanceId,
+        roleDefinitionId: roleCard.definitionId,
+        abilityType: ability.type,
+        discardedCount: costCards.length,
+        deck: ability.deck,
+        drawCount: draw.cards.length,
+      },
+      ...draw.cards.map<GameEvent>((card) => ({
+        type: "CARD_DRAWN",
+        visibility: "PRIVATE",
+        recipientPlayerId: actorId,
+        playerId: actorId,
+        cardId: card.instanceId,
+        definitionId: card.definitionId,
+        deck: ability.deck,
+      })),
+    ]);
+  }
+
+  if (state.combat === null || state.phase !== GamePhase.DOOR_RESOLUTION)
+    return fail(
+      state,
+      "INVALID_PHASE",
+      "This role ability requires an active combat.",
+    );
+  const stale = validateCombatAddress(
+    state,
+    command.combatId,
+    command.combatRevision,
+  );
+  if (stale !== null) return stale;
+  const reactionWindow = state.combat.reactionWindow;
+  if (reactionWindow !== null) {
+    if (command.reactionWindowId !== reactionWindow.windowId)
+      return fail(
+        state,
+        "STALE_COMBAT_REACTION",
+        "The role ability targets a stale victory window.",
+      );
+    if (reactionWindow.confirmedPlayerIds.includes(actorId))
+      return fail(
+        state,
+        "REACTION_ALREADY_CONFIRMED",
+        "A player who passed cannot use a role ability until combat changes.",
+      );
+  } else if (command.reactionWindowId !== undefined) {
+    return fail(
+      state,
+      "STALE_COMBAT_REACTION",
+      "The referenced victory reaction window is no longer active.",
+    );
+  }
+  if (state.combat.runAway !== null)
+    return fail(
+      state,
+      "COMMAND_NOT_AVAILABLE",
+      "Role abilities cannot interrupt an escape sequence.",
+    );
+
+  const combatantIds = [
+    state.combat.playerId,
+    ...(state.combat.helpAgreement === null
+      ? []
+      : [state.combat.helpAgreement.helperId]),
+  ];
+  if (
+    ability.type === "RUN_AWAY_BONUS" &&
+    (!combatantIds.includes(actorId) || command.target.type !== "SELF")
+  )
+    return fail(
+      state,
+      "INVALID_TARGET",
+      "A Run Away ability can only target its combatant owner.",
+    );
+  if (
+    ability.type === "COMBAT_BONUS" &&
+    (command.target.type !== "COMBAT" || command.target.side !== "PLAYERS")
+  )
+    return fail(
+      state,
+      "INVALID_TARGET",
+      "This role ability targets the player side of combat.",
+    );
+
+  const effectTargetId =
+    ability.type === "COMBAT_BONUS" ? state.combat.playerId : actorId;
+  let nextState = updatePlayer(state, actorId, (player) => ({
+    ...player,
+    hand: player.hand.filter((card) => !uniqueCostIds.has(card.instanceId)),
+    abilityUsages: [
+      ...(player.abilityUsages ?? []).filter(
+        (usage) => usage.sourceCardId !== roleCard.instanceId,
+      ),
+      {
+        sourceCardId: roleCard.instanceId,
+        sourceDefinitionId: roleCard.definitionId,
+        scope: { type: "COMBAT", combatId: state.combat!.combatId },
+      },
+    ],
+  }));
+  nextState = updatePlayer(nextState, effectTargetId, (player) => ({
+    ...player,
+    activeEffects: [
+      ...player.activeEffects,
+      ability.type === "COMBAT_BONUS"
+        ? {
+            type: "COMBAT_POWER" as const,
+            sourceDefinitionId: roleCard.definitionId,
+            amount: ability.amount,
+            expires: "END_OF_COMBAT" as const,
+          }
+        : {
+            type: "RUN_AWAY_ROLL" as const,
+            sourceDefinitionId: roleCard.definitionId,
+            amount: ability.amount,
+            expires: "END_OF_COMBAT" as const,
+          },
+    ],
+  }));
+  nextState = addToDiscard(nextState, costCards);
+  nextState = {
+    ...nextState,
+    combat: {
+      ...nextState.combat!,
+      history: [
+        ...nextState.combat!.history,
+        {
+          type: "ROLE_ABILITY_USED",
+          playerId: actorId,
+          roleCardId: roleCard.instanceId,
+          roleDefinitionId: roleCard.definitionId,
+          abilityType: ability.type,
+          side: "PLAYERS",
+          amount: ability.amount,
+        },
+      ],
+    },
+  };
+  const intervention = updateCombatAfterIntervention(nextState, nowEpochMs);
+  nextState = intervention.state;
+  return succeed(nextState, [
+    {
+      type: "ROLE_ABILITY_USED",
+      visibility: "PUBLIC",
+      playerId: actorId,
+      roleCardId: roleCard.instanceId,
+      roleDefinitionId: roleCard.definitionId,
+      abilityType: ability.type,
+      discardedCount: costCards.length,
+      amount: ability.amount,
+    },
+    {
+      type: "COMBAT_UPDATED",
+      visibility: "PUBLIC",
+      playerId: state.combat.playerId,
+      playerPower: calculateCombatSidePower(nextState),
+      monsterPower: calculateMonsterPower(nextState),
+    },
+    ...intervention.events,
+  ]);
+}
+
 function discardRolePermission(
   state: GameState,
   actorId: PlayerId,
@@ -2822,8 +3087,12 @@ function playCard(
     definition.effects.every(
       (effect) => effect.type === "MONSTER_COMBAT_BONUS",
     );
+  const isEitherSideBonusCard =
+    definition.type === CardType.TEMPORARY_BONUS &&
+    definition.effects.length > 0 &&
+    definition.effects.every((effect) => effect.type === "COMBAT_SIDE_BONUS");
   const isPlayerBonus =
-    isPlayerSideBonusCard &&
+    (isPlayerSideBonusCard || isEitherSideBonusCard) &&
     command.target?.type === "COMBAT" &&
     command.target.side === "PLAYERS";
   const isCombatCurse =
@@ -2851,7 +3120,10 @@ function playCard(
       (effect) => effect.type === "CLONE_COMBAT_MONSTER",
     );
   const targetsMonster =
-    (isMonsterSideBonusCard || isMonsterModifier || clonesMonster) &&
+    (isMonsterSideBonusCard ||
+      isEitherSideBonusCard ||
+      isMonsterModifier ||
+      clonesMonster) &&
     command.target?.type === "COMBAT" &&
     command.target.side === "MONSTER";
   const targetsCombatPlayer =
@@ -2863,6 +3135,7 @@ function playCard(
   if (
     (isPlayerSideBonusCard ||
       isMonsterSideBonusCard ||
+      isEitherSideBonusCard ||
       isMonsterModifier ||
       addsMonster ||
       clonesMonster ||
@@ -2948,7 +3221,9 @@ function playCard(
   if (isPlayerBonus) {
     const bonus = definition.effects.reduce(
       (total, effect) =>
-        effect.type === "COMBAT_BONUS" ? total + effect.amount : total,
+        effect.type === "COMBAT_BONUS" || effect.type === "COMBAT_SIDE_BONUS"
+          ? total + effect.amount
+          : total,
       0,
     );
     nextState = updatePlayer(nextState, state.combat.playerId, (player) => ({
@@ -3061,6 +3336,9 @@ function playCard(
           return { ...total, strength: total.strength + effect.amount };
         }
         if (effect.type === "MONSTER_COMBAT_BONUS") {
+          return { ...total, strength: total.strength + effect.amount };
+        }
+        if (effect.type === "COMBAT_SIDE_BONUS") {
           return { ...total, strength: total.strength + effect.amount };
         }
         if (effect.type === "MODIFY_MONSTER") {
@@ -4340,7 +4618,8 @@ function executePlayerCommand(
   if (
     state.combat?.reactionWindow !== null &&
     state.combat?.reactionWindow !== undefined &&
-    command.type !== "PLAY_CARD"
+    command.type !== "PLAY_CARD" &&
+    command.type !== "USE_ROLE_ABILITY"
   ) {
     return fail(
       state,
@@ -4351,6 +4630,16 @@ function executePlayerCommand(
 
   if (command.type === "PLAY_CARD") {
     return playCard(
+      state,
+      command.actorId,
+      command,
+      context.random,
+      contextNow(context),
+    );
+  }
+
+  if (command.type === "USE_ROLE_ABILITY") {
+    return useRoleAbility(
       state,
       command.actorId,
       command,

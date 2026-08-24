@@ -62,6 +62,7 @@ export type EquipmentSlot = (typeof EquipmentSlot)[keyof typeof EquipmentSlot];
 
 export const CardPlayTiming = {
   TURN: "TURN",
+  POST_DOOR: "POST_DOOR",
   ACTIVE_COMBAT: "ACTIVE_COMBAT",
   VICTORY_REACTION: "VICTORY_REACTION",
   WHEN_DRAWN: "WHEN_DRAWN",
@@ -75,6 +76,7 @@ export const CardPlayTarget = {
   ANY_PLAYER: "ANY_PLAYER",
   COMBAT_PLAYERS: "COMBAT_PLAYERS",
   COMBAT_PLAYER: "COMBAT_PLAYER",
+  COMBAT_SIDE: "COMBAT_SIDE",
   MONSTER_ENCOUNTER: "MONSTER_ENCOUNTER",
   HAND_MONSTER: "HAND_MONSTER",
   EQUIPMENT: "EQUIPMENT",
@@ -159,9 +161,43 @@ export interface CardPlayDefinition {
   readonly target: CardPlayTarget;
 }
 
+export interface RoleAbilityCostDefinition {
+  readonly type: "DISCARD_HAND";
+  readonly count: number;
+}
+
+export type RoleActiveAbilityDefinition =
+  | {
+      readonly type: "COMBAT_BONUS";
+      readonly amount: number;
+      readonly target: "PLAYERS";
+      readonly cost: RoleAbilityCostDefinition;
+      readonly usage: "ONCE_PER_COMBAT";
+    }
+  | {
+      readonly type: "RUN_AWAY_BONUS";
+      readonly amount: number;
+      readonly target: "SELF";
+      readonly cost: RoleAbilityCostDefinition;
+      readonly usage: "ONCE_PER_COMBAT";
+    }
+  | {
+      readonly type: "DRAW_CARDS";
+      readonly deck: DeckType;
+      readonly count: number;
+      readonly target: "SELF";
+      readonly cost: RoleAbilityCostDefinition;
+      readonly usage: "ONCE_PER_TURN";
+    };
+
 export type CardEffect =
   | {
       readonly type: "COMBAT_BONUS";
+      readonly amount: number;
+    }
+  | {
+      /** A temporary modifier authored as legal for either exact combat side. */
+      readonly type: "COMBAT_SIDE_BONUS";
       readonly amount: number;
     }
   | {
@@ -260,6 +296,7 @@ export interface CardDefinition {
   readonly role?: {
     readonly role: "CLASS" | "RACE";
     readonly modifier?: ConditionalModifierDefinition;
+    readonly activeAbility?: RoleActiveAbilityDefinition;
   };
   readonly companion?: {
     readonly kind: "HIRELING" | "MOUNT";

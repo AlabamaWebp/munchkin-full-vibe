@@ -1481,3 +1481,154 @@ describe('createGameView', () => {
     ]);
   });
 });
+
+describe('V2 card-rule intent projection', () => {
+  it('projects both exact combat sides, role costs, and complete Details metadata', () => {
+    const playerId = parsePlayerId('rule-viewer');
+    const random = createSeededRandomSource(2026);
+    let state = createGame({ id: parseGameId('rule-view') });
+    const added = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId: playerId, name: 'Rule Viewer' },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const started = executeCommand(
+      added.state,
+      { type: 'START_GAME', actorId: playerId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    state = started.state;
+    const instance = (definitionId: string, suffix: string) => ({
+      instanceId: parseCardInstanceId(`${definitionId}-${suffix}`),
+      definitionId: parseCardDefinitionId(definitionId),
+    });
+    const neutral = instance('bottled-applause', 'view');
+    const playersOnly = instance('emergency-confetti', 'view');
+    const cost = instance('door-cache', 'cost');
+    const role = instance('scrap-knights', 'role');
+    const monster = instance('map-eater', 'combat');
+    const encounterId = parseEncounterId('rule-view-encounter');
+    state = {
+      ...state,
+      phase: GamePhase.DOOR_RESOLUTION,
+      players: state.players.map((player) => ({
+        ...player,
+        hand: [neutral, playersOnly, cost],
+        classCards: [role],
+        abilityUsages: [],
+      })),
+      combat: {
+        combatId: parseCombatId('rule-view-combat'),
+        playerId,
+        revision: 4,
+        monsters: [
+          {
+            encounterId,
+            monster,
+            sourceCard: monster,
+            clonedFromEncounterId: null,
+            baseStrength: 8,
+            baseLevelRewards: 1,
+            baseTreasureRewards: 2,
+            tier: 2,
+            tags: ['BEAST'],
+            badStuff: [],
+            strengthModifier: 0,
+            treasureModifier: 0,
+            playedCards: [],
+          },
+        ],
+        nextEncounterSequence: 2,
+        nextHelpOfferSequence: 1,
+        nextReactionWindowSequence: 1,
+        reactionWindow: null,
+        helpOffer: null,
+        helpAgreement: null,
+        history: [
+          {
+            type: 'COMBAT_STARTED',
+            playerId,
+            encounterId,
+            monsterDefinitionId: monster.definitionId,
+          },
+        ],
+        runAway: null,
+      },
+    };
+
+    const view = createGameView(state, playerId);
+    expect(
+      view.availableIntents
+        .filter(
+          (intent) =>
+            intent.kind === 'PLAY_CARD' && intent.cardId === neutral.instanceId,
+        )
+        .map((intent) => ('target' in intent ? intent.target : null)),
+    ).toEqual([{ type: 'PLAYERS' }, { type: 'MONSTER', encounterId }]);
+    expect(
+      view.availableIntents.filter(
+        (intent) =>
+          intent.kind === 'PLAY_CARD' &&
+          intent.cardId === playersOnly.instanceId,
+      ),
+    ).toEqual([expect.objectContaining({ target: { type: 'PLAYERS' } })]);
+    expect(view.availableIntents).toContainEqual(
+      expect.objectContaining({
+        kind: 'USE_ROLE_ABILITY',
+        roleCardId: role.instanceId,
+        abilityType: 'COMBAT_BONUS',
+        cost: {
+          count: 1,
+          eligibleCardIds: [
+            neutral.instanceId,
+            playersOnly.instanceId,
+            cost.instanceId,
+          ],
+        },
+        target: { type: 'PLAYERS' },
+        combatId: 'rule-view-combat',
+        combatRevision: 4,
+      }),
+    );
+    expect(
+      view.self.hand.find((card) => card.instanceId === neutral.instanceId),
+    ).toMatchObject({
+      duration: 'END_OF_COMBAT',
+      play: { target: 'COMBAT_SIDE' },
+      effects: [{ type: 'COMBAT_SIDE_BONUS', amount: 3 }],
+    });
+    expect(view.self.classCards?.[0]).toMatchObject({
+      duration: 'WHILE_ROLE_ACTIVE',
+      role: {
+        role: 'CLASS',
+        modifier: { type: 'COMBAT_POWER' },
+        activeAbility: {
+          type: 'COMBAT_BONUS',
+          cost: { type: 'DISCARD_HAND', count: 1 },
+          usage: 'ONCE_PER_COMBAT',
+        },
+      },
+    });
+
+    const drawRole = instance('guild-of-echoes', 'role');
+    const exhausted: GameState = {
+      ...state,
+      phase: GamePhase.TURN_START,
+      combat: null,
+      treasureDeck: [],
+      treasureDiscard: [],
+      players: state.players.map((player) => ({
+        ...player,
+        hand: [neutral, cost],
+        classCards: [drawRole],
+      })),
+    };
+    expect(
+      createGameView(exhausted, playerId).availableIntents.some(
+        (intent) => intent.kind === 'USE_ROLE_ABILITY',
+      ),
+    ).toBe(false);
+  });
+});
