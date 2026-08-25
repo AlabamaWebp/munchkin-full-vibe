@@ -185,13 +185,13 @@ describe("authoritative next-pass foundations", () => {
       ).toThrow(/Maximum hand size/);
   });
 
-  it("keeps the authored one-in-six theft tuning deterministic under seeded sampling", () => {
+  it("keeps the authored two-in-six theft tuning deterministic under seeded sampling", () => {
     const authored = createDevelopmentCardSet()
       .definitions.map((entry) => entry.role?.activeAbility)
       .find((ability) => ability?.type === "STEAL_EQUIPPED_ITEM");
     expect(authored).toMatchObject({
       type: "STEAL_EQUIPPED_ITEM",
-      successChance: { numerator: 1, denominator: 6 },
+      successChance: { numerator: 2, denominator: 6 },
       usage: "ONCE_PER_TURN",
     });
     if (authored?.type !== "STEAL_EQUIPPED_ITEM") return;
@@ -203,7 +203,7 @@ describe("authoritative next-pass foundations", () => {
         authored.successChance.numerator
       )
         successes += 1;
-    expect(successes).toBe(114);
+    expect(successes).toBe(201);
   });
 
   it("consumes a failed low-chance equipped theft and persists its once-per-turn usage", () => {

@@ -91,7 +91,7 @@ primitives, including a bounded attempt to steal one exact public equipped item.
 Costs and exact legal targets are projected as intents. A single JSON-safe usage
 ledger enforces once-per-turn or once-per-combat limits and survives reconnect.
 The initial equipped-theft content allows one paid attempt per turn at an
-authored 1-in-6 success chance. Failure consumes the cost and usage; success
+authored 2-in-6 success chance. Failure consumes the cost and usage; success
 moves the same physical item into the thief's hand, then applies normal
 attachment and equipment-revalidation rules to the victim.
 

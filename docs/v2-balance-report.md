@@ -75,3 +75,31 @@ Validate first-level all-pack combat pressure and early Curse/Equipment loss in
 - Companions: `eager-intern`, `lantern-scout`, `scrap-squire`, `stubborn-pony`, `archive-apprentice`, `graveyard-guide`, `clockwork-goat`, `mossback-elk`, `deadline-ostrich`, `veteran-retainer`, `comet-stag`, `leviathan-skipper`.
 - Arsenal: `sharpening-chorus`, `balanced-pommel`, `hexproof-cap`, `beast-hunters-vest`, `construct-cracker`, `smoke-pellet`, `moonsteel-edge`, `thunder-weight`, `undead-surveyors-goggles`, `arcane-grounding-boots`, `defensive-umbrella`, `escape-route-boots`, `comet-core`, `wardens-aegis`, `last-second-ramp`, `monster-compass`.
 - Dual Identity: `double-major`, `mixed-heritage`, `mirror-sages`, `iron-chorus`, `night-school`, `adopted-tradition`, `beast-barristers`, `graveborn`, `bladesingers`, `polymath-license`, `many-roots`, `two-world-walkers`.
+
+## 2026-08-25 pressure and interaction pass
+
+The same all-packs, 20,000-scenario, three-seed run was repeated after the
+catalog pass (176 definitions / 388 physical cards before option filtering).
+The startup matrix separately verifies the catalog at 3, 4, and 6 players in
+both modes. The harness samples the authored early/mid/late power bands; it
+does not model negotiation, player count, or rational use of reaction cards, so
+the following are catalog-wide evidence, not separate player-count predictions.
+
+| Metric                               |     Before |      After |
+| ------------------------------------ | ---------: | ---------: |
+| Weak Tier-1 solo beatability         | 57.7–58.0% | 57.7–58.0% |
+| Door-Monster beatability, levels 1–3 | 65.5–66.9% | 64.9–65.6% |
+| Door-Monster beatability, levels 4–6 | 80.5–81.5% | 74.8–76.2% |
+| Door-Monster beatability, levels 7–9 | 97.1–97.3% | 93.9–94.6% |
+| No plausible solo recovery           |   7.8–7.9% |  9.9–10.3% |
+| Early permanent-loss rate            |   3.5–3.6% |   3.5–3.6% |
+
+The change deliberately preserves the early anti-death-spiral signal while
+bringing mid/late raw solo victories down. The remaining high late solo value is
+expected because the harness does not price the expanded reaction economy:
+additional either-side boosts, exact-Monster modifiers, add/clone pressure, and
+the 2/6 once-per-turn equipped theft require 3–6-player LAN observation.
+
+`Quiet Acquisition Office` now succeeds at 2/6 rather than 1/6. The retained
+hand-card cost and once-per-turn ceiling, together with the stronger existing
+reaction density, make 2/6 meaningful without escalating to 3/6.

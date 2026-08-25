@@ -44,14 +44,26 @@ interface PickerOption {
   readonly label: string;
   readonly facts?: string;
   readonly playerColor?: GameView['players'][number]['color'];
+  readonly card?: GameCardView;
 }
 
 interface TargetPickerState {
   readonly title: string;
   readonly card: GameCardView;
   readonly kind:
-    'CURSE' | 'PLAYER_CARD' | 'COMBAT_CURSE' | 'MONSTER' | 'HAND_MONSTER' | 'EQUIPMENT' | 'TRADE';
+    | 'CURSE'
+    | 'PLAYER_CARD'
+    | 'COMBAT_CURSE'
+    | 'MONSTER'
+    | 'HAND_MONSTER'
+    | 'EQUIPMENT'
+    | 'THEFT'
+    | 'TRADE';
   readonly options: readonly PickerOption[];
+  readonly theftIntents?: readonly Extract<
+    AvailableIntentView,
+    { readonly kind: 'USE_ROLE_ABILITY' }
+  >[];
 }
 
 interface CardUse {
@@ -287,6 +299,7 @@ interface CardUse {
                     [card]="card"
                     [cardName]="displayCardName"
                     [playable]="playableIds().includes(card.instanceId)"
+                    [upgrade]="card.permanentCombatUpgrade === true"
                     [reason]="cardReason(card)"
                     [showDetails]="true"
                     [details]="compactHandFacts(card)"
@@ -323,7 +336,21 @@ interface CardUse {
             </header>
             <div class="sheet-scroll option-list">
               @for (option of picker.options; track option.id) {
-                <button type="button" (click)="chooseTarget(picker, option.id)">
+                <article class="picker-option">
+                  @if (option.card; as optionCard) {
+                    <button
+                      type="button"
+                      class="picker-option-artwork"
+                      [attr.aria-label]="'Подробнее: ' + cardName(optionCard)"
+                      (click)="$event.stopPropagation(); selectedCard.set(optionCard)"
+                    >
+                      <app-card-artwork
+                        [artKey]="optionCard.artKey"
+                        [label]="cardName(optionCard)"
+                        [compact]="true"
+                      />
+                    </button>
+                  }
                   @if (option.playerColor; as color) {
                     <span
                       class="target-avatar"
@@ -332,11 +359,17 @@ interface CardUse {
                       >{{ option.label.charAt(0).toUpperCase() }}</span
                     >
                   }
-                  <strong>{{ option.label }}</strong>
-                  @if (option.facts) {
-                    <small>{{ option.facts }}</small>
-                  }
-                </button>
+                  <button
+                    type="button"
+                    class="picker-option-select"
+                    (click)="chooseTarget(picker, option.id)"
+                  >
+                    <strong>{{ option.label }}</strong>
+                    @if (option.facts) {
+                      <small>{{ option.facts }}</small>
+                    }
+                  </button>
+                </article>
               }
             </div>
           </section>
@@ -363,16 +396,34 @@ interface CardUse {
             </header>
             <div class="sheet-scroll option-list">
               @for (cardId of intent.cost.eligibleCardIds; track cardId) {
-                <button
-                  type="button"
-                  [class.selected]="roleAbilityCostSelection().includes(cardId)"
-                  (click)="toggleRoleAbilityCost(cardId, intent.cost.count)"
-                >
-                  <strong>{{ ownCardName(cardId) }}</strong>
-                  <small>{{
-                    roleAbilityCostSelection().includes(cardId) ? 'Выбрано' : 'Нажмите для выбора'
-                  }}</small>
-                </button>
+                @if (ownCard(cardId); as costCard) {
+                  <article
+                    class="decision-card"
+                    [class.selected]="roleAbilityCostSelection().includes(cardId)"
+                  >
+                    <button
+                      type="button"
+                      class="decision-card-artwork"
+                      [attr.aria-label]="'Подробнее: ' + cardName(costCard)"
+                      (click)="selectedCard.set(costCard)"
+                    >
+                      <app-card-artwork
+                        [artKey]="costCard.artKey"
+                        [label]="cardName(costCard)"
+                        [compact]="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="decision-card-select"
+                      [attr.aria-pressed]="roleAbilityCostSelection().includes(cardId)"
+                      (click)="toggleRoleAbilityCost(cardId, intent.cost.count)"
+                    >
+                      <span>{{ cardName(costCard) }}</span>
+                      <small>Нажмите, чтобы выбрать карту для сброса</small>
+                    </button>
+                  </article>
+                }
               }
             </div>
             <footer>
@@ -752,10 +803,11 @@ interface CardUse {
                   {{ rolesLabel(value.raceCards, value.raceCard) }}
                 </p>
                 @if (
-                  (value.hirelingCards?.length ?? 0) > 0 ||
-                  (value.mountCards?.length ?? 0) > 0 ||
-                  value.hirelingCard ||
-                  value.mountCard
+                  companionSurfacesAvailable() &&
+                  ((value.hirelingCards?.length ?? 0) > 0 ||
+                    (value.mountCards?.length ?? 0) > 0 ||
+                    value.hirelingCard ||
+                    value.mountCard)
                 ) {
                   <p>
                     Спутники:
@@ -768,6 +820,8 @@ interface CardUse {
                   [player]="value"
                   [labels]="equipmentLabels"
                   [cardName]="displayCardName"
+                  [showCompanions]="companionSurfacesAvailable()"
+                  [showRolePermissions]="rolePermissionSurfacesAvailable()"
                   (cardOpened)="selectedCard.set($event)"
                 />
               </div>
@@ -998,6 +1052,14 @@ export class GameShellComponent {
       .reverse();
   });
   protected readonly playableIds = computed(() => this.collectPlayableIds());
+  protected readonly combatPlayableIds = computed(
+    () =>
+      new Set(
+        this.game().availableIntents.flatMap((intent) =>
+          intent.kind === 'PLAY_CARD' && 'combatId' in intent ? [intent.cardId] : [],
+        ),
+      ),
+  );
   protected readonly sortedHand = computed(() =>
     [...this.game().self.hand].sort(
       (a, b) =>
@@ -1011,10 +1073,7 @@ export class GameShellComponent {
       if (filter === 'ALL') return true;
       if (filter === 'PLAYABLE') return this.playableIds().includes(card.instanceId);
       if (filter === 'EQUIPMENT') return card.type === 'EQUIPMENT';
-      if (filter === 'COMBAT')
-        return (
-          card.type === 'TEMPORARY_BONUS' && (card.play?.timings.includes('ACTIVE_COMBAT') ?? false)
-        );
+      if (filter === 'COMBAT') return this.combatPlayableIds().has(card.instanceId);
       if (filter === 'CURSES') return card.type === 'CURSE' || card.type === 'COMBAT_CURSE';
       if (filter === 'MONSTERS') return card.type === 'MONSTER';
       if (filter === 'RACES') return card.type === 'RACE';
@@ -1044,11 +1103,7 @@ export class GameShellComponent {
         ].includes(kind),
       ),
   );
-  protected readonly hasPlayableCombatCards = computed(() =>
-    this.game().availableIntents.some(
-      (intent) => intent.kind === 'PLAY_CARD' && 'combatId' in intent,
-    ),
-  );
+  protected readonly hasPlayableCombatCards = computed(() => this.combatPlayableIds().size > 0);
   protected readonly utilityActions = computed<readonly ActionDockUtilityAction[]>(() => [
     ...(this.saleCards().length > 0 && this.game().self.level < 9
       ? [{ id: 'SELL_CARDS' as const, label: 'Продать карты', hint: 'Получить уровни' }]
@@ -1168,6 +1223,15 @@ export class GameShellComponent {
     empty: 'Свободно',
     twoHanded: 'две руки',
   };
+  protected readonly companionSurfacesAvailable = computed(
+    () =>
+      this.game().config?.enabledSetIds.some(
+        (setId) => setId === 'COMPANIONS' || setId === 'STEED_HIRELINGS',
+      ) ?? false,
+  );
+  protected readonly rolePermissionSurfacesAvailable = computed(
+    () => this.game().config?.enabledSetIds.includes('DUAL_IDENTITY') ?? false,
+  );
   protected readonly displayCardName = (card: GameCardView): string => this.cardName(card);
   protected readonly selectedCard = signal<GameCardView | null>(null);
   protected readonly selectedPlayerId = signal<string | null>(null);
@@ -1337,6 +1401,16 @@ export class GameShellComponent {
 
   protected chooseTarget(picker: TargetPickerState, id: string): void {
     this.targetPicker.set(null);
+    if (picker.kind === 'THEFT') {
+      const theftIntent = picker.theftIntents?.find(
+        (intent) => intent.target.type === 'EQUIPMENT' && intent.target.cardId === id,
+      );
+      if (theftIntent) {
+        this.roleAbilityCostSelection.set([]);
+        this.roleAbilityIntent.set(theftIntent);
+      }
+      return;
+    }
     const reactionWindowId = this.game().combat?.reactionWindow?.windowId;
     if (picker.kind === 'CURSE')
       this.send({ type: 'PLAY_CURSE', cardId: picker.card.instanceId, targetPlayerId: id });
@@ -1450,10 +1524,15 @@ export class GameShellComponent {
     return this.player(id)?.name ?? 'Игрок';
   }
   protected ownCardName(id: string): string {
-    const card = [...this.game().self.hand, ...this.game().self.equipment].find(
-      (candidate) => candidate.instanceId === id,
+    const card = this.ownCard(id);
+    return card === null ? 'карта' : this.cardName(card);
+  }
+  protected ownCard(id: string): GameCardView | null {
+    return (
+      [...this.game().self.hand, ...this.game().self.equipment].find(
+        (candidate) => candidate.instanceId === id,
+      ) ?? null
     );
-    return card === undefined ? 'карта' : this.cardName(card);
   }
   protected deadlineLabel(expiresAtEpochMs: number): string {
     return new Date(expiresAtEpochMs).toLocaleTimeString([], {
@@ -2181,12 +2260,36 @@ export class GameShellComponent {
       (intent) => intent.abilityType === 'STEAL_EQUIPPED_ITEM',
     )) {
       if (theftIntent.target.type !== 'EQUIPMENT') continue;
-      const owner = game.players.find((player) => player.playerId === theftIntent.target.playerId);
-      const target = owner?.equipment.find((item) => item.instanceId === theftIntent.target.cardId);
       uses.push({
-        label: `Попытаться забрать: ${target?.name ?? 'снаряжение'} (${owner?.name ?? 'игрок'})`,
-        roleAbility: theftIntent,
+        label: `Попытаться забрать снаряжение (${card.role?.activeAbility?.type === 'STEAL_EQUIPPED_ITEM' ? `${card.role.activeAbility.successChance.numerator}/${card.role.activeAbility.successChance.denominator}` : '?'})`,
+        picker: {
+          title: 'Попытка кражи · доступна одна попытка в этот ход',
+          card,
+          kind: 'THEFT',
+          theftIntents: roleAbilityIntents.filter(
+            (intent) => intent.abilityType === 'STEAL_EQUIPPED_ITEM',
+          ),
+          options: roleAbilityIntents.flatMap((intent) => {
+            if (intent.abilityType !== 'STEAL_EQUIPPED_ITEM' || intent.target.type !== 'EQUIPMENT')
+              return [];
+            const owner = game.players.find((player) => player.playerId === intent.target.playerId);
+            const target = owner?.equipment.find(
+              (item) => item.instanceId === intent.target.cardId,
+            );
+            return target === undefined
+              ? []
+              : [
+                  {
+                    id: target.instanceId,
+                    label: `${this.cardName(target)} · ${owner?.name ?? 'игрок'}`,
+                    facts: this.cardFacts(target).join(' · '),
+                    card: target,
+                  },
+                ];
+          }),
+        },
       });
+      break;
     }
     if (roleIntent?.kind === 'PLAY_ROLE')
       uses.push({
@@ -2212,7 +2315,11 @@ export class GameShellComponent {
     if (selfIntent)
       uses.push({
         label:
-          card.type === 'HIRELING' || card.type === 'MOUNT' ? 'Призвать спутника' : 'Сыграть карту',
+          card.type === 'HIRELING' || card.type === 'MOUNT'
+            ? 'Призвать спутника'
+            : card.effects.some((effect) => effect.type === 'STEAL_RANDOM_HAND_CARD')
+              ? 'Украсть карту вслепую'
+              : 'Сыграть карту',
         command: { type: 'PLAY_CARD', cardId: card.instanceId, target: { type: 'SELF' } },
       });
     if (equipmentIntents.length > 0)
@@ -2227,8 +2334,9 @@ export class GameShellComponent {
             const target = game.self.equipment.find((item) => item.instanceId === targetId);
             return {
               id: targetId,
-              label: target?.name ?? 'Снаряжение',
+              label: target === undefined ? 'Снаряжение' : this.cardName(target),
               facts: target === undefined ? '' : this.cardFacts(target).join(' · '),
+              ...(target === undefined ? {} : { card: target }),
             };
           }),
         ),
@@ -2243,8 +2351,14 @@ export class GameShellComponent {
       }));
       uses.push(
         this.useWithTargets(
-          card.type === 'CURSE' ? 'Наложить проклятие' : 'Сыграть на игрока',
-          'Выберите цель',
+          card.type === 'CURSE'
+            ? 'Наложить проклятие'
+            : card.effects.some((effect) => effect.type === 'STEAL_RANDOM_HAND_CARD')
+              ? 'Украсть случайную карту'
+              : 'Сыграть на игрока',
+          card.effects.some((effect) => effect.type === 'STEAL_RANDOM_HAND_CARD')
+            ? 'Выберите игрока — его рука останется скрытой'
+            : 'Выберите цель',
           card,
           card.type === 'CURSE' ? 'CURSE' : 'PLAYER_CARD',
           options,
@@ -2308,6 +2422,11 @@ export class GameShellComponent {
                 ? `Сила ${target.currentStrength} · ${target.currentTreasures} сокр.`
                 : '';
             })(),
+            card: game.combat?.monsters.find(
+              (monster) =>
+                monster.encounterId ===
+                (intent.target.type === 'MONSTER' ? intent.target.encounterId : ''),
+            )?.monster,
           })),
         ),
       );
@@ -2321,12 +2440,13 @@ export class GameShellComponent {
           'HAND_MONSTER',
           addIntents.map((intent) => ({
             id: intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : '',
-            label:
+            label: this.cardName(
               game.self.hand.find(
                 (value) =>
                   value.instanceId ===
                   (intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : ''),
-              )?.name ?? 'Монстр',
+              ) ?? card,
+            ),
             facts: this.cardFacts(
               game.self.hand.find(
                 (value) =>
@@ -2334,6 +2454,12 @@ export class GameShellComponent {
                   (intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : ''),
               ) ?? card,
             ).join(' · '),
+            card:
+              game.self.hand.find(
+                (value) =>
+                  value.instanceId ===
+                  (intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : ''),
+              ) ?? card,
           })),
         ),
       );
@@ -2428,6 +2554,7 @@ export class GameShellComponent {
         id: card.instanceId,
         label: this.cardName(card),
         facts: this.cardFacts(card).join(' · '),
+        card,
       })),
     });
   }

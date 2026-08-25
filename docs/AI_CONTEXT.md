@@ -87,6 +87,10 @@ current `AvailableIntentView`.
 - The game view contains `availableIntents`, `expectedAction`, unavailability
   reasons, exact workflow addresses/deadlines, and authoritative presentation
   buckets. New UI should consume these rather than introduce parallel lists.
+- Combat hand filtering, POST_DOOR action reachability, exact combat targets,
+  theft targets, and Equipment upgrade hints are all intent/projection-driven.
+  Card-instance pickers reuse artwork and Details while retaining valid local
+  selection; never derive alternate targets or reveal hidden-hand candidates.
 
 ## Domain
 
@@ -240,8 +244,11 @@ Important incomplete/known areas:
   not yet serve Angular static output or present the final single LAN URL.
 - No durable persistence, accounts, authentication, Internet/cloud deployment,
   matchmaking, AI opponents, database, Redis, SSR, GraphQL, NgRx, or Nx.
-- Deterministic balance simulation exists but real 3–6-player LAN playtesting
-  and broad device/accessibility verification are still needed.
+- The 2026-08-25 catalog pass uses 2/6 paid, once-per-turn equipped theft,
+  broader either-side/exact-Monster interference, and stronger selected mid/late
+  Core Monsters. The deterministic harness is catalog-wide rather than
+  player-count/negotiation aware; real 3–6-player LAN playtesting and broad
+  device/accessibility verification are still needed.
 
 ## Documentation map
 

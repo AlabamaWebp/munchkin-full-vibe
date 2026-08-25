@@ -169,6 +169,14 @@ describe('App lobby', () => {
       .find((button) => button.textContent?.includes('Спутники'))!
       .click();
     expect(client.setSettings).toHaveBeenCalledWith('BALANCED', ['CORE', 'COMPANIONS']);
+    Array.from(root.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === '7')!
+      .click();
+    expect(client.setSettings).toHaveBeenCalledWith('BALANCED', ['CORE'], 7);
+    Array.from(root.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Двойная засада'))!
+      .click();
+    expect(client.setSettings).toHaveBeenCalledWith('BALANCED', ['CORE'], 5, true);
     expect(root.textContent).toContain('Нейро 1');
     expect(root.textContent).toContain('Классическое фэнтези');
     expect(root.textContent).toContain('Ошибки духовенства');

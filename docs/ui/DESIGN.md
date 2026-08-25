@@ -183,6 +183,14 @@ through public lobby state and is included in game UI identity. The picker must:
 Color is cosmetic only. It must not affect Sex, role, cards, rules, or any
 other gameplay calculation.
 
+### Authoritative lobby settings
+
+The host controls the projected maximum hand size and optional double-Monster
+ambush switch through the existing lobby settings controls. Other players see
+the active values but receive no editable controls. The client forwards the
+selection only; validation and the set of supported values remain authoritative
+on the server.
+
 Only the stage is flexible in the vertical grid. Fixed regions should have a
 compact-height variant for short viewports. If space is limited, reduce
 ornament and secondary copy before reducing touch targets.
@@ -254,6 +262,10 @@ conditions/modifiers, role abilities and a duration category. Flavor copy may
 remain, but it cannot be the sole gameplay explanation. A side-neutral combat
 card presents separate “players” and exact named-Monster choices. An active role
 opens a bounded cost-card picker sourced only from its `AvailableIntentView`.
+The combat-hand category is likewise the set of cards with a current projected
+combat intent, never a client-maintained type list. Equipment cards carry a
+positive enhancement marker only when their server projection says they are a
+legal permanent-power upgrade.
 
 ### Sheets and dialogs
 
@@ -263,6 +275,15 @@ opens a bounded cost-card picker sourced only from its `AvailableIntentView`.
 - Keep focus trap, focus return, Escape/close behavior, and visible focus rings.
 - A blocking authoritative decision cannot be dismissed as though it were
   optional.
+- Every card-instance picker uses the normal artwork plus a separate Details
+  affordance; returning from Details keeps the valid selection. Selection is
+  communicated by the standard selected visual and semantic pressed state, not
+  repeated "selected" copy. Player-only pickers for hidden-hand theft never
+  reveal hand candidates.
+- Menus, sheets, Details, character surfaces, blocking windows and meaningful
+  stage changes use short opacity/translate/scale transitions. Snapshot refreshes
+  and reconnect recovery do not replay entrance motion, and reduced-motion
+  preference removes decorative animation.
 
 ## Existing UI: preserve and replace
 

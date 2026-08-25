@@ -259,6 +259,12 @@ function eventSummary(
       return `${player} продал карты`;
     case 'ITEM_TRADED':
       return `${player} передал ${cardLabel ?? 'предмет'}${target ? ` игроку ${target}` : ''}`;
+    case 'EQUIPPED_ITEM_THEFT_ATTEMPTED':
+      return `${player} попытался забрать ${cardLabel ?? 'снаряжение'}${target ? ` у ${target}` : ''}: ${entry.outcome === 'SUCCEEDED' ? 'успех' : 'неудача'}`;
+    case 'RANDOM_HAND_THEFT':
+      return `${player} украл случайную карту${target ? ` у ${target}` : ''}`;
+    case 'STOLEN_HAND_CARD_REVEALED':
+      return `${target ?? 'Игрок'} потерял ${cardLabel ?? 'карту'} при краже`;
     case 'CHARITY_RESOLVED':
       return `${player} раздал милостыню`;
     default:

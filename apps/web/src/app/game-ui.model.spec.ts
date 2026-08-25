@@ -244,6 +244,65 @@ describe('game UI state mapper', () => {
 
     expect(events[0]?.summary).toBe('Ada открыл Заводской як');
   });
+  it('presents authoritative theft outcomes without inventing hidden-hand candidates', () => {
+    const stolen = card({ instanceId: 'stolen', name: 'Секретная карта' });
+    const events = presentEvents(
+      view({
+        players: [player(), player({ playerId: 'p2', name: 'Boris' })],
+        presentation: {
+          blocking: null,
+          important: [
+            {
+              sequence: 1,
+              turnNumber: 1,
+              phase: 'POST_DOOR',
+              type: 'EQUIPPED_ITEM_THEFT_ATTEMPTED',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              targetPlayerId: 'p2',
+              card: card({ name: 'Шлем' }),
+              outcome: 'FAILED',
+              priority: 'IMPORTANT',
+              summaryCode: 'EQUIPPED_ITEM_THEFT_ATTEMPTED',
+              requiresViewerAction: false,
+            },
+            {
+              sequence: 2,
+              turnNumber: 1,
+              phase: 'POST_DOOR',
+              type: 'RANDOM_HAND_THEFT',
+              visibility: 'PUBLIC',
+              playerId: 'p1',
+              targetPlayerId: 'p2',
+              priority: 'IMPORTANT',
+              summaryCode: 'RANDOM_HAND_THEFT',
+              requiresViewerAction: false,
+            },
+            {
+              sequence: 3,
+              turnNumber: 1,
+              phase: 'POST_DOOR',
+              type: 'STOLEN_HAND_CARD_REVEALED',
+              visibility: 'PRIVATE',
+              playerId: 'p1',
+              targetPlayerId: 'p2',
+              card: stolen,
+              priority: 'IMPORTANT',
+              summaryCode: 'STOLEN_HAND_CARD_REVEALED',
+              requiresViewerAction: false,
+            },
+          ],
+          routine: [],
+        },
+      }),
+    );
+
+    expect(events.map((event) => event.summary)).toEqual([
+      'Ada попытался забрать Шлем у Boris: неудача',
+      'Ada украл случайную карту у Boris',
+      'Boris потерял Секретная карта при краже',
+    ]);
+  });
   it('keeps a combat Treasure reward as one typed presentation outcome', () => {
     const rewards = presentEvents(
       view({

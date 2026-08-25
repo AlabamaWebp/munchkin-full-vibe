@@ -160,7 +160,7 @@ describe("game setup", () => {
     ).toHaveLength(29);
     expect(
       set.definitions.filter((card) => card.type === CardType.EQUIPMENT),
-    ).toHaveLength(36);
+    ).toHaveLength(37);
     expect(
       set.definitions.filter((card) => card.type === CardType.CURSE),
     ).toHaveLength(13);

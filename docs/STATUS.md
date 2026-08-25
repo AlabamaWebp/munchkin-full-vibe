@@ -40,6 +40,25 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-25: completed the projected-state frontend pass. Lobby hand-limit and
+  double-ambush controls now follow host-only settings; combat filtering is
+  derived from current legal intents (including Clone), and eligible equipment
+  upgrades are server-hinted in both hand surfaces. Card pickers consistently
+  expose artwork and Details without losing selection, optional companion/role
+  slots follow enabled sets, and POST_DOOR actions remain intent-gated. Theft
+  selects only server-approved targets, preserves hidden hands, and presents
+  authoritative outcomes. Shared restrained sheet/stage motion respects reduced
+  motion; focused Angular coverage and local 390×844/360×640 browser checks
+  passed.
+- 2026-08-25: completed a catalog pressure and interaction pass. Equipped theft
+  is now data-authored at 2/6 while retaining its paid once-per-turn limit;
+  hidden-hand theft, all four capacity modifiers, ordinary level-up, and optional
+  ambush retain the previous generic mechanics. Added side-neutral negative
+  combat pressure, a Magic Equipment package, and Construct companion/role
+  links; raised selected mid/late Core Monsters without changing early pressure.
+  Russian catalog names now have a test-enforced no-English-fallback guarantee,
+  including «Проклятие! Узел клятв». The refreshed deterministic report records
+  the pressure movement and remaining live-playtest uncertainty.
 - 2026-08-25: added the next authoritative gameplay foundations: exact-side
   combat interference, bounded equipped and hidden-hand theft with reconnect-safe
   privacy, typed Head/Hands/Hireling/Mount capacity modifiers and revalidation,

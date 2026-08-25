@@ -173,7 +173,8 @@
         } @else if (room.settings; as settings) {
           <p class="settings-readonly">
             {{ settings.mode === 'BALANCED' ? 'Баланс' : 'Классический хаос' }} · рука
-            {{ settings.maxHandSize }} · {{ settings.enabledSetIds.length }} набора
+            {{ settings.maxHandSize }} · {{ settings.enabledSetIds.length }} набора · двойная засада
+            {{ settings.doubleMonsterAmbushEnabled ? 'включена' : 'выключена' }}
           </p>
         }
         @if (isHost() && !hasStarted()) {

@@ -586,8 +586,8 @@ limits. The server projects an intent with the exact eligible cost-card ids and
 target; Angular only collects the selection and sends the intention. There is no
 skill tree, ability currency, role-specific state machine, or browser cooldown.
 
-The initial equipped-theft authoring is deliberately conservative: one attempt
-per turn at `1/6`, with the probability stored on the ability. The authored cost
+Equipped theft is deliberately bounded: one attempt per turn at `2/6`, with the probability
+stored on the ability. The authored cost
 and generic usage are consumed before the injected `RandomSource` roll; failure
 moves nothing, while success moves the same physical item to the thief's hand
 and applies normal attachment and victim-equipment revalidation.

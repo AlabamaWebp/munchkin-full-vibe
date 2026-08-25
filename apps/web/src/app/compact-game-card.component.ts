@@ -12,6 +12,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       [class.playable]="playable()"
       [class.unavailable]="!playable()"
       [class.with-details]="showDetails()"
+      [class.upgrade]="upgrade()"
     >
       <button
         type="button"
@@ -21,6 +22,9 @@ import { CardArtworkComponent } from './card-artwork.component';
       >
         <app-card-artwork [artKey]="card().artKey" [label]="displayName()" [compact]="true" />
         <strong>{{ displayName() }}</strong>
+        @if (upgrade()) {
+          <span class="upgrade-badge">Постоянное усиление</span>
+        }
         @if (showDetails()) {
           @if (details().length > 0) {
             <div class="facts">
@@ -66,6 +70,25 @@ import { CardArtworkComponent } from './card-artwork.component';
     article.playable {
       border-color: #e2b965;
       box-shadow: inset 0 0 0 1px rgba(226, 185, 101, 0.3);
+    }
+    article.upgrade {
+      border-color: #77d5b5;
+      box-shadow:
+        inset 0 0 0 1px rgba(119, 213, 181, 0.42),
+        0 0 0.75rem rgba(65, 180, 142, 0.32);
+    }
+    .upgrade-badge {
+      position: absolute;
+      z-index: 1;
+      top: 0.35rem;
+      right: 0.35rem;
+      padding: 0.15rem 0.3rem;
+      border: 1px solid #a8eed5;
+      border-radius: 999px;
+      color: #e6fff4;
+      background: #1c6954;
+      font-size: 0.58rem;
+      font-weight: 900;
     }
     .card-action {
       display: grid;
@@ -136,6 +159,7 @@ export class CompactGameCardComponent {
   readonly card = input.required<GameCardView>();
   readonly cardName = input<(card: GameCardView) => string>((card) => card.name);
   readonly playable = input(false);
+  readonly upgrade = input(false);
   readonly reason = input('Можно позже');
   readonly showDetails = input(false);
   readonly details = input<readonly string[]>([]);

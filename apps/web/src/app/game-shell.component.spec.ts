@@ -192,8 +192,30 @@ describe('GameShellComponent', () => {
     expect(root.querySelector('#target-title')?.textContent).toContain('Выберите монстра');
     expect(client.sendGameCommand).not.toHaveBeenCalled();
 
-    root.querySelector<HTMLButtonElement>('.option-list button')!.click();
+    root.querySelector<HTMLButtonElement>('.picker-option-select')!.click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'LOOK_FOR_TROUBLE', cardId: 'm1' });
+  });
+
+  it('keeps POST_DOOR end-turn and sale controls absent until the server projects them', () => {
+    const monsterCard = card({ instanceId: 'post-door-monster', type: 'MONSTER' });
+    const root = render(
+      base({
+        phase: 'POST_DOOR',
+        self: { ...player({ handCount: 1 }), hand: [monsterCard] },
+        availableIntents: [
+          {
+            id: 'look:post-door',
+            kind: 'LOOK_FOR_TROUBLE',
+            reasonCode: 'PRIMARY_TURN_ACTION',
+            cardId: monsterCard.instanceId,
+          },
+        ],
+      }),
+    ).nativeElement as HTMLElement;
+
+    expect(root.textContent).toContain('Искать неприятности');
+    expect(root.textContent).not.toContain('Завершить ход');
+    expect(root.textContent).not.toContain('Продать карты');
   });
 
   it('shows the character sex below the nickname', () => {
@@ -234,7 +256,7 @@ describe('GameShellComponent', () => {
     root.querySelector<HTMLButtonElement>('.character-summary')!.click();
     fixture.detectChanges();
     expect(root.textContent).toContain('Классы: нет · Расы: нет');
-    expect(root.querySelectorAll('.equipment-grid .empty')).toHaveLength(10);
+    expect(root.querySelectorAll('.equipment-grid .empty')).toHaveLength(7);
   });
 
   it('shows Door reveal and immediate Curse consequence from the event log', () => {
@@ -622,6 +644,12 @@ describe('GameShellComponent', () => {
     const self = player({ handCount: 1 });
     const fixture = render(
       base({
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE', 'COMPANIONS'],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
         players: [self],
         self: { ...self, hand: [defense] },
         curseResponse: {
@@ -685,11 +713,16 @@ describe('GameShellComponent', () => {
     expect(root.querySelector('.full-hand-grid .with-details .facts')?.textContent).toContain('+3');
   });
 
-  it('filters the full hand by card type and keeps combat to active-combat bonuses', () => {
+  it('filters the full hand by card type and keeps combat to projected legal uses', () => {
     const combatBonus = card({
       instanceId: 'combat-bonus',
       name: 'Combat bonus',
       play: { timings: ['ACTIVE_COMBAT'], target: 'COMBAT_PLAYER' },
+    });
+    const clone = card({
+      instanceId: 'clone',
+      name: 'Бюрократическая копирка',
+      type: 'CLONE_MONSTER',
     });
     const turnBonus = card({
       instanceId: 'turn-bonus',
@@ -702,7 +735,27 @@ describe('GameShellComponent', () => {
     const fixture = render(
       base({
         players: [gamePlayer],
-        self: { ...gamePlayer, hand: [combatBonus, turnBonus, curse, monster, race] },
+        self: { ...gamePlayer, hand: [combatBonus, turnBonus, curse, monster, race, clone] },
+        availableIntents: [
+          {
+            id: 'combat-bonus:players',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'combat-bonus',
+            target: { type: 'PLAYERS' },
+            combatId: 'combat-1',
+            combatRevision: 1,
+          },
+          {
+            id: 'clone:e1',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'clone',
+            target: { type: 'MONSTER', encounterId: 'e1' },
+            combatId: 'combat-1',
+            combatRevision: 1,
+          },
+        ],
       }),
     );
     const root = fixture.nativeElement as HTMLElement;
@@ -725,8 +778,43 @@ describe('GameShellComponent', () => {
     expect(cardsText()).not.toContain('Curse');
     filter('Усиления в бою');
     expect(cardsText()).toContain('Combat bonus');
+    expect(cardsText()).toContain('Бюрократическая копирка');
     expect(cardsText()).not.toContain('Turn bonus');
     expect(cardsText()).not.toContain('Curse');
+  });
+
+  it('marks only the authoritative permanent Equipment upgrade hint in dock and full hand', () => {
+    const upgrade = card({
+      instanceId: 'upgrade',
+      name: 'Upgrade kit',
+      type: 'EQUIPMENT',
+      permanentCombatUpgrade: true,
+    });
+    const fixture = render(base({ self: { ...player({ handCount: 1 }), hand: [upgrade] } }));
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('app-hand-dock .upgrade-badge')?.textContent).toContain(
+      'Постоянное усиление',
+    );
+    root.querySelector<HTMLButtonElement>('.hand-menu')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.full-hand-grid .upgrade-badge')).not.toBeNull();
+  });
+
+  it('hides unused companion and role-permission slots from a Core-only match', () => {
+    const root = render(
+      base({
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE'],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
+      }),
+    ).nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.player')!.click();
+    expect(root.querySelector('.equipment-grid .hireling')).toBeNull();
+    expect(root.querySelector('.equipment-grid .mount')).toBeNull();
+    expect(root.querySelector('.equipment-grid .permissions')).toBeNull();
   });
 
   it('requires card details before dispatching an equip action or opening a target picker', () => {
@@ -931,6 +1019,12 @@ describe('GameShellComponent', () => {
       base({
         players: [self],
         self: { ...self, hand: [] },
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE', 'COMPANIONS'],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
         availableIntents: [
           {
             id: 'unequip:helmet',
@@ -1042,7 +1136,7 @@ describe('GameShellComponent', () => {
     fixture.detectChanges();
     expect(root.querySelector('.character')).toBeNull();
     expect(root.querySelector('#ability-cost-title')?.textContent).toContain('Сбросьте 1 карт');
-    root.querySelector<HTMLButtonElement>('.option-list button')!.click();
+    root.querySelector<HTMLButtonElement>('.decision-card-select')!.click();
     fixture.detectChanges();
     Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
       .find((button) => button.textContent?.includes('Применить способность'))!
@@ -1106,7 +1200,7 @@ describe('GameShellComponent', () => {
     actions.find((button) => button.textContent?.includes('Помочь монстру'))!.click();
     fixture.detectChanges();
     expect(root.querySelector('#target-title')?.textContent).toContain('Помочь какому монстру');
-    expect(root.querySelectorAll('.option-list button')).toHaveLength(2);
+    expect(root.querySelectorAll('.picker-option-select')).toHaveLength(2);
   });
 
   it('makes optional-set cards actionable and displays their public slots', () => {
@@ -1157,6 +1251,12 @@ describe('GameShellComponent', () => {
       base({
         players: [self],
         self: { ...self, hand: [companion, permission, attachment] },
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE', 'COMPANIONS', 'DUAL_IDENTITY'],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
         availableIntents: [
           {
             id: 'companion:companion',

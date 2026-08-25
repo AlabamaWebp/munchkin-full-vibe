@@ -21,6 +21,7 @@ describe('LocalizationService', () => {
     for (const definition of createDevelopmentCardSet().definitions) {
       expect(RUSSIAN_CARDS[definition.id]?.name).toBeTruthy();
       expect(RUSSIAN_CARDS[definition.id]?.description).toBeTruthy();
+      expect(RUSSIAN_CARDS[definition.id]?.name).not.toBe(definition.name);
     }
   });
   beforeEach(() => {

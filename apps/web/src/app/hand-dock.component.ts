@@ -47,6 +47,7 @@ import { unavailableReason } from './game-ui.model';
             [card]="card"
             [cardName]="cardName()"
             [playable]="playableIds().includes(card.instanceId)"
+            [upgrade]="card.permanentCombatUpgrade === true"
             [reason]="reason(card)"
             (activated)="cardActivated.emit($event)"
           />

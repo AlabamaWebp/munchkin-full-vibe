@@ -42,22 +42,28 @@ export interface EquipmentLayoutLabels {
         <small>{{ labels().race }}</small>
         <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: roleCards('RACE') }" />
       </div>
-      <div class="slot companion hireling">
-        <small>{{ labels().hireling }}</small>
-        <ng-container
-          *ngTemplateOutlet="cardsSlot; context: { cards: companionCards('HIRELING') }"
-        />
-      </div>
-      <div class="slot companion mount">
-        <small>{{ labels().mount }}</small>
-        <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: companionCards('MOUNT') }" />
-      </div>
-      <div class="slot permissions">
-        <small>{{ labels().permissions }}</small>
-        <ng-container
-          *ngTemplateOutlet="cardsSlot; context: { cards: player().rolePermissionCards ?? [] }"
-        />
-      </div>
+      @if (showCompanions()) {
+        <div class="slot companion hireling">
+          <small>{{ labels().hireling }}</small>
+          <ng-container
+            *ngTemplateOutlet="cardsSlot; context: { cards: companionCards('HIRELING') }"
+          />
+        </div>
+        <div class="slot companion mount">
+          <small>{{ labels().mount }}</small>
+          <ng-container
+            *ngTemplateOutlet="cardsSlot; context: { cards: companionCards('MOUNT') }"
+          />
+        </div>
+      }
+      @if (showRolePermissions()) {
+        <div class="slot permissions">
+          <small>{{ labels().permissions }}</small>
+          <ng-container
+            *ngTemplateOutlet="cardsSlot; context: { cards: player().rolePermissionCards ?? [] }"
+          />
+        </div>
+      }
       @if (twoHandedCard(); as card) {
         <div class="slot hands two-handed">
           <small>{{ labels().leftHand }} + {{ labels().rightHand }}</small>
@@ -262,6 +268,8 @@ export interface EquipmentLayoutLabels {
 export class EquipmentLayoutComponent {
   readonly player = input.required<GamePlayerView>();
   readonly labels = input.required<EquipmentLayoutLabels>();
+  readonly showCompanions = input(false);
+  readonly showRolePermissions = input(false);
   readonly cardName = input.required<(card: GameCardView) => string>();
   readonly cardOpened = output<GameCardView>();
 
