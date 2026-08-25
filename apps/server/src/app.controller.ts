@@ -30,6 +30,7 @@ export class AppController {
   @Post('development/scenario/:scenario')
   loadDevelopmentScenario(@Param('scenario') scenario: string): {
     loaded: number;
+    phase: string | null;
   } {
     if (
       process.env.NODE_ENV === 'production' ||
@@ -37,17 +38,21 @@ export class AppController {
     )
       throw new NotFoundException();
     let loaded = 0;
+    let phase: string | null = null;
     for (const roomCode of this.gameService.developmentRoomCodes()) {
       const state = this.gameService.stateForDevelopment(roomCode);
+      const replacement =
+        state === null
+          ? null
+          : createDevelopmentScenario(state, scenario as DevelopmentScenario);
       if (
-        state !== null &&
-        this.gameService.replaceForDevelopment(
-          roomCode,
-          createDevelopmentScenario(state, scenario as DevelopmentScenario),
-        )
-      )
+        replacement !== null &&
+        this.gameService.replaceForDevelopment(roomCode, replacement)
+      ) {
         loaded += 1;
+        phase = replacement.phase;
+      }
     }
-    return { loaded };
+    return { loaded, phase };
   }
 }

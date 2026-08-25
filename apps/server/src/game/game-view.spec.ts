@@ -1017,12 +1017,14 @@ describe('createGameView', () => {
     expect(view.availableIntents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: 'RUN_AWAY' }),
-        expect.objectContaining({ kind: 'PROPOSE_HELP' }),
         expect.objectContaining({
           kind: 'PLAY_CARD',
           cardId: bonus.instanceId,
         }),
       ]),
+    );
+    expect(view.availableIntents).not.toContainEqual(
+      expect.objectContaining({ kind: 'PROPOSE_HELP' }),
     );
     expect(view.unavailableCardReasons).not.toContainEqual(
       expect.objectContaining({ cardId: bonus.instanceId }),

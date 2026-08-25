@@ -40,6 +40,11 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-25: completed the final browser command-path verification: active
+  role abilities, exact-Monster modifiers, a real level-9 combat victory to
+  level 10 across two clients, and one-player combat. Role-action sheets now
+  close their parent character sheet before accepting cost input; solo combat
+  no longer projects an impossible help request.
 - 2026-08-24: added a fixed, development-only browser-QA scenario endpoint,
   guarded out of production, for reconstructing authoritative blocker, Curse,
   equipment, combat, escape, ability, and finished states. The targeted pass

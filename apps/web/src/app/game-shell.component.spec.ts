@@ -958,6 +958,8 @@ describe('GameShellComponent', () => {
       .find((button) => button.textContent?.includes('Сбросить расу'))!
       .click();
     expect(client.sendGameCommand).toHaveBeenCalledWith({ type: 'DISCARD_ROLE', cardId: 'race' });
+    root.querySelector<HTMLButtonElement>('.player')!.click();
+    fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.equipment-grid .class button')!.click();
     fixture.detectChanges();
     Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
@@ -1024,6 +1026,7 @@ describe('GameShellComponent', () => {
       .find((button) => button.textContent?.includes('Применить боевую способность'))!
       .click();
     fixture.detectChanges();
+    expect(root.querySelector('.character')).toBeNull();
     expect(root.querySelector('#ability-cost-title')?.textContent).toContain('Сбросьте 1 карт');
     root.querySelector<HTMLButtonElement>('.option-list button')!.click();
     fixture.detectChanges();

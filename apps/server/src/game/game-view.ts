@@ -1196,15 +1196,20 @@ function availableIntents(
         reasonCode: 'COMBAT_LOSING',
         ...address,
       });
-    if (combat.helpAgreement === null && combat.helpOffer === null)
+    const helperIds = state.players
+      .filter((player) => player.id !== viewerPlayerId && !player.isDead)
+      .map((player) => player.id);
+    if (
+      combat.helpAgreement === null &&
+      combat.helpOffer === null &&
+      helperIds.length > 0
+    )
       intents.push({
         id: `help-propose:${combat.combatId}:${combat.revision}`,
         kind: 'PROPOSE_HELP',
         reasonCode: 'OPTIONAL_CARD_PLAY',
         ...address,
-        helperIds: state.players
-          .filter((player) => player.id !== viewerPlayerId && !player.isDead)
-          .map((player) => player.id),
+        helperIds,
         minTreasures: 0,
         maxTreasures: combat.monsters.reduce(
           (sum, monster) => sum + calculateMonsterTreasures(monster),

@@ -23,6 +23,7 @@ export const DEVELOPMENT_SCENARIOS = [
   'curse-response',
   'ability-turn',
   'ability-combat',
+  'winning-combat',
   'successful-run-away',
   'finished',
 ] as const;
@@ -259,17 +260,18 @@ export function createDevelopmentScenario(
   if (scenario === 'ability-turn') {
     const role = qaCard('guild-of-echoes', 'qa-guild-of-echoes');
     const costs = [
-      card(initial, 'emergency-confetti'),
-      card(initial, 'bottled-applause'),
+      qaCard('emergency-confetti', 'qa-ability-cost-1'),
+      qaCard('bottled-applause', 'qa-ability-cost-2'),
     ];
-    const state = withCardsRemoved(initial, [role, ...costs]);
+    const state = initial;
     return {
       ...state,
       phase: GamePhase.POST_DOOR,
       activePlayerId: active.id,
-      players: cleanPlayers(state, [costs]).map((player, index) =>
-        index === 0 ? { ...player, classCards: [role] } : player,
-      ),
+      players: cleanPlayers(
+        state,
+        state.players.map(() => costs),
+      ).map((player) => ({ ...player, classCards: [role] })),
       combat: null,
       pendingDecision: null,
       curseResponse: null,
@@ -390,6 +392,24 @@ export function createDevelopmentScenario(
         index === 0 ? { ...player, classCards: [role] } : player,
       ),
       combat,
+      pendingDecision: null,
+      curseResponse: null,
+      lastRunAwayResult: null,
+    };
+  }
+  if (scenario === 'winning-combat') {
+    return {
+      ...state,
+      phase: GamePhase.DOOR_RESOLUTION,
+      activePlayerId: active.id,
+      players: cleanPlayers(state, []).map((player, index) => ({
+        ...player,
+        level: index === 0 ? 9 : 1,
+      })),
+      combat: {
+        ...combat,
+        monsters: [monster(state, 'qa-encounter-1', firstMonster)],
+      },
       pendingDecision: null,
       curseResponse: null,
       lastRunAwayResult: null,

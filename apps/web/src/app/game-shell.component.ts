@@ -181,7 +181,10 @@ interface CardUse {
               <p>
                 {{
                   decision.type === 'DISCARD_CARDS'
-                    ? 'Выберите ровно ' + decision.count + '. Причина: ' + cardName(decision.sourceCard)
+                    ? 'Выберите ровно ' +
+                      decision.count +
+                      '. Причина: ' +
+                      cardName(decision.sourceCard)
                     : 'Этот выбор нужен, чтобы продолжить игру.'
                 }}
               </p>
@@ -1228,6 +1231,7 @@ export class GameShellComponent {
 
   protected chooseCardDetailUse(use: CardUse): void {
     this.selectedCard.set(null);
+    this.selectedPlayerId.set(null);
     this.chooseUse(use);
   }
 
