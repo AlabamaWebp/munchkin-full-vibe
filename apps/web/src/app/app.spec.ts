@@ -149,7 +149,12 @@ describe('App lobby', () => {
             color: 'PINK',
           },
         ],
-        settings: { mode: 'BALANCED', enabledSetIds: ['CORE'] },
+        settings: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE'],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
       },
       'p1',
     );

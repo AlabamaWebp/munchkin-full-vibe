@@ -11,7 +11,9 @@ this document lists remaining work rather than restating completed milestones.
   mix, including reconnects during every blocking workflow.
 - Validate actual game duration, late-game equipment accumulation, sale batching,
   negotiated help value, the differentiated Core role abilities, authored
-  either-side combat boosts, and optional-set interactions.
+  either-side combat boosts, the initial one-in-six/once-per-turn equipped-theft
+  tuning, configured hand sizes, optional double-Monster ambush frequency, and
+  capacity-modifier interactions.
 - Tune catalog data only with deterministic tests and refreshed balance reports;
   do not add card-name rules or untested special-case state machines.
 

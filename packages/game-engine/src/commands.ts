@@ -31,6 +31,10 @@ export type CardTarget =
   | {
       readonly type: "EQUIPMENT";
       readonly cardId: CardInstanceId;
+    }
+  | {
+      readonly type: "COMPANION";
+      readonly cardId: CardInstanceId;
     };
 
 interface PlayerCommand {
@@ -68,7 +72,8 @@ export type GameCommand =
       readonly costCardIds: readonly CardInstanceId[];
       readonly target:
         | { readonly type: "SELF" }
-        | { readonly type: "COMBAT"; readonly side: "PLAYERS" };
+        | { readonly type: "COMBAT"; readonly side: "PLAYERS" }
+        | { readonly type: "EQUIPMENT"; readonly cardId: CardInstanceId };
       readonly reactionWindowId?: number;
       readonly combatId?: CombatId;
       readonly combatRevision?: number;

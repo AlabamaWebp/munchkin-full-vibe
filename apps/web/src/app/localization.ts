@@ -1130,6 +1130,8 @@ function russianRoleAbilityDescription(
     return `${cost}, чтобы взять ${ability.count} из колоды ${ability.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}; один раз за ход.`;
   if (ability.type === 'RUN_AWAY_BONUS')
     return `${cost}, чтобы получить ${ability.amount >= 0 ? '+' : ''}${ability.amount} к своему броску побега; один раз за бой.`;
+  if (ability.type === 'STEAL_EQUIPPED_ITEM')
+    return `${cost}, чтобы попытаться забрать выбранное снаряжение (${ability.successChance.numerator}/${ability.successChance.denominator}); один раз за ход.`;
   return `${cost}, чтобы дать ${ability.amount >= 0 ? '+' : ''}${ability.amount} стороне игроков; один раз за бой.`;
 }
 
@@ -1139,6 +1141,10 @@ function russianEffectsDescription(effects: CardDefinition['effects']): string {
       switch (effect.type) {
         case 'DRAW_CARDS':
           return `Возьмите ${effect.count} карту из колоды ${effect.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}.`;
+        case 'STEAL_RANDOM_HAND_CARD':
+          return 'Украдите одну случайно выбранную движком карту из руки другого игрока.';
+        case 'AMBUSH_MONSTERS':
+          return 'Начните обычный бой с двумя случайно выбранными движком монстрами.';
         case 'COMBAT_BONUS':
           return `${effect.amount >= 0 ? '+' : ''}${effect.amount} к боевой силе выбранного участника боя.`;
         case 'COMBAT_SIDE_BONUS':

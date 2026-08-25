@@ -45,7 +45,9 @@ arms the next deadline, and sends a freshly projected `game:state` to each
 connected player.
 
 Lobby actions use their own Socket.IO messages: create/join, session resume,
-sex/color/settings selection, start, rematch, and return-to-lobby. `LobbyState`
+sex/color/settings selection, start, rematch, and return-to-lobby. Lobby settings
+include bounded hand size and the optional ambush toggle; both are snapshotted
+into immutable `GameConfig` and copied into rematches. `LobbyState`
 and `GameView` are full snapshots rather than client patches. Command acks
 report success or a typed error; state events remain the rendering authority.
 
@@ -75,24 +77,28 @@ presentation priority. A pending decision includes full selectable-card
 presentation only for its addressed player; observers receive no private-card
 identity. Equipped-card views nest their public attachment cards and a
 server-resolved contribution so Details can explain a host item without client
-power calculation. Angular must not recreate those permissions or relationships
-locally.
+power calculation. Hand Equipment additionally receives an authoritative
+permanent-upgrade flag, and replacement intents carry the exact cards to remove
+and projected permanent-power increase. Angular must not recreate those
+permissions or relationships locally.
 
 ## Rules execution and time
 
 Card definitions are immutable data; physical `CardInstance`s carry only an
 instance id and definition id. Typed effects, conditions, modifiers, equipment
-restrictions, roles, companions, protections, and attachments are evaluated by
-the engine. This includes side-neutral combat effects and the three reusable
-role-ability primitives. Calculated power is derived at execution/projection
-time.
+restrictions, roles, companions, capacity modifiers, protections, and
+attachments are evaluated by the engine. This includes side-neutral combat
+effects, exact equipped-item theft, hidden random hand theft, and atomic
+double-Monster ambush selection. Calculated power and replacement improvement
+are derived at execution/projection time.
 
 Card-set display metadata lives with the public lobby contracts, so clients show
 human-readable names/descriptions while game configuration retains stable ids.
 `CORE` therefore remains the internal mandatory id while displaying as “Нейро 1”.
 
 Role ability usage is a generic JSON-safe player ledger scoped to a turn number
-or combat id; there is no per-role state machine. The projection supplies exact
+or combat id; equipped theft reuses it, so consumed attempts persist through
+reconnect without a per-card state machine. The projection supplies exact
 cost-card ids, targets, combat addresses, and reaction-window addresses.
 `GameCardView` carries the rule-bearing fields needed by Details plus a
 server-derived duration category. An equipped instance additionally carries its
@@ -100,7 +106,8 @@ attached enhancers and resolved current contribution where applicable, so
 Angular formats metadata but does not evaluate gameplay rules.
 
 Randomness comes from an injected `RandomSource`; tests provide deterministic
-sources. A `Clock` is likewise injected. Blocking reaction windows, help offers,
+sources. Theft and ambush mechanics use bounded candidate selection rather than
+retry loops. A `Clock` is likewise injected. Blocking reaction windows, help offers,
 pending decisions, and Curse responses persist absolute deadlines in state.
 The engine owns expiration defaults. Server timers only wake the service, which
 re-reads state and invokes the engine, making reconnect and superseded timers

@@ -24,7 +24,7 @@ export interface EquipmentLayoutLabels {
     <div class="equipment-grid">
       <div class="slot head">
         <small>{{ labels().head }}</small>
-        <ng-container *ngTemplateOutlet="slot; context: { card: slotCard('HEAD') }" />
+        <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: slotCards('HEAD') }" />
       </div>
       <div class="slot body">
         <small>{{ labels().body }}</small>
@@ -44,11 +44,13 @@ export interface EquipmentLayoutLabels {
       </div>
       <div class="slot companion hireling">
         <small>{{ labels().hireling }}</small>
-        <ng-container *ngTemplateOutlet="slot; context: { card: player().hirelingCard ?? null }" />
+        <ng-container
+          *ngTemplateOutlet="cardsSlot; context: { cards: companionCards('HIRELING') }"
+        />
       </div>
       <div class="slot companion mount">
         <small>{{ labels().mount }}</small>
-        <ng-container *ngTemplateOutlet="slot; context: { card: player().mountCard ?? null }" />
+        <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: companionCards('MOUNT') }" />
       </div>
       <div class="slot permissions">
         <small>{{ labels().permissions }}</small>
@@ -87,6 +89,12 @@ export interface EquipmentLayoutLabels {
           <ng-container *ngTemplateOutlet="slot; context: { card: handCards()[1] ?? null }" />
         </div>
       }
+      @if (extraHandCards().length > 0) {
+        <div class="slot hand-overflow">
+          <small>{{ labels().leftHand }} +</small>
+          <ng-container *ngTemplateOutlet="cardsSlot; context: { cards: extraHandCards() }" />
+        </div>
+      }
     </div>
     <ng-template #slot let-card="card">
       @if (card) {
@@ -116,6 +124,9 @@ export interface EquipmentLayoutLabels {
         @for (card of cards; track card.instanceId) {
           <button type="button" (click)="cardOpened.emit(card)">
             <strong>{{ cardName()(card) }}</strong>
+            @if (card.equipment || card.companion) {
+              <span>{{ resolvedBonus(card) }}</span>
+            }
           </button>
         }
       } @else {
@@ -177,6 +188,9 @@ export interface EquipmentLayoutLabels {
       grid-column: 1 / 3;
       border-style: solid;
       border-color: #efc66d;
+    }
+    .slot.hand-overflow {
+      grid-column: 1 / 3;
     }
     small {
       color: #bda987;
@@ -255,12 +269,29 @@ export class EquipmentLayoutComponent {
     return this.player().equipment.find((card) => card.equipment?.slot === slot) ?? null;
   }
 
+  slotCards(slot: Exclude<GameEquipmentSlot, 'HANDS'>): readonly GameCardView[] {
+    return this.player().equipment.filter((card) => card.equipment?.slot === slot);
+  }
+
   handCards(): readonly GameCardView[] {
     return this.player().equipment.filter((card) => card.equipment?.slot === 'HANDS');
   }
 
   twoHandedCard(): GameCardView | null {
     return this.handCards().find((card) => card.equipment?.hands === 2) ?? null;
+  }
+
+  extraHandCards(): readonly GameCardView[] {
+    const twoHanded = this.twoHandedCard();
+    return twoHanded === null
+      ? this.handCards().slice(2)
+      : this.handCards().filter((card) => card.instanceId !== twoHanded.instanceId);
+  }
+
+  companionCards(kind: 'HIRELING' | 'MOUNT'): readonly GameCardView[] {
+    const cards = kind === 'HIRELING' ? this.player().hirelingCards : this.player().mountCards;
+    const fallback = kind === 'HIRELING' ? this.player().hirelingCard : this.player().mountCard;
+    return cards ?? (fallback === undefined || fallback === null ? [] : [fallback]);
   }
 
   cardCombatBonus(card: GameCardView): number {

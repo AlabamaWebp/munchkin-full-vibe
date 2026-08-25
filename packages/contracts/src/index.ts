@@ -11,6 +11,9 @@ export interface FoundationStatusResponse {
 export const LOBBY_MIN_PLAYERS = 1;
 export const LOBBY_MAX_PLAYERS = 6;
 export const ROOM_CODE_LENGTH = 4;
+export const DEFAULT_MAX_HAND_SIZE = 5;
+export const MIN_MAX_HAND_SIZE = 3;
+export const MAX_MAX_HAND_SIZE = 10;
 
 export const LobbyStatus = { LOBBY: "LOBBY", STARTED: "STARTED" } as const;
 export type LobbyStatus = (typeof LobbyStatus)[keyof typeof LobbyStatus];
@@ -108,6 +111,8 @@ export interface LobbyState {
   readonly settings?: {
     readonly mode: GameMode;
     readonly enabledSetIds: readonly CardSetId[];
+    readonly maxHandSize: number;
+    readonly doubleMonsterAmbushEnabled: boolean;
   };
 }
 
@@ -136,6 +141,8 @@ export interface SetPlayerColorPayload extends StartLobbyPayload {
 export interface SetLobbySettingsPayload extends StartLobbyPayload {
   readonly mode: GameMode;
   readonly enabledSetIds: readonly CardSetId[];
+  readonly maxHandSize: number;
+  readonly doubleMonsterAmbushEnabled: boolean;
 }
 
 export type LobbyErrorCode =
@@ -204,6 +211,7 @@ export type GameCardType =
   | "ATTACHMENT";
 export type GameDeckType = "DOOR" | "TREASURE";
 export type GameEquipmentSlot = "HEAD" | "BODY" | "FEET" | "HANDS";
+export type GameCapacityType = "HEAD" | "HANDS" | "HIRELING" | "MOUNT";
 export type GameCardPlayTiming =
   "TURN" | "POST_DOOR" | "ACTIVE_COMBAT" | "VICTORY_REACTION" | "WHEN_DRAWN";
 export type GameCardTarget =
@@ -288,6 +296,16 @@ export type GameRoleAbilityView =
       readonly target: "SELF";
       readonly cost: { readonly type: "DISCARD_HAND"; readonly count: number };
       readonly usage: "ONCE_PER_TURN";
+    }
+  | {
+      readonly type: "STEAL_EQUIPPED_ITEM";
+      readonly target: "EQUIPMENT";
+      readonly successChance: {
+        readonly numerator: number;
+        readonly denominator: number;
+      };
+      readonly cost: { readonly type: "DISCARD_HAND"; readonly count: number };
+      readonly usage: "ONCE_PER_TURN";
     };
 
 export interface GameCardView {
@@ -329,6 +347,12 @@ export interface GameCardView {
     readonly target: GameCardTarget;
   };
   readonly effects: readonly GameEffectView[];
+  readonly capacityModifiers?: readonly {
+    readonly capacity: GameCapacityType;
+    readonly amount: number;
+  }[];
+  /** Viewer-only authoritative hint; absent/false is not an upgrade. */
+  readonly permanentCombatUpgrade?: boolean;
   readonly equipment?: {
     readonly slot: GameEquipmentSlot;
     readonly hands: 0 | 1 | 2;
@@ -410,6 +434,8 @@ export type GameEffectView =
       readonly deck: GameDeckType;
       readonly count: number;
     }
+  | { readonly type: "STEAL_RANDOM_HAND_CARD" }
+  | { readonly type: "AMBUSH_MONSTERS"; readonly count: 2 }
   | {
       readonly type: "DISCARD_RANDOM_CARDS" | "DISCARD_CHOSEN_CARDS";
       readonly count: number;
@@ -461,6 +487,8 @@ export interface GamePlayerView {
   readonly rolePermissionCards?: readonly GameCardView[];
   readonly hirelingCard?: GameCardView | null;
   readonly mountCard?: GameCardView | null;
+  readonly hirelingCards?: readonly GameCardView[];
+  readonly mountCards?: readonly GameCardView[];
   readonly isDead: boolean;
 }
 
@@ -508,7 +536,6 @@ export type AvailableIntentView =
   | (AvailableIntentBase & {
       readonly kind:
         | "LOOK_FOR_TROUBLE"
-        | "EQUIP_ITEM"
         | "UNEQUIP_ITEM"
         | "PLAY_ROLE"
         | "DISCARD_ROLE"
@@ -516,6 +543,12 @@ export type AvailableIntentView =
         | "DISCARD_ROLE_PERMISSION";
       readonly cardId: string;
       readonly replaceCardId?: string;
+    })
+  | (AvailableIntentBase & {
+      readonly kind: "EQUIP_ITEM";
+      readonly cardId: string;
+      readonly replaceCardIds?: readonly string[];
+      readonly permanentCombatPowerIncrease?: number;
     })
   | (AvailableIntentBase &
       CombatIntentAddress & {
@@ -552,12 +585,27 @@ export type AvailableIntentView =
       readonly target: { readonly type: "SELF" };
     })
   | (AvailableIntentBase & {
+      readonly kind: "USE_ROLE_ABILITY";
+      readonly roleCardId: string;
+      readonly abilityType: "STEAL_EQUIPPED_ITEM";
+      readonly cost: {
+        readonly count: number;
+        readonly eligibleCardIds: readonly string[];
+      };
+      readonly target: {
+        readonly type: "EQUIPMENT";
+        readonly cardId: string;
+        readonly playerId: string;
+      };
+    })
+  | (AvailableIntentBase & {
       readonly kind: "PLAY_CARD";
       readonly cardId: string;
       readonly target:
         | { readonly type: "SELF" }
         | { readonly type: "PLAYER"; readonly playerId: string }
-        | { readonly type: "EQUIPMENT"; readonly cardId: string };
+        | { readonly type: "EQUIPMENT"; readonly cardId: string }
+        | { readonly type: "COMPANION"; readonly cardId: string };
     })
   | (AvailableIntentBase &
       CombatIntentAddress & {
@@ -720,6 +768,7 @@ export type GameLogEventType =
   | "ROLE_ABILITY_USED"
   | "ITEM_EQUIPPED"
   | "ITEM_UNEQUIPPED"
+  | "COMPANION_UNSLOTTED"
   | "ROLE_PLAYED"
   | "ROLE_DISCARDED"
   | "CARDS_SOLD"
@@ -728,6 +777,9 @@ export type GameLogEventType =
   | "ROLE_RETENTION_REQUIRED"
   | "ROLE_RETAINED"
   | "ITEM_TRADED"
+  | "EQUIPPED_ITEM_THEFT_ATTEMPTED"
+  | "RANDOM_HAND_THEFT"
+  | "STOLEN_HAND_CARD_REVEALED"
   | "CHARITY_RESOLVED"
   | "CHARITY_CARDS_REVEALED"
   | "PLAYER_DIED"
@@ -773,7 +825,8 @@ export interface GameLogEntryView {
   readonly deck?: GameDeckType;
   readonly side?: "PLAYERS" | "MONSTER";
   readonly role?: "CLASS" | "RACE";
-  readonly abilityType?: "COMBAT_BONUS" | "RUN_AWAY_BONUS" | "DRAW_CARDS";
+  readonly abilityType?:
+    "COMBAT_BONUS" | "RUN_AWAY_BONUS" | "DRAW_CARDS" | "STEAL_EQUIPPED_ITEM";
   readonly zone?: "HAND" | "EQUIPMENT";
 }
 
@@ -819,6 +872,8 @@ export interface GameView {
   readonly config?: {
     readonly mode: GameMode;
     readonly enabledSetIds: readonly CardSetId[];
+    readonly maxHandSize?: number;
+    readonly doubleMonsterAmbushEnabled?: boolean;
   };
   readonly activePlayerId: string;
   readonly turnNumber: number;
@@ -975,7 +1030,9 @@ export type GameClientCommand =
         | { readonly type: "PLAYERS" }
         | { readonly type: "MONSTER"; readonly encounterId: string }
         | { readonly type: "HAND_MONSTER"; readonly monsterCardId: string }
-        | { readonly type: "EQUIPMENT"; readonly cardId: string };
+        | { readonly type: "EQUIPMENT"; readonly cardId: string }
+        | { readonly type: "COMPANION"; readonly cardId: string }
+        | { readonly type: "PLAYER"; readonly playerId: string };
       readonly reactionWindowId?: number;
       readonly combatId?: string;
       readonly combatRevision?: number;
@@ -984,7 +1041,10 @@ export type GameClientCommand =
       readonly type: "USE_ROLE_ABILITY";
       readonly roleCardId: string;
       readonly costCardIds: readonly string[];
-      readonly target: { readonly type: "SELF" } | { readonly type: "PLAYERS" };
+      readonly target:
+        | { readonly type: "SELF" }
+        | { readonly type: "PLAYERS" }
+        | { readonly type: "EQUIPMENT"; readonly cardId: string };
       readonly reactionWindowId?: number;
       readonly combatId?: string;
       readonly combatRevision?: number;

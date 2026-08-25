@@ -540,6 +540,7 @@ describe('createGameView', () => {
       phase: GamePhase.POST_DOOR,
       players: started.state.players.map((entry) => ({ ...entry, hand })),
     };
+    state = { ...state, phase: GamePhase.END_TURN };
     const intents = createGameView(state, playerId).availableIntents;
     expect(intents).toContainEqual(
       expect.objectContaining({ kind: 'SELL_CARDS' }),

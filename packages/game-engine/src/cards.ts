@@ -63,6 +63,13 @@ export const EquipmentSlot = {
 
 export type EquipmentSlot = (typeof EquipmentSlot)[keyof typeof EquipmentSlot];
 
+export type CapacityType = "HEAD" | "HANDS" | "HIRELING" | "MOUNT";
+
+export interface CapacityModifierDefinition {
+  readonly capacity: CapacityType;
+  readonly amount: number;
+}
+
 export const CardPlayTiming = {
   TURN: "TURN",
   POST_DOOR: "POST_DOOR",
@@ -191,6 +198,16 @@ export type RoleActiveAbilityDefinition =
       readonly target: "SELF";
       readonly cost: RoleAbilityCostDefinition;
       readonly usage: "ONCE_PER_TURN";
+    }
+  | {
+      readonly type: "STEAL_EQUIPPED_ITEM";
+      readonly target: "EQUIPMENT";
+      readonly successChance: {
+        readonly numerator: number;
+        readonly denominator: number;
+      };
+      readonly cost: RoleAbilityCostDefinition;
+      readonly usage: "ONCE_PER_TURN";
     };
 
 export type CardEffect =
@@ -231,6 +248,13 @@ export type CardEffect =
       readonly type: "DRAW_CARDS";
       readonly deck: DeckType;
       readonly count: number;
+    }
+  | {
+      readonly type: "STEAL_RANDOM_HAND_CARD";
+    }
+  | {
+      readonly type: "AMBUSH_MONSTERS";
+      readonly count: 2;
     }
   | {
       readonly type: "DISCARD_RANDOM_CARDS";
@@ -278,9 +302,13 @@ export interface CardDefinition {
   readonly tradeable?: boolean;
   readonly starterEligible?: boolean;
   readonly scavengeEligible?: boolean;
+  /** Removes option-specific physical copies before the match starts. */
+  readonly requiredGameOption?: "DOUBLE_MONSTER_AMBUSH";
   /** Explicit when timing or target is not inherent in the card type. */
   readonly play?: CardPlayDefinition;
   readonly effects: readonly CardEffect[];
+  /** Capacity granted while this card is in one of the owner's public zones. */
+  readonly capacityModifiers?: readonly CapacityModifierDefinition[];
   readonly equipment?: EquipmentDefinition;
   readonly monster?: {
     readonly strength: number;

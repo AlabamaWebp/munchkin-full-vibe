@@ -1,6 +1,6 @@
 # Munchkin LAN — external AI context
 
-Updated: 2026-08-24  
+Updated: 2026-08-25
 Repository commit: `f04e07814bb98e615d230892d58e47fe5cdfae1f`
 
 This is a compact planning context, not a substitute for repository inspection.
@@ -107,7 +107,8 @@ current `AvailableIntentView`.
   event presentation, deck counts, expected action, and unavailability reasons.
   Pending-choice card presentation is supplied only to the addressed viewer;
   equipped public item views include attachment relationships and a
-  server-resolved contribution for Details.
+  server-resolved contribution for Details. Config snapshots the bounded host
+  hand limit (3–10, default 5) and optional double-Monster ambush toggle.
 
 ### Cards, sets, and mechanics data
 
@@ -117,15 +118,16 @@ current `AvailableIntentView`.
   timing/target, typed effects, equipment, Monster/Curse, role, companion,
   permission, protection, and attachment metadata as applicable.
 - Typed effects include player/Monster/exact authored-side combat modification,
-  add/clone Monster, level gain/loss, draws, random/chosen discards, role
-  discard, and death. Card views project rule-bearing metadata plus a derived
-  duration category for Details.
+  add/clone/atomic double-Monster ambush, level gain/loss, hidden random hand
+  theft, random/chosen discards, role discard, and death. Card views project
+  rule-bearing metadata plus a derived duration category for Details.
 - Conditions/modifiers express Sex, Class/Race, Monster tag, equipped-tag,
   specific definition, and Curse matching. Reusable modifiers cover combat
   power, equipment-tag scaling, run-away roll, and automatic protection.
 - An ordinary Class/Race may have one passive and one active ability. Active
-  abilities reuse discard-for-combat, discard-for-Run-Away, and discard-to-draw
-  primitives; one JSON-safe turn/combat-scoped usage ledger serves every role.
+  abilities reuse discard-for-combat, discard-for-Run-Away, discard-to-draw, and
+  exact equipped-item-theft primitives; one JSON-safe turn/combat-scoped usage
+  ledger serves every role.
 - Card sets: mandatory stable `CORE` (player-facing “Нейро 1”); optional
   `COMPANIONS`, `ARSENAL`, `DUAL_IDENTITY`, `CLASSIC_FANTASY`,
   `CLERICAL_ERRORS`, and `STEED_HIRELINGS`. Start config selects `BALANCED` or
@@ -139,18 +141,24 @@ current `AvailableIntentView`.
 ### Turn, build, and economy
 
 - Setup deals four Door plus four Treasure cards; Balanced additionally reserves
-  a legal neutral Tier-1 starter item for each player. Doors resolve into combat,
-  Curse, or private hand movement; post-door offers Look for Trouble, Loot Room,
-  eligible Scavenge recovery, or end-turn.
-- Equipment has Head/Body/Feet/Hands slots and one/two-hand capacity. Its
-  restrictions and all power are engine-derived. Attachments target typed eligible
-  equipped items; public player views expose attachments and public role zones.
+  a legal neutral Tier-1 starter item for each player. Draw-only ambush Doors are
+  kept out of opening hands. Doors resolve into combat, Curse, private hand
+  movement, or an enabled atomic two-Monster ambush. After a non-combat Door the
+  player must choose Look for Trouble, Loot Room, or eligible Scavenge before
+  End Turn or Sale becomes legal.
+- Equipment has Head/Body/Feet/Hands slots and one/two-hand capacity. Typed
+  modifiers expand Head, Hands, Hireling, or Mount capacity and normal
+  revalidation handles capacity loss. Restrictions and all power are
+  engine-derived. Attachments target typed eligible equipped items; public player
+  views expose attachments and public role zones. Hand Equipment receives a
+  server-derived legal permanent-upgrade flag and exact replacement intent.
 - Class/Race are role arrays with a normal capacity of one. Permission cards may
   expand capacity; a lost permission can create a retained-role decision.
   Hireling and mount cards occupy distinct companion containers.
 - Eligible positive-value Treasure can be sold: each full 1,000 gold grants one
-  level, remainder is lost, and sale cannot deliver the winning level. Trade and
-  charity are authoritative commands; charity enforces hand-limit progression.
+  level, remainder is lost, and sale plus ordinary `GAIN_LEVEL` stop at level 9.
+  Standard level 10 requires Monster victory. Trade and charity are authoritative
+  commands; charity enforces the configured hand-limit progression.
 
 ### Combat, help, and losing
 
@@ -188,6 +196,9 @@ current `AvailableIntentView`.
 - Domain events have public/private audience. Server projection enriches visible
   cards, assigns `BLOCKING`, `IMPORTANT`, or `ROUTINE`, and makes blocking mean
   the current viewer can act. Angular does not persist a second notification log.
+- Random hand theft emits an identity-free public summary plus a victim-private
+  exact-card event; the thief learns the card through their new hand. Those same
+  audience rules reconstruct correctly on reconnect.
 
 ### Completion and room lifecycle
 
@@ -218,7 +229,7 @@ current `AvailableIntentView`.
 ## Current implementation status
 
 Working: lobby/session reconnect; game creation/config; original Core plus all
-three optional sets; data-driven cards/build/economy; multi-Monster combat/help/
+optional sets; data-driven cards/build/economy; multi-Monster combat/help/
 reactions/run-away; deadlines and Curse response; player-specific views/intents/
 history; victory/rematch/lobby return; mobile-first Angular shell; deterministic
 engine, server, contracts, and frontend test coverage.

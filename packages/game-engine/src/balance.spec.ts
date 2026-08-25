@@ -10,7 +10,7 @@ describe("balance harness", () => {
     } as const;
     const first = simulateBalance(options);
     expect(simulateBalance(options)).toEqual(first);
-    expect(first.catalog.CORE).toEqual({ definitions: 80, physicalCards: 192 });
+    expect(first.catalog.CORE).toEqual({ definitions: 81, physicalCards: 194 });
     expect(first.doorTierDistribution.LEVEL_1_3[2]).toBe(0);
     expect(first.usableStartingEquipmentProbability).toBe(1);
     expect(first.weakTierOneSoloBeatability).toBeGreaterThan(0.5);

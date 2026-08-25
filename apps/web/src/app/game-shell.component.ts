@@ -49,7 +49,8 @@ interface PickerOption {
 interface TargetPickerState {
   readonly title: string;
   readonly card: GameCardView;
-  readonly kind: 'CURSE' | 'COMBAT_CURSE' | 'MONSTER' | 'HAND_MONSTER' | 'EQUIPMENT' | 'TRADE';
+  readonly kind:
+    'CURSE' | 'PLAYER_CARD' | 'COMBAT_CURSE' | 'MONSTER' | 'HAND_MONSTER' | 'EQUIPMENT' | 'TRADE';
   readonly options: readonly PickerOption[];
 }
 
@@ -740,16 +741,26 @@ interface CardUse {
             @if (player(id); as value) {
               <div class="sheet-scroll character">
                 <b>Уровень {{ value.level }} · сила {{ value.combatPower }}</b>
-                <p>Пол: {{ sexLabel(value.sex) }} · Рука: {{ value.handCount }}/5</p>
+                <p>
+                  Пол: {{ sexLabel(value.sex) }} · Рука: {{ value.handCount }}/{{
+                    game().config?.maxHandSize ?? 5
+                  }}
+                </p>
                 <p>{{ characterStatus(value) }}</p>
                 <p>
                   Классы: {{ rolesLabel(value.classCards, value.classCard) }} · Расы:
                   {{ rolesLabel(value.raceCards, value.raceCard) }}
                 </p>
-                @if (value.hirelingCard || value.mountCard) {
+                @if (
+                  (value.hirelingCards?.length ?? 0) > 0 ||
+                  (value.mountCards?.length ?? 0) > 0 ||
+                  value.hirelingCard ||
+                  value.mountCard
+                ) {
                   <p>
-                    Спутники: {{ value.hirelingCard?.name ?? '—' }} ·
-                    {{ value.mountCard?.name ?? '—' }}
+                    Спутники:
+                    {{ rolesLabel(value.hirelingCards, value.hirelingCard ?? null) }} ·
+                    {{ rolesLabel(value.mountCards, value.mountCard ?? null) }}
                   </p>
                 }
                 <h3>Снаряжение</h3>
@@ -1236,24 +1247,7 @@ export class GameShellComponent {
   }
 
   protected replacementCardIds(card: GameCardView): readonly string[] {
-    if (
-      card.type !== 'EQUIPMENT' ||
-      card.equipment === undefined ||
-      !this.hasEquipmentConflict(card.instanceId)
-    )
-      return [];
-
-    const equipped = this.game().self.equipment;
-    const conflicts =
-      card.equipment.slot === 'HANDS'
-        ? this.handEquipmentToReplace(card, equipped)
-        : equipped.filter((item) => item.equipment?.slot === card.equipment!.slot);
-    const unequipIds = new Set<string>();
-    for (const intent of this.game().availableIntents)
-      if (intent.kind === 'UNEQUIP_ITEM' && 'cardId' in intent) unequipIds.add(intent.cardId);
-    return conflicts.length > 0 && conflicts.every((item) => unequipIds.has(item.instanceId))
-      ? conflicts.map((item) => item.instanceId)
-      : [];
+    return this.equipmentReplacementIntent(card)?.replaceCardIds ?? [];
   }
 
   protected replaceEquipment(card: GameCardView): void {
@@ -1267,15 +1261,26 @@ export class GameShellComponent {
   }
 
   protected replacementPowerDelta(card: GameCardView): number {
-    return (
-      (card.equipment?.combatBonus ?? 0) -
-      this.replacementCardIds(card).reduce(
-        (total, cardId) =>
-          total +
-          (this.game().self.equipment.find((item) => item.instanceId === cardId)?.equipment
-            ?.combatBonus ?? 0),
-        0,
-      )
+    return this.equipmentReplacementIntent(card)?.permanentCombatPowerIncrease ?? 0;
+  }
+
+  private equipmentReplacementIntent(card: GameCardView):
+    | (Extract<AvailableIntentView, { readonly kind: 'EQUIP_ITEM' }> & {
+        readonly replaceCardIds: readonly string[];
+        readonly permanentCombatPowerIncrease: number;
+      })
+    | undefined {
+    return this.game().availableIntents.find(
+      (
+        intent,
+      ): intent is Extract<AvailableIntentView, { readonly kind: 'EQUIP_ITEM' }> & {
+        readonly replaceCardIds: readonly string[];
+        readonly permanentCombatPowerIncrease: number;
+      } =>
+        intent.kind === 'EQUIP_ITEM' &&
+        intent.cardId === card.instanceId &&
+        intent.replaceCardIds !== undefined &&
+        intent.permanentCombatPowerIncrease !== undefined,
     );
   }
 
@@ -1313,7 +1318,10 @@ export class GameShellComponent {
       type: 'USE_ROLE_ABILITY',
       roleCardId: intent.roleCardId,
       costCardIds: this.roleAbilityCostSelection(),
-      target: intent.target,
+      target:
+        intent.target.type === 'EQUIPMENT'
+          ? { type: 'EQUIPMENT', cardId: intent.target.cardId }
+          : intent.target,
       ...('combatId' in intent
         ? {
             combatId: intent.combatId,
@@ -1332,6 +1340,12 @@ export class GameShellComponent {
     const reactionWindowId = this.game().combat?.reactionWindow?.windowId;
     if (picker.kind === 'CURSE')
       this.send({ type: 'PLAY_CURSE', cardId: picker.card.instanceId, targetPlayerId: id });
+    else if (picker.kind === 'PLAYER_CARD')
+      this.send({
+        type: 'PLAY_CARD',
+        cardId: picker.card.instanceId,
+        target: { type: 'PLAYER', playerId: id },
+      });
     else if (picker.kind === 'COMBAT_CURSE' && reactionWindowId !== undefined)
       this.send({
         type: 'PLAY_COMBAT_CURSE',
@@ -1730,6 +1744,19 @@ export class GameShellComponent {
       facts.push(
         `Постоянно разрешает ещё одну роль: ${card.rolePermission.role === 'CLASS' ? 'Класс' : 'Раса'}`,
       );
+    for (const modifier of card.capacityModifiers ?? [])
+      facts.push(
+        `Вместимость: ${modifier.amount >= 0 ? '+' : ''}${modifier.amount} ${
+          {
+            HEAD: 'голова',
+            HANDS: 'руки',
+            HIRELING: 'наёмник',
+            MOUNT: 'ездовой спутник',
+          }[modifier.capacity]
+        }`,
+      );
+    if (card.permanentCombatUpgrade === true)
+      facts.push('Авторитетная оценка: есть легальное постоянное усиление');
     if (card.attachment)
       facts.push(
         `Прикрепление: +${card.attachment.combatBonus}; цели с метками ${card.attachment.allowedTags.map((tag) => this.tagLabel(tag)).join(', ')}`,
@@ -1783,6 +1810,10 @@ export class GameShellComponent {
         return `потерять ${effect.amount} уровень`;
       case 'DRAW_CARDS':
         return `взять ${effect.count} из колоды ${effect.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}`;
+      case 'STEAL_RANDOM_HAND_CARD':
+        return 'украсть случайную карту из руки выбранного игрока';
+      case 'AMBUSH_MONSTERS':
+        return 'начать бой с двумя случайно выбранными монстрами';
       case 'DISCARD_RANDOM_CARDS':
       case 'DISCARD_CHOSEN_CARDS':
         return `${effect.type === 'DISCARD_RANDOM_CARDS' ? 'случайно ' : ''}сбросить ${effect.count} из ${effect.zone === 'HAND' ? 'руки' : 'снаряжения'}`;
@@ -1830,6 +1861,8 @@ export class GameShellComponent {
       return `${cost}, взять ${ability.count} из колоды ${ability.deck === 'DOOR' ? 'Дверей' : 'Сокровищ'}; один раз за ход`;
     if (ability.type === 'RUN_AWAY_BONUS')
       return `${cost}, получить ${ability.amount >= 0 ? '+' : ''}${ability.amount} к своему броску побега; один раз за бой`;
+    if (ability.type === 'STEAL_EQUIPPED_ITEM')
+      return `${cost}, попытаться забрать выбранное снаряжение (${ability.successChance.numerator}/${ability.successChance.denominator}); один раз за ход`;
     return `${cost}, дать ${ability.amount >= 0 ? '+' : ''}${ability.amount} стороне игроков; один раз за бой`;
   }
   protected compactHandFacts(card: GameCardView): readonly string[] {
@@ -2022,9 +2055,9 @@ export class GameShellComponent {
                 combatRevision: intent.combatRevision,
               }
             : {
-                type: 'PLAY_CURSE',
+                type: 'PLAY_CARD',
                 cardId: intent.cardId,
-                targetPlayerId: target.playerId,
+                target,
               };
         if (target.type === 'SELF')
           return {
@@ -2032,7 +2065,7 @@ export class GameShellComponent {
             cardId: intent.cardId,
             target,
           };
-        if (target.type === 'EQUIPMENT')
+        if (target.type === 'EQUIPMENT' || target.type === 'COMPANION')
           return {
             type: 'PLAY_CARD',
             cardId: intent.cardId,
@@ -2068,40 +2101,23 @@ export class GameShellComponent {
       ),
     ];
   }
-  private hasEquipmentConflict(cardId: string): boolean {
-    return this.game().unavailableCardReasons.some(
-      (entry) =>
-        entry.cardId === cardId &&
-        (entry.reason === 'SLOT_OCCUPIED' || entry.reason === 'NOT_ENOUGH_FREE_HANDS'),
-    );
-  }
-  private handEquipmentToReplace(
-    candidate: GameCardView,
-    equipped: readonly GameCardView[],
-  ): readonly GameCardView[] {
-    const requiredHands = candidate.equipment?.hands ?? 1;
-    const handItems = equipped.filter((item) => item.equipment?.slot === 'HANDS');
-    let usedHands = handItems.reduce((total, item) => total + (item.equipment?.hands ?? 1), 0);
-    const conflicts: GameCardView[] = [];
-    for (const item of handItems) {
-      if (usedHands + requiredHands <= 2) break;
-      conflicts.push(item);
-      usedHands -= item.equipment?.hands ?? 1;
-    }
-    return conflicts;
-  }
   protected cardActions(card: GameCardView): readonly CardUse[] {
     const game = this.game(),
       uses: CardUse[] = [];
     const intents = game.availableIntents.filter(
       (intent) => 'cardId' in intent && intent.cardId === card.instanceId,
     );
-    const roleAbilityIntent = game.availableIntents.find(
+    const roleAbilityIntents = game.availableIntents.filter(
       (intent): intent is Extract<AvailableIntentView, { readonly kind: 'USE_ROLE_ABILITY' }> =>
         intent.kind === 'USE_ROLE_ABILITY' && intent.roleCardId === card.instanceId,
     );
+    const roleAbilityIntent = roleAbilityIntents.find(
+      (intent) => intent.abilityType !== 'STEAL_EQUIPPED_ITEM',
+    );
     const lookIntent = intents.find((intent) => intent.kind === 'LOOK_FOR_TROUBLE');
-    const equipIntent = intents.find((intent) => intent.kind === 'EQUIP_ITEM');
+    const equipIntent = intents.find(
+      (intent) => intent.kind === 'EQUIP_ITEM' && intent.replaceCardIds === undefined,
+    );
     const unequipIntent = intents.find((intent) => intent.kind === 'UNEQUIP_ITEM');
     const roleIntent = intents.find((intent) => intent.kind === 'PLAY_ROLE');
     const discardRoleIntent = intents.find((intent) => intent.kind === 'DISCARD_ROLE');
@@ -2161,6 +2177,17 @@ export class GameShellComponent {
               : 'Применить боевую способность',
         roleAbility: roleAbilityIntent,
       });
+    for (const theftIntent of roleAbilityIntents.filter(
+      (intent) => intent.abilityType === 'STEAL_EQUIPPED_ITEM',
+    )) {
+      if (theftIntent.target.type !== 'EQUIPMENT') continue;
+      const owner = game.players.find((player) => player.playerId === theftIntent.target.playerId);
+      const target = owner?.equipment.find((item) => item.instanceId === theftIntent.target.cardId);
+      uses.push({
+        label: `Попытаться забрать: ${target?.name ?? 'снаряжение'} (${owner?.name ?? 'игрок'})`,
+        roleAbility: theftIntent,
+      });
+    }
     if (roleIntent?.kind === 'PLAY_ROLE')
       uses.push({
         label: 'Сыграть роль',
@@ -2214,7 +2241,15 @@ export class GameShellComponent {
           intent.target.type === 'PLAYER' ? intent.target.playerId : '',
         ),
       }));
-      uses.push(this.useWithTargets('Наложить проклятие', 'Выберите цель', card, 'CURSE', options));
+      uses.push(
+        this.useWithTargets(
+          card.type === 'CURSE' ? 'Наложить проклятие' : 'Сыграть на игрока',
+          'Выберите цель',
+          card,
+          card.type === 'CURSE' ? 'CURSE' : 'PLAYER_CARD',
+          options,
+        ),
+      );
     }
     if (combatCurseIntents.length > 0) {
       uses.push(

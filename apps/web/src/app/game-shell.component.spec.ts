@@ -664,6 +664,12 @@ describe('GameShellComponent', () => {
     const self = player({ handCount: 7 });
     const fixture = render(
       base({
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE'],
+          maxHandSize: 7,
+          doubleMonsterAmbushEnabled: false,
+        },
         players: [self],
         self: { ...self, hand },
         unavailableCardReasons: [{ cardId: 'c0', reason: 'WAITING_FOR_TURN' }],
@@ -671,7 +677,7 @@ describe('GameShellComponent', () => {
     );
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelectorAll('app-hand-dock app-compact-game-card')).toHaveLength(7);
-    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/5');
+    expect(root.textContent?.replace(/\s+/gu, ' ').trim()).toContain('Рука 7/7');
     expect(root.textContent).toContain('Card 0');
     root.querySelector<HTMLButtonElement>('.hand-menu')!.click();
     fixture.detectChanges();
@@ -803,6 +809,14 @@ describe('GameShellComponent', () => {
         players: [self],
         self: { ...self, hand: [twoHanded] },
         availableIntents: [
+          {
+            id: 'equip:two-handed:replace',
+            kind: 'EQUIP_ITEM',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'two-handed',
+            replaceCardIds: ['left', 'right'],
+            permanentCombatPowerIncrease: 3,
+          },
           {
             id: 'unequip:left',
             kind: 'UNEQUIP_ITEM',
@@ -1108,6 +1122,12 @@ describe('GameShellComponent', () => {
       type: 'HIRELING',
       companion: { combatBonus: 1 },
     });
+    const secondCompanion = card({
+      instanceId: 'second-companion',
+      name: 'Quartermaster',
+      type: 'HIRELING',
+      companion: { combatBonus: 1 },
+    });
     const permission = card({
       instanceId: 'permission',
       name: 'Double Major',
@@ -1129,6 +1149,7 @@ describe('GameShellComponent', () => {
       handCount: 3,
       equipment: [weapon],
       hirelingCard: companion,
+      hirelingCards: [companion, secondCompanion],
       mountCard: mount,
       rolePermissionCards: [activePermission],
     });
@@ -1164,6 +1185,7 @@ describe('GameShellComponent', () => {
     root.querySelector<HTMLButtonElement>('.player')!.click();
     fixture.detectChanges();
     expect(root.querySelector('.equipment-grid .hireling')?.textContent).toContain('Scout');
+    expect(root.querySelector('.equipment-grid .hireling')?.textContent).toContain('Quartermaster');
     expect(root.querySelector('.equipment-grid .hireling')?.textContent).toContain('+1');
     expect(root.querySelector('.equipment-grid .mount')?.textContent).toContain('Pony');
     expect(root.querySelector('.equipment-grid .mount')?.textContent).toContain('+2');

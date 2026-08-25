@@ -13,6 +13,8 @@ import {
   calculateMonsterPower,
   calculateMonsterTreasures,
   canChangeEquipment,
+  capacityFor,
+  companionCards,
   equipmentConflict,
   equipmentRestriction,
   permanentCombatPower,
@@ -63,6 +65,9 @@ export const COMBAT_REACTION_TIMEOUT_MS = 20_000;
 export const PENDING_DECISION_TIMEOUT_MS = 60_000;
 export const HELP_OFFER_TIMEOUT_MS = 30_000;
 export const CURSE_RESPONSE_TIMEOUT_MS = 20_000;
+function maxHandSize(state: GameState): number {
+  return state.config.maxHandSize ?? HAND_LIMIT;
+}
 
 export interface Clock {
   now(): number;
@@ -185,8 +190,8 @@ function hasAutomaticCurseProtection(
     ...player.equipment,
     ...player.classCards,
     ...player.raceCards,
-    ...(player.hirelingCard === null ? [] : [player.hirelingCard]),
-    ...(player.mountCard === null ? [] : [player.mountCard]),
+    ...companionCards(player, "HIRELING"),
+    ...companionCards(player, "MOUNT"),
   ];
   return sources.some((card) => {
     const definition = findDefinition(state, card);
@@ -213,11 +218,43 @@ function revalidatePlayerEquipment(
 ): { readonly state: GameState; readonly events: readonly GameEvent[] } {
   const player = state.players.find((candidate) => candidate.id === playerId);
   if (player === undefined) return { state, events: [] };
-  const incompatible = player.equipment.filter(
-    (card) =>
-      equipmentRestriction(player, findDefinition(state, card)) !== null,
+  const headCapacity = capacityFor(state, player, "HEAD");
+  const handsCapacity = capacityFor(state, player, "HANDS");
+  let heads = 0;
+  let bodies = 0;
+  let feet = 0;
+  let hands = 0;
+  const compatible: CardInstance[] = [];
+  const incompatible: CardInstance[] = [];
+  for (const card of player.equipment) {
+    const definition = findDefinition(state, card);
+    const equipment = definition.equipment;
+    let legal = equipmentRestriction(player, definition) === null;
+    if (equipment !== undefined && legal) {
+      if (equipment.slot === "HEAD") legal = heads++ < headCapacity;
+      else if (equipment.slot === "BODY") legal = bodies++ < 1;
+      else if (equipment.slot === "FEET") legal = feet++ < 1;
+      else {
+        const occupiedHands = equipment.hands ?? 1;
+        legal = hands + occupiedHands <= handsCapacity;
+        if (legal) hands += occupiedHands;
+      }
+    }
+    (legal ? compatible : incompatible).push(card);
+  }
+  const hirelings = companionCards(player, "HIRELING");
+  const mounts = companionCards(player, "MOUNT");
+  const keptHirelings = hirelings.slice(
+    0,
+    capacityFor(state, player, "HIRELING"),
   );
-  if (incompatible.length === 0) return { state, events: [] };
+  const keptMounts = mounts.slice(0, capacityFor(state, player, "MOUNT"));
+  const excessCompanions = [
+    ...hirelings.slice(keptHirelings.length),
+    ...mounts.slice(keptMounts.length),
+  ];
+  if (incompatible.length === 0 && excessCompanions.length === 0)
+    return { state, events: [] };
 
   const incompatibleIds = new Set(incompatible.map((card) => card.instanceId));
   const detached = player.equipmentAttachments.filter((attachment) =>
@@ -226,28 +263,43 @@ function revalidatePlayerEquipment(
   const detachedIds = new Set(
     detached.map((attachment) => attachment.card.instanceId),
   );
-  return {
-    state: updatePlayer(state, playerId, (current) => ({
-      ...current,
-      equipment: current.equipment.filter(
-        (card) => !incompatibleIds.has(card.instanceId),
-      ),
-      equipmentAttachments: current.equipmentAttachments.filter(
-        (attachment) => !detachedIds.has(attachment.card.instanceId),
-      ),
-      hand: [
-        ...current.hand,
-        ...incompatible,
-        ...detached.map((attachment) => attachment.card),
-      ],
-    })),
-    events: incompatible.map((card) => ({
+  const nextState = updatePlayer(state, playerId, (current) => ({
+    ...current,
+    equipment: compatible,
+    equipmentAttachments: current.equipmentAttachments.filter(
+      (attachment) => !detachedIds.has(attachment.card.instanceId),
+    ),
+    hand: [
+      ...current.hand,
+      ...incompatible,
+      ...detached.map((attachment) => attachment.card),
+      ...excessCompanions,
+    ],
+    hirelingCards: keptHirelings,
+    mountCards: keptMounts,
+    hirelingCard: keptHirelings[0] ?? null,
+    mountCard: keptMounts[0] ?? null,
+  }));
+  const events: GameEvent[] = [
+    ...incompatible.map((card) => ({
       type: "ITEM_UNEQUIPPED" as const,
       visibility: "PUBLIC" as const,
       playerId,
       cardId: card.instanceId,
       definitionId: card.definitionId,
     })),
+    ...excessCompanions.map((card) => ({
+      type: "COMPANION_UNSLOTTED" as const,
+      visibility: "PUBLIC" as const,
+      playerId,
+      cardId: card.instanceId,
+      definitionId: card.definitionId,
+    })),
+  ];
+  const stabilized = revalidatePlayerEquipment(nextState, playerId);
+  return {
+    state: stabilized.state,
+    events: [...events, ...stabilized.events],
   };
 }
 
@@ -432,6 +484,11 @@ function discardRandomCards(
         },
   );
   nextState = addToDiscard(nextState, allDiscarded);
+  const revalidated =
+    effect.zone === "EQUIPMENT"
+      ? revalidatePlayerEquipment(nextState, playerId)
+      : { state: nextState, events: [] as readonly GameEvent[] };
+  nextState = revalidated.state;
 
   return {
     state: nextState,
@@ -453,6 +510,7 @@ function discardRandomCards(
               count: allDiscarded.length,
               zone: effect.zone,
             },
+            ...revalidated.events,
           ],
   };
 }
@@ -466,6 +524,7 @@ function applyEffects(
   completion: PendingEffectCompletion,
   nowEpochMs = 0,
   protectedCardId?: CardInstanceId,
+  sourcePlayerId: PlayerId = playerId,
 ): EffectResult {
   let nextState = state;
   const events: GameEvent[] = [];
@@ -546,6 +605,50 @@ function applyEffects(
         events.push(...result.events);
         break;
       }
+      case "STEAL_RANDOM_HAND_CARD": {
+        if (sourcePlayerId === playerId)
+          throw new TypeError("Random hand theft requires another player.");
+        const victim = nextState.players.find(
+          (candidate) => candidate.id === playerId,
+        );
+        if (victim === undefined || victim.hand.length === 0)
+          throw new TypeError("Random hand theft has no eligible victim card.");
+        const stolen = victim.hand[random.nextInt(victim.hand.length)];
+        if (stolen === undefined)
+          throw new RangeError("Random hand theft selected no card.");
+        nextState = updatePlayer(nextState, playerId, (current) => ({
+          ...current,
+          hand: current.hand.filter(
+            (candidate) => candidate.instanceId !== stolen.instanceId,
+          ),
+        }));
+        nextState = updatePlayer(nextState, sourcePlayerId, (current) => ({
+          ...current,
+          hand: [...current.hand, stolen],
+        }));
+        events.push(
+          {
+            type: "RANDOM_HAND_THEFT",
+            visibility: "PUBLIC",
+            playerId: sourcePlayerId,
+            victimPlayerId: playerId,
+          },
+          {
+            type: "STOLEN_HAND_CARD_REVEALED",
+            visibility: "PRIVATE",
+            recipientPlayerId: playerId,
+            playerId: sourcePlayerId,
+            victimPlayerId: playerId,
+            cardId: stolen.instanceId,
+            definitionId: stolen.definitionId,
+          },
+        );
+        break;
+      }
+      case "AMBUSH_MONSTERS":
+        throw new TypeError(
+          "An ambush Door effect can only resolve while kicking the Door.",
+        );
       case "DISCARD_RANDOM_CARDS": {
         const result = discardRandomCards(
           nextState,
@@ -640,8 +743,8 @@ function applyEffects(
             ...player.raceCards,
             ...player.rolePermissionCards,
             ...player.equipmentAttachments.map((attachment) => attachment.card),
-            ...(player.hirelingCard === null ? [] : [player.hirelingCard]),
-            ...(player.mountCard === null ? [] : [player.mountCard]),
+            ...companionCards(player, "HIRELING"),
+            ...companionCards(player, "MOUNT"),
           ];
           nextState = updatePlayer(nextState, playerId, (current) => ({
             ...current,
@@ -653,6 +756,8 @@ function applyEffects(
             rolePermissionCards: [],
             hirelingCard: null,
             mountCard: null,
+            hirelingCards: [],
+            mountCards: [],
             activeEffects: [],
             abilityUsages: [],
             isDead: true,
@@ -1059,6 +1164,8 @@ function addPlayer(
     rolePermissionCards: [],
     hirelingCard: null,
     mountCard: null,
+    hirelingCards: [],
+    mountCards: [],
     isDead: false,
     activeEffects: [],
     abilityUsages: [],
@@ -1088,8 +1195,13 @@ function startGame(state: GameState, random: RandomSource): CommandResult {
   }
 
   const cardsNeeded = state.players.length * STARTING_HAND_SIZE_PER_DECK;
+  const drawOnlyAmbushCards = state.doorDeck.filter((card) =>
+    findDefinition(state, card).effects.some(
+      (effect) => effect.type === "AMBUSH_MONSTERS",
+    ),
+  );
   if (
-    state.doorDeck.length < cardsNeeded ||
+    state.doorDeck.length - drawOnlyAmbushCards.length < cardsNeeded ||
     state.treasureDeck.length < cardsNeeded
   ) {
     return fail(
@@ -1120,7 +1232,15 @@ function startGame(state: GameState, random: RandomSource): CommandResult {
     );
   }
 
-  let workingState = state;
+  const drawOnlyAmbushIds = new Set(
+    drawOnlyAmbushCards.map((card) => card.instanceId),
+  );
+  let workingState: GameState = {
+    ...state,
+    doorDeck: state.doorDeck.filter(
+      (card) => !drawOnlyAmbushIds.has(card.instanceId),
+    ),
+  };
   const reserved = new Map<PlayerId, CardInstance>();
   if (balanced) {
     const candidates = [...starterCandidates];
@@ -1196,6 +1316,11 @@ function startGame(state: GameState, random: RandomSource): CommandResult {
     throw new RangeError("Starting player selection returned no player.");
   }
 
+  const remainingDoorDeck =
+    drawOnlyAmbushCards.length === 0
+      ? workingState.doorDeck
+      : shuffle([...workingState.doorDeck, ...drawOnlyAmbushCards], random);
+
   return succeed(
     {
       ...state,
@@ -1203,7 +1328,7 @@ function startGame(state: GameState, random: RandomSource): CommandResult {
       phase: GamePhase.TURN_START,
       players,
       activePlayerId: activePlayer.id,
-      doorDeck: workingState.doorDeck,
+      doorDeck: remainingDoorDeck,
       treasureDeck: workingState.treasureDeck,
       turnNumber: 1,
     },
@@ -1261,6 +1386,108 @@ function kickDoor(
     phase: GamePhase.DOOR_RESOLUTION,
     lastRunAwayResult: null,
   };
+
+  const ambush = definition.effects.find(
+    (effect) => effect.type === "AMBUSH_MONSTERS",
+  );
+  if (ambush !== undefined) {
+    const currentMonsterCount = nextState.doorDeck.filter(
+      (candidate) =>
+        findDefinition(nextState, candidate).type === CardType.MONSTER,
+    ).length;
+    const discardMonsterCount = nextState.doorDiscard.filter(
+      (candidate) =>
+        findDefinition(nextState, candidate).type === CardType.MONSTER,
+    ).length;
+    const needsRecycle = currentMonsterCount < ambush.count;
+    const canReachRecycleBoundary =
+      nextState.doorDeck.length === currentMonsterCount;
+    if (
+      (needsRecycle && !canReachRecycleBoundary) ||
+      currentMonsterCount + discardMonsterCount < ambush.count
+    )
+      return fail(
+        state,
+        "INSUFFICIENT_CARDS",
+        "The Door resources cannot provide two distinct Monsters for the ambush.",
+      );
+
+    const ambushEvents: GameEvent[] = [];
+    let pile = [...nextState.doorDeck];
+    let discard = [...nextState.doorDiscard];
+    const monsters: CardInstance[] = [];
+    for (let selected = 0; selected < ambush.count; selected += 1) {
+      if (pile.length === 0) {
+        pile = shuffle(discard, random);
+        discard = [];
+        ambushEvents.push({
+          type: "DECK_RESHUFFLED",
+          visibility: "PUBLIC",
+          deck: DeckType.DOOR,
+        });
+      }
+      const candidateIndices = pile.flatMap((candidate, index) =>
+        findDefinition(nextState, candidate).type === CardType.MONSTER
+          ? [index]
+          : [],
+      );
+      const chosenIndex =
+        candidateIndices[random.nextInt(candidateIndices.length)];
+      if (chosenIndex === undefined)
+        throw new RangeError("Ambush selection returned no Monster.");
+      const [monster] = pile.splice(chosenIndex, 1);
+      if (monster === undefined)
+        throw new RangeError("Ambush selected an invalid Monster index.");
+      monsters.push(monster);
+    }
+    const combatId = parseCombatId(
+      `combat-${nextState.nextCombatSequence ?? 1}`,
+    );
+    const encounters = monsters.map((monster, index) =>
+      createCombatMonster(nextState, monster, nextEncounterId(index + 1)),
+    );
+    nextState = addToDiscard(
+      {
+        ...nextState,
+        doorDeck: pile,
+        doorDiscard: discard,
+        nextCombatSequence: (nextState.nextCombatSequence ?? 1) + 1,
+        combat: {
+          combatId,
+          playerId: actorId,
+          revision: 1,
+          monsters: encounters,
+          nextEncounterSequence: encounters.length + 1,
+          nextHelpOfferSequence: 1,
+          nextReactionWindowSequence: 1,
+          reactionWindow: null,
+          helpOffer: null,
+          helpAgreement: null,
+          runAway: null,
+          history: encounters.map((encounter) => ({
+            type: "COMBAT_STARTED" as const,
+            playerId: actorId,
+            encounterId: encounter.encounterId,
+            monsterDefinitionId: encounter.monster.definitionId,
+          })),
+        },
+      },
+      [card],
+    );
+    return succeed(nextState, [
+      ...draw.events,
+      doorEvent,
+      ...ambushEvents,
+      ...encounters.map<GameEvent>((encounter) => ({
+        type: "COMBAT_STARTED",
+        visibility: "PUBLIC",
+        playerId: actorId,
+        encounterId: encounter.encounterId,
+        monsterCardId: encounter.monster.instanceId,
+        monsterDefinitionId: encounter.monster.definitionId,
+      })),
+    ]);
+  }
 
   if (definition.type === CardType.MONSTER) {
     const encounterId = nextEncounterId(1);
@@ -1605,23 +1832,21 @@ function endTurn(
   actorId: PlayerId,
   random: RandomSource,
 ): CommandResult {
-  if (
-    state.phase !== GamePhase.POST_DOOR &&
-    state.phase !== GamePhase.END_TURN
-  ) {
+  if (state.phase !== GamePhase.END_TURN) {
     return fail(
       state,
       "INVALID_PHASE",
-      "END_TURN is only available after Door resolution or room looting.",
+      "END_TURN requires Look for Trouble, Loot Room, or Scavenge after the Door resolves.",
     );
   }
 
   const actor = state.players.find((player) => player.id === actorId);
-  if (actor !== undefined && actor.hand.length > HAND_LIMIT) {
+  const handLimit = maxHandSize(state);
+  if (actor !== undefined && actor.hand.length > handLimit) {
     return fail(
       state,
       "HAND_LIMIT_EXCEEDED",
-      `The player must give away or discard ${actor.hand.length - HAND_LIMIT} excess card(s).`,
+      `The player must give away or discard ${actor.hand.length - handLimit} excess card(s).`,
     );
   }
 
@@ -2136,6 +2361,99 @@ function useRoleAbility(
     ]);
   }
 
+  if (ability.type === "STEAL_EQUIPPED_ITEM") {
+    if (
+      !canChangeEquipment(state, actorId) ||
+      state.combat !== null ||
+      command.target.type !== "EQUIPMENT"
+    )
+      return fail(
+        state,
+        "INVALID_PHASE",
+        "Equipped-item theft can only be attempted on your turn outside combat.",
+      );
+    const targetEquipmentId = command.target.cardId;
+    const victim = state.players.find(
+      (player) =>
+        player.id !== actorId &&
+        player.equipment.some((card) => card.instanceId === targetEquipmentId),
+    );
+    const targetCard = victim?.equipment.find(
+      (card) => card.instanceId === targetEquipmentId,
+    );
+    if (victim === undefined || targetCard === undefined)
+      return fail(
+        state,
+        "INVALID_TARGET",
+        "The target must be an exact public Equipment card owned by another player.",
+      );
+    const chance = ability.successChance;
+    if (
+      !Number.isSafeInteger(chance.numerator) ||
+      !Number.isSafeInteger(chance.denominator) ||
+      chance.numerator < 1 ||
+      chance.numerator >= chance.denominator
+    )
+      throw new TypeError(
+        "Equipped-item theft has an invalid authored chance.",
+      );
+
+    let nextState = updatePlayer(state, actorId, (player) => ({
+      ...player,
+      hand: player.hand.filter((card) => !uniqueCostIds.has(card.instanceId)),
+      abilityUsages: [
+        ...(player.abilityUsages ?? []).filter(
+          (usage) => usage.sourceCardId !== roleCard.instanceId,
+        ),
+        {
+          sourceCardId: roleCard.instanceId,
+          sourceDefinitionId: roleCard.definitionId,
+          scope: { type: "TURN", turnNumber: state.turnNumber },
+        },
+      ],
+    }));
+    nextState = addToDiscard(nextState, costCards);
+    const succeeded = random.nextInt(chance.denominator) < chance.numerator;
+    const events: GameEvent[] = [];
+    if (succeeded) {
+      const attachments = victim.equipmentAttachments.filter(
+        (attachment) => attachment.attachedToCardId === targetCard.instanceId,
+      );
+      nextState = updatePlayer(nextState, victim.id, (player) => ({
+        ...player,
+        equipment: player.equipment.filter(
+          (card) => card.instanceId !== targetCard.instanceId,
+        ),
+        equipmentAttachments: player.equipmentAttachments.filter(
+          (attachment) => attachment.attachedToCardId !== targetCard.instanceId,
+        ),
+        hand: [
+          ...player.hand,
+          ...attachments.map((attachment) => attachment.card),
+        ],
+      }));
+      nextState = updatePlayer(nextState, actorId, (player) => ({
+        ...player,
+        hand: [...player.hand, targetCard],
+      }));
+      const revalidated = revalidatePlayerEquipment(nextState, victim.id);
+      nextState = revalidated.state;
+      events.push(...revalidated.events);
+    }
+    return succeed(nextState, [
+      {
+        type: "EQUIPPED_ITEM_THEFT_ATTEMPTED",
+        visibility: "PUBLIC",
+        playerId: actorId,
+        victimPlayerId: victim.id,
+        cardId: targetCard.instanceId,
+        definitionId: targetCard.definitionId,
+        succeeded,
+      },
+      ...events,
+    ]);
+  }
+
   if (state.combat === null || state.phase !== GamePhase.DOOR_RESOLUTION)
     return fail(
       state,
@@ -2348,6 +2666,10 @@ function discardRolePermission(
       role,
       expiresAtEpochMs: nowEpochMs + PENDING_DECISION_TIMEOUT_MS,
     });
+  } else {
+    const revalidated = revalidatePlayerEquipment(nextState, actorId);
+    nextState = revalidated.state;
+    events.push(...revalidated.events);
   }
   return succeed(nextState, events);
 }
@@ -2410,11 +2732,11 @@ function sellItems(
   actorId: PlayerId,
   cardIds: readonly import("./identifiers.js").CardInstanceId[],
 ): CommandResult {
-  if (!canChangeEquipment(state, actorId))
+  if (!canChangeEquipment(state, actorId) || state.phase !== GamePhase.END_TURN)
     return fail(
       state,
       "INVALID_PHASE",
-      "Items can only be sold during your turn outside combat.",
+      "Items can only be sold after mandatory post-Door progression.",
     );
   if (cardIds.length === 0 || new Set(cardIds).size !== cardIds.length)
     return fail(
@@ -2487,7 +2809,8 @@ function sellItems(
     ...items,
     ...soldAttachments.map((attachment) => attachment.card),
   ]);
-  return succeed(nextState, [
+  const revalidated = revalidatePlayerEquipment(nextState, actorId);
+  return succeed(revalidated.state, [
     {
       type: "CARDS_SOLD",
       visibility: "PUBLIC",
@@ -2496,6 +2819,7 @@ function sellItems(
       value,
       levelsGained,
     },
+    ...revalidated.events,
   ]);
 }
 
@@ -2556,7 +2880,8 @@ function tradeItem(
     ...player,
     hand: [...player.hand, card],
   }));
-  return succeed(nextState, [
+  const revalidated = revalidatePlayerEquipment(nextState, actorId);
+  return succeed(revalidated.state, [
     {
       type: "ITEM_TRADED",
       visibility: "PUBLIC",
@@ -2565,6 +2890,7 @@ function tradeItem(
       cardId,
       definitionId: card.definitionId,
     },
+    ...revalidated.events,
   ]);
 }
 
@@ -2577,7 +2903,7 @@ function giveCharity(
   if (
     state.activePlayerId !== actorId ||
     state.combat !== null ||
-    (state.phase !== GamePhase.POST_DOOR && state.phase !== GamePhase.END_TURN)
+    state.phase !== GamePhase.END_TURN
   )
     return fail(
       state,
@@ -2585,7 +2911,7 @@ function giveCharity(
       "Charity is only resolved at the end of your turn.",
     );
   const actor = state.players.find((player) => player.id === actorId)!;
-  const excess = Math.max(0, actor.hand.length - HAND_LIMIT);
+  const excess = Math.max(0, actor.hand.length - maxHandSize(state));
   if (
     cardIds.length !== excess ||
     new Set(cardIds).size !== cardIds.length ||
@@ -2669,7 +2995,7 @@ function giveRandomCharity(
   if (actor === undefined) {
     return fail(state, "ACTOR_NOT_FOUND", "The charity player is missing.");
   }
-  const excess = Math.max(0, actor.hand.length - HAND_LIMIT);
+  const excess = Math.max(0, actor.hand.length - maxHandSize(state));
   const pool = [...actor.hand];
   const selected: CardInstance[] = [];
   while (selected.length < excess && pool.length > 0) {
@@ -2715,13 +3041,15 @@ function unequipItem(
       `Card ${cardId} is not equipped by the actor.`,
     );
   }
-  const nextState = updatePlayer(state, actorId, (current) => ({
+  let nextState = updatePlayer(state, actorId, (current) => ({
     ...current,
     hand: [...current.hand, card],
     equipment: current.equipment.filter(
       (candidate) => candidate.instanceId !== cardId,
     ),
   }));
+  const revalidated = revalidatePlayerEquipment(nextState, actorId);
+  nextState = revalidated.state;
   return succeed(nextState, [
     {
       type: "ITEM_UNEQUIPPED",
@@ -2730,6 +3058,7 @@ function unequipItem(
       cardId,
       definitionId: card.definitionId,
     },
+    ...revalidated.events,
   ]);
 }
 
@@ -2887,27 +3216,47 @@ function playCard(
     definition.type === CardType.HIRELING ||
     definition.type === CardType.MOUNT
   ) {
-    if (!canChangeEquipment(state, actorId) || !targetsSelf)
+    const kind = definition.type === CardType.HIRELING ? "HIRELING" : "MOUNT";
+    const currentCards = companionCards(actor, kind);
+    const capacity = capacityFor(state, actor, kind);
+    const replacementCardId =
+      command.target?.type === "COMPANION" ? command.target.cardId : undefined;
+    const replacementTarget = currentCards.find(
+      (candidate) => candidate.instanceId === replacementCardId,
+    );
+    const hasFreeSlot = currentCards.length < capacity;
+    const legacyReplacement =
+      !hasFreeSlot && capacity === 1 && targetsSelf
+        ? currentCards[0]
+        : undefined;
+    const replaced = replacementTarget ?? legacyReplacement;
+    if (
+      !canChangeEquipment(state, actorId) ||
+      (hasFreeSlot ? !targetsSelf : replaced === undefined)
+    )
       return fail(
         state,
         "INVALID_TARGET",
-        "A companion can only be played into your own slot on your turn.",
+        "A companion needs a free authored slot or an exact replacement target.",
       );
-    const previous =
-      definition.type === CardType.HIRELING
-        ? actor.hirelingCard
-        : actor.mountCard;
+    const nextCards = [
+      ...currentCards.filter(
+        (candidate) => candidate.instanceId !== replaced?.instanceId,
+      ),
+      card,
+    ];
     let nextState = updatePlayer(state, actorId, (player) => ({
       ...player,
       hand: player.hand.filter(
         (candidate) => candidate.instanceId !== card.instanceId,
       ),
-      ...(definition.type === CardType.HIRELING
-        ? { hirelingCard: card }
-        : { mountCard: card }),
+      ...(kind === "HIRELING"
+        ? { hirelingCards: nextCards, hirelingCard: nextCards[0] ?? null }
+        : { mountCards: nextCards, mountCard: nextCards[0] ?? null }),
     }));
-    if (previous !== null) nextState = addToDiscard(nextState, [previous]);
-    return succeed(nextState, [
+    if (replaced !== undefined) nextState = addToDiscard(nextState, [replaced]);
+    const revalidated = revalidatePlayerEquipment(nextState, actorId);
+    return succeed(revalidated.state, [
       {
         type: "CARD_PLAYED",
         visibility: "PUBLIC",
@@ -2915,6 +3264,7 @@ function playCard(
         cardId: card.instanceId,
         target: command.target,
       },
+      ...revalidated.events,
     ]);
   }
   if (definition.type === CardType.ATTACHMENT) {
@@ -2983,11 +3333,27 @@ function playCard(
         "CARD_NOT_PLAYABLE",
         "A turn utility cannot be played during combat.",
       );
-    if (!canChangeEquipment(state, actorId) || !targetsSelf)
+    const stealsRandomHand = definition.effects.some(
+      (effect) => effect.type === "STEAL_RANDOM_HAND_CARD",
+    );
+    const targetPlayerId =
+      command.target?.type === "PLAYER" ? command.target.playerId : actorId;
+    const targetPlayer = state.players.find(
+      (player) => player.id === targetPlayerId,
+    );
+    const legalTarget = stealsRandomHand
+      ? command.target?.type === "PLAYER" &&
+        targetPlayerId !== actorId &&
+        targetPlayer !== undefined &&
+        targetPlayer.hand.length > 0
+      : targetsSelf;
+    if (!canChangeEquipment(state, actorId) || !legalTarget)
       return fail(
         state,
-        "INVALID_PHASE",
-        "A utility card can only be played on your turn outside combat.",
+        legalTarget ? "INVALID_PHASE" : "INVALID_TARGET",
+        stealsRandomHand
+          ? "Random hand theft requires another player with an eligible hidden hand card."
+          : "A utility card can only be played on your turn outside combat.",
       );
     const withoutCard = updatePlayer(state, actorId, (player) => ({
       ...player,
@@ -2997,7 +3363,7 @@ function playCard(
     }));
     const applied = applyEffects(
       withoutCard,
-      actorId,
+      targetPlayerId,
       definition.effects,
       random,
       card,
@@ -3007,6 +3373,9 @@ function playCard(
         targetPlayerId: actorId,
         phaseAfterResolution: null,
       },
+      0,
+      undefined,
+      actorId,
     );
     return succeed(addToDiscard(applied.state, [card]), [
       {
@@ -4233,13 +4602,8 @@ function continueRunAway(
       ...(combatant?.equipment ?? []),
       ...(combatant?.classCards ?? []),
       ...(combatant?.raceCards ?? []),
-      ...(combatant?.hirelingCard === null ||
-      combatant?.hirelingCard === undefined
-        ? []
-        : [combatant.hirelingCard]),
-      ...(combatant?.mountCard === null || combatant?.mountCard === undefined
-        ? []
-        : [combatant.mountCard]),
+      ...(combatant === undefined ? [] : companionCards(combatant, "HIRELING")),
+      ...(combatant === undefined ? [] : companionCards(combatant, "MOUNT")),
     ].reduce((sum, card) => {
       const definition = findDefinition(nextState, card);
       const modifier =
@@ -4499,6 +4863,11 @@ function resolveCardDiscard(
       zone: decision.zone,
     },
   ];
+  if (decision.zone === "EQUIPMENT") {
+    const revalidated = revalidatePlayerEquipment(nextState, actorId);
+    nextState = revalidated.state;
+    events.push(...revalidated.events);
+  }
   const remaining = applyEffectsAndComplete(
     nextState,
     actorId,

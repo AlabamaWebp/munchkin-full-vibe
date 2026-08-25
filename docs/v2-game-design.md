@@ -69,9 +69,12 @@ Before the match:
 - every player chooses `MALE` or `FEMALE` for their own character;
 - the host chooses `BALANCED` or `CLASSIC_CHAOS`;
 - the host enables any optional card sets; `CORE` is always enabled;
+- the host selects maximum hand size from 3 through 10 (default 5) and may enable
+  the optional double-Monster ambush Door;
 - the host cannot start until every player has chosen Sex and the selected
   catalog can satisfy the bounded starting-deal requirements;
-- mode and enabled sets become immutable when the game starts.
+- mode, enabled sets, hand limit, and ambush option become immutable when the
+  game starts and are preserved by rematch.
 
 Sex is public, supplies no inherent bonus, and is used only by a small number of
 explicit card conditions.
@@ -85,6 +88,8 @@ Each player starts at level 1 with four Door and four Treasure cards. In
 `BALANCED`, one of the four Treasure cards is guaranteed to be a neutral,
 actually equippable Tier-1 starter item. Setup reserves those items in one
 bounded pass before dealing the remaining cards; it never redraws in a loop.
+Draw-only ambush Doors are reserved out of the opening deal and shuffled back
+into the hidden Door resources afterward.
 
 The starting player is selected through `RandomSource`. The first turn begins in
 `TURN_START`.
@@ -103,7 +108,6 @@ TURN_START
        LOOK_FOR_TROUBLE with one hand Monster
        or LOOT_ROOM facedown
        or SCAVENGE when strictly eligible
-       or END_TURN
   -> END_TURN
        satisfy hand limit / charity
        advance to the next player
@@ -112,6 +116,16 @@ TURN_START
 `SCAVENGE` replaces `LOOT_ROOM`; a player never receives both in one turn.
 Combat victory goes directly to `END_TURN`. Running away completes every
 combatant/encounter attempt and then goes to `END_TURN`.
+After a Door resolves without combat, one `POST_DOOR` progression is mandatory:
+Look for Trouble, Loot Room, or eligible Scavenge. End Turn and Sale are not
+legal until one of those choices advances the phase to `END_TURN`.
+
+When the host option is enabled, a reusable draw-only Door effect may atomically
+select two distinct Monster instances from the Door draw/discard resources and
+start the normal multi-Monster combat. It preflights combined availability,
+recycles only Door cards at the normal empty-pile boundary, uses bounded
+`RandomSource` candidate selection, and does not reveal unselected candidates or
+retry on unsuitable draws.
 
 ## Balance goals
 
@@ -395,6 +409,15 @@ The expected total equipped bonus is controlled by slot competition, hands,
 restrictions, and copy count, not by reducing every card to the same value.
 Starter equipment is not broadly Class/Race restricted.
 
+Reusable capacity modifiers identify one of `HEAD`, `HANDS`, `HIRELING`, or
+`MOUNT`. Capacity loss runs the ordinary deterministic legality/revalidation
+path, returning excess cards (and attachments on returned Equipment) to hand.
+The hand-card projection marks a permanent Equipment upgrade only when the
+engine can find a currently legal equip/replacement outcome whose complete
+permanent combat contribution is higher after slot, hand, restriction,
+modifier, and attachment consequences. The corresponding intent names the
+exact replacement cards; Angular never searches replacement combinations.
+
 Arsenal weapon enhancers use one reusable attachment rule: one enhancer per
 equipped weapon, an explicit eligible Equipment tag/definition condition, and a
 typed bonus. If the host Equipment returns to hand, its enhancer returns to hand;
@@ -548,11 +571,13 @@ most one active ability. Allowed passive examples are:
 - `+1` to matching Equipment, with an authored cap;
 - one situational Curse or Bad Stuff defense.
 
-Active abilities use only three reusable primitives in V2:
+Active abilities use only four reusable primitives in V2:
 
 - discard authored hand-card costs for a signed player-side combat intervention;
 - discard authored hand-card costs for a personal Run Away-roll bonus;
 - discard authored hand-card costs to draw an authored count from one deck.
+- discard authored hand-card costs for one bounded attempt to steal an exact
+  public equipped Equipment instance from another player.
 
 Every active ability declares its exact cost, target, and either
 `ONCE_PER_TURN` or `ONCE_PER_COMBAT`. One generic serializable usage ledger,
@@ -560,6 +585,18 @@ keyed by the physical role card and current turn/combat address, enforces those
 limits. The server projects an intent with the exact eligible cost-card ids and
 target; Angular only collects the selection and sends the intention. There is no
 skill tree, ability currency, role-specific state machine, or browser cooldown.
+
+The initial equipped-theft authoring is deliberately conservative: one attempt
+per turn at `1/6`, with the probability stored on the ability. The authored cost
+and generic usage are consumed before the injected `RandomSource` roll; failure
+moves nothing, while success moves the same physical item to the thief's hand
+and applies normal attachment and victim-equipment revalidation.
+
+A separate `STEAL_RANDOM_HAND_CARD` effect targets another player. No candidate
+card ids appear in intents or public events. Resolution performs one bounded
+random index selection, moves that physical card to the thief's hand, emits an
+identity-free public summary, and emits an exact-card private event only to the
+victim. Match-log projection preserves that split after reconnect.
 
 By default a player may have one Class and one Race. A public
 `ROLE_PERMISSION` card from `DUAL_IDENTITY` grants exactly one additional slot
@@ -744,7 +781,7 @@ The main Stage has one state at a time:
 
 1. `TURN_READY` — active player and Kick Door;
 2. `DOOR_REVEAL` — revealed card and its resolved consequence;
-3. `POST_DOOR_CHOICE` — trouble, loot, Scavenge, or end;
+3. `POST_DOOR_CHOICE` — mandatory trouble, loot, or eligible Scavenge;
 4. `COMBAT_OPEN` — score, encounters, offers/agreement, legal interference;
 5. `COMBAT_REACTION` — score plus deadline and viewer-specific reaction state;
 6. `RUN_AWAY_SEQUENCE` — current combatant/encounter and completed result matrix;
@@ -927,8 +964,8 @@ cancel or continue. Accepted agreements have no deadline.
 ### Hand limit and charity
 
 - Active-player combat rewards and Scavenge enter hand before `END_TURN`, so the
-  existing five-card limit and charity apply normally.
-- A helper may temporarily exceed five cards outside their turn and resolves the
+  configured 3–10 card limit (default 5) and charity apply normally.
+- A helper may temporarily exceed the configured limit outside their turn and resolves the
   excess only at the end of their next own turn.
 - Role/equipment revalidation may increase hand size and is handled by the same
   cleanup rule, never an immediate privacy-leaking forced transfer.

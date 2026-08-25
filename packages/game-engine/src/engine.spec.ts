@@ -160,7 +160,7 @@ describe("game setup", () => {
     ).toHaveLength(29);
     expect(
       set.definitions.filter((card) => card.type === CardType.EQUIPMENT),
-    ).toHaveLength(34);
+    ).toHaveLength(36);
     expect(
       set.definitions.filter((card) => card.type === CardType.CURSE),
     ).toHaveLength(13);
@@ -534,6 +534,7 @@ describe("turn commands", () => {
     const result = executeCommand(
       {
         ...afterDoor,
+        phase: GamePhase.END_TURN,
         players: afterDoor.players.map((player) =>
           player.id === activeId
             ? { ...player, hand: player.hand.slice(0, 5) }

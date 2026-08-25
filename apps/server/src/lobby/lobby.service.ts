@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   LOBBY_MAX_PLAYERS,
+  DEFAULT_MAX_HAND_SIZE,
+  MIN_MAX_HAND_SIZE,
+  MAX_MAX_HAND_SIZE,
   CARD_SET_DISPLAY_METADATA,
   PLAYER_COLORS,
   LobbyStatus,
@@ -38,6 +41,8 @@ interface LobbyRoomRecord {
   settings: {
     mode: import('@munchkin-lan/contracts').GameMode;
     enabledSetIds: readonly import('@munchkin-lan/contracts').CardSetId[];
+    maxHandSize: number;
+    doubleMonsterAmbushEnabled: boolean;
   };
 }
 
@@ -110,7 +115,12 @@ export class LobbyService {
       status: LobbyStatus.LOBBY,
       hostPlayerId: player.playerId,
       players: [player],
-      settings: { mode: 'BALANCED', enabledSetIds: ['CORE'] },
+      settings: {
+        mode: 'BALANCED',
+        enabledSetIds: ['CORE'],
+        maxHandSize: DEFAULT_MAX_HAND_SIZE,
+        doubleMonsterAmbushEnabled: false,
+      },
     };
     this.rooms.set(roomCode, room);
     this.trackPlayer(roomCode, player);
@@ -321,7 +331,11 @@ export class LobbyService {
       return failure('GAME_ALREADY_STARTED', 'The game has already started.');
     if (
       (payload.mode !== 'BALANCED' && payload.mode !== 'CLASSIC_CHAOS') ||
-      !Array.isArray(payload.enabledSetIds)
+      !Array.isArray(payload.enabledSetIds) ||
+      !Number.isSafeInteger(payload.maxHandSize) ||
+      payload.maxHandSize < MIN_MAX_HAND_SIZE ||
+      payload.maxHandSize > MAX_MAX_HAND_SIZE ||
+      typeof payload.doubleMonsterAmbushEnabled !== 'boolean'
     )
       return failure('INVALID_GAME_SETTINGS', 'Choose valid game settings.');
     const valid = new Set(CARD_SET_DISPLAY_METADATA.map((set) => set.id));
@@ -335,7 +349,12 @@ export class LobbyService {
         'INVALID_GAME_SETTINGS',
         'CORE must be enabled and card sets must be unique.',
       );
-    room.settings = { mode: payload.mode, enabledSetIds: [...ids] };
+    room.settings = {
+      mode: payload.mode,
+      enabledSetIds: [...ids],
+      maxHandSize: payload.maxHandSize,
+      doubleMonsterAmbushEnabled: payload.doubleMonsterAmbushEnabled,
+    };
     return this.success(room, player);
   }
 

@@ -116,7 +116,7 @@ export class GameService {
     }
     this.games.delete(roomCode);
     this.clearDeadline(roomCode);
-    const restarted = this.startGame(roomCode, players);
+    const restarted = this.startGame(roomCode, players, current.config);
     if (!restarted.success) {
       this.games.set(roomCode, current);
       this.scheduleNextDeadline(roomCode);
@@ -323,7 +323,13 @@ export class GameService {
           target.monsterCardId.trim().length > 0) ||
         (target?.type === 'EQUIPMENT' &&
           typeof target.cardId === 'string' &&
-          target.cardId.trim().length > 0);
+          target.cardId.trim().length > 0) ||
+        (target?.type === 'COMPANION' &&
+          typeof target.cardId === 'string' &&
+          target.cardId.trim().length > 0) ||
+        (target?.type === 'PLAYER' &&
+          typeof target.playerId === 'string' &&
+          target.playerId.trim().length > 0);
       if (!validTarget) {
         return {
           success: false,
@@ -364,7 +370,11 @@ export class GameService {
     }
     if (command.type === 'USE_ROLE_ABILITY') {
       const validTarget =
-        command.target?.type === 'SELF' || command.target?.type === 'PLAYERS';
+        command.target?.type === 'SELF' ||
+        command.target?.type === 'PLAYERS' ||
+        (command.target?.type === 'EQUIPMENT' &&
+          typeof command.target.cardId === 'string' &&
+          command.target.cardId.trim().length > 0);
       if (
         typeof command.roleCardId !== 'string' ||
         command.roleCardId.trim().length === 0 ||
@@ -475,10 +485,22 @@ export class GameService {
                             command.target.monsterCardId,
                           ),
                         }
-                      : {
-                          type: 'EQUIPMENT',
-                          cardId: parseCardInstanceId(command.target.cardId),
-                        },
+                      : command.target.type === 'EQUIPMENT'
+                        ? {
+                            type: 'EQUIPMENT',
+                            cardId: parseCardInstanceId(command.target.cardId),
+                          }
+                        : command.target.type === 'COMPANION'
+                          ? {
+                              type: 'COMPANION',
+                              cardId: parseCardInstanceId(
+                                command.target.cardId,
+                              ),
+                            }
+                          : {
+                              type: 'PLAYER',
+                              playerId: parsePlayerId(command.target.playerId),
+                            },
             ...(command.reactionWindowId === undefined
               ? {}
               : { reactionWindowId: command.reactionWindowId }),
@@ -498,7 +520,12 @@ export class GameService {
               target:
                 command.target.type === 'SELF'
                   ? { type: 'SELF' }
-                  : { type: 'COMBAT', side: 'PLAYERS' },
+                  : command.target.type === 'PLAYERS'
+                    ? { type: 'COMBAT', side: 'PLAYERS' }
+                    : {
+                        type: 'EQUIPMENT',
+                        cardId: parseCardInstanceId(command.target.cardId),
+                      },
               ...(command.reactionWindowId === undefined
                 ? {}
                 : { reactionWindowId: command.reactionWindowId }),

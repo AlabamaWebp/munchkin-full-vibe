@@ -633,3 +633,42 @@ paths, so a presentation migration would create needless compatibility churn.
 Separating display metadata preserves that identity while making selection clear
 to players. Limiting new content to existing primitives keeps every set
 server-authoritative, deterministic, and auditable through the catalog harness.
+
+---
+
+## ADR-036 — Bounded theft, typed capacities, configured cleanup, and mandatory post-Door progress
+
+The immutable match config snapshots a host-selected maximum hand size from 3
+through 10 (default 5) and an optional double-Monster ambush toggle. Cleanup,
+charity, rematch, and the option-specific catalog all use that snapshot. An
+enabled draw-only ambush Door stays out of opening hands and atomically selects
+two distinct physical Monsters from Door draw/discard resources with bounded
+`RandomSource` selection before starting the ordinary multi-Monster combat.
+
+Equipped-item theft is a reusable role ability targeting one exact public
+Equipment instance. Its authored probability and cost reuse the existing
+serialized usage ledger; failure consumes the attempt, success preserves the
+physical instance and invokes normal attachment and equipment revalidation.
+Random hand theft is a separate effect with no projected candidates: it emits
+an identity-free public event and an exact-card event private to the victim,
+while the thief learns the card through their own hand projection.
+
+Capacity modifiers are typed as Head, Hands, Hireling, or Mount and feed the
+same legality/revalidation path as base capacity. The server also derives legal
+permanent Equipment-upgrade outcomes and exact replacement intents; the browser
+does not reproduce slot, restriction, modifier, or attachment rules.
+
+After a non-combat Door, `POST_DOOR` must resolve through Look for Trouble, Loot
+Room, or eligible Scavenge before End Turn or Sale. Sale and ordinary
+`GAIN_LEVEL` stop at level 9; standard level 10 remains a Monster-victory result,
+while the existing explicit `victoryEligible` escape hatch is reserved for
+intentionally exceptional authored content.
+
+Reason:
+
+These mechanics affect hidden information, randomness, equipment legality, and
+turn progression, so they must share existing authoritative primitives rather
+than create card-specific workflows or Angular rule inference. Bounded random
+selection makes failure and deck-shortage behavior deterministic and atomic;
+serialized usage/events make reconnect reconstruct the same permissions and
+privacy.

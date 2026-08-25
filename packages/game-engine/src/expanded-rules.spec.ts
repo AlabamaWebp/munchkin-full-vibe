@@ -269,10 +269,7 @@ describe("expanded rules", () => {
 
   it("discards an active race through the authoritative role command", () => {
     const raceCard = card("race-1", race.id);
-    const initial = state([
-      player(adaId, 1, [raceCard]),
-      player(bobId, 1, []),
-    ]);
+    const initial = state([player(adaId, 1, [raceCard]), player(bobId, 1, [])]);
     const played = executeCommand(
       initial,
       { type: "PLAY_ROLE", actorId: adaId, cardId: raceCard.instanceId },
@@ -382,10 +379,10 @@ describe("expanded rules", () => {
   it("sells enough item value for engine-calculated levels and rejects too little", () => {
     const valuable = card("item-2", item.id);
     const cheapCard = card("cheap-1", cheap.id);
-    const initial = state([
-      player(adaId, 2, [valuable, cheapCard]),
-      player(bobId, 1, []),
-    ]);
+    const initial = {
+      ...state([player(adaId, 2, [valuable, cheapCard]), player(bobId, 1, [])]),
+      phase: GamePhase.END_TURN,
+    };
     const rejected = executeCommand(
       initial,
       { type: "SELL_ITEMS", actorId: adaId, cardIds: [cheapCard.instanceId] },
@@ -401,7 +398,10 @@ describe("expanded rules", () => {
     if (sold.success) expect(sold.state.players[0]?.level).toBe(3);
 
     const winningSale = executeCommand(
-      state([player(adaId, 9, [valuable]), player(bobId, 1, [])]),
+      {
+        ...state([player(adaId, 9, [valuable]), player(bobId, 1, [])]),
+        phase: GamePhase.END_TURN,
+      },
       { type: "SELL_ITEMS", actorId: adaId, cardIds: [valuable.instanceId] },
       { random },
     );

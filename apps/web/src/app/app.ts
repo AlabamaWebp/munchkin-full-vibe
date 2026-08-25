@@ -102,6 +102,23 @@ export class App {
     else enabled.add(setId);
     this.lobbyClient.setSettings(settings?.mode ?? 'BALANCED', [...enabled]);
   }
+  protected setMaxHandSize(value: number): void {
+    const settings = this.lobby()?.settings;
+    this.lobbyClient.setSettings(
+      settings?.mode ?? 'BALANCED',
+      settings?.enabledSetIds ?? ['CORE'],
+      value,
+    );
+  }
+  protected setDoubleMonsterAmbush(enabled: boolean): void {
+    const settings = this.lobby()?.settings;
+    this.lobbyClient.setSettings(
+      settings?.mode ?? 'BALANCED',
+      settings?.enabledSetIds ?? ['CORE'],
+      settings?.maxHandSize ?? 5,
+      enabled,
+    );
+  }
   protected setLocale(locale: AppLocale): void {
     this.localization.setLocale(locale);
   }

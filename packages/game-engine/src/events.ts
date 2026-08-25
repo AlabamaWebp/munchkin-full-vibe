@@ -297,6 +297,12 @@ export type GameEvent =
       readonly definitionId: CardDefinitionId;
     })
   | (PublicEvent & {
+      readonly type: "COMPANION_UNSLOTTED";
+      readonly playerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
       readonly type: "ROLE_PLAYED";
       readonly playerId: PlayerId;
       readonly cardId: CardInstanceId;
@@ -328,6 +334,26 @@ export type GameEvent =
       readonly type: "ITEM_TRADED";
       readonly playerId: PlayerId;
       readonly recipientId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+    })
+  | (PublicEvent & {
+      readonly type: "RANDOM_HAND_THEFT";
+      readonly playerId: PlayerId;
+      readonly victimPlayerId: PlayerId;
+    })
+  | (PublicEvent & {
+      readonly type: "EQUIPPED_ITEM_THEFT_ATTEMPTED";
+      readonly playerId: PlayerId;
+      readonly victimPlayerId: PlayerId;
+      readonly cardId: CardInstanceId;
+      readonly definitionId: CardDefinitionId;
+      readonly succeeded: boolean;
+    })
+  | (PrivateEvent & {
+      readonly type: "STOLEN_HAND_CARD_REVEALED";
+      readonly playerId: PlayerId;
+      readonly victimPlayerId: PlayerId;
       readonly cardId: CardInstanceId;
       readonly definitionId: CardDefinitionId;
     })

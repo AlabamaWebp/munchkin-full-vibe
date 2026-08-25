@@ -149,14 +149,27 @@ export class LobbyClient {
     );
   }
 
-  setSettings(mode: GameMode, enabledSetIds: readonly CardSetId[]): void {
+  setSettings(
+    mode: GameMode,
+    enabledSetIds: readonly CardSetId[],
+    maxHandSize?: number,
+    doubleMonsterAmbushEnabled?: boolean,
+  ): void {
     const lobby = this.currentLobby();
     const playerId = this.currentPlayerId();
     if (lobby === null || playerId === null) return;
     this.beginRequest();
     this.socket.emit(
       'lobby:set-settings',
-      { roomCode: lobby.roomCode, playerId, mode, enabledSetIds: [...enabledSetIds] },
+      {
+        roomCode: lobby.roomCode,
+        playerId,
+        mode,
+        enabledSetIds: [...enabledSetIds],
+        maxHandSize: maxHandSize ?? lobby.settings?.maxHandSize ?? 5,
+        doubleMonsterAmbushEnabled:
+          doubleMonsterAmbushEnabled ?? lobby.settings?.doubleMonsterAmbushEnabled ?? false,
+      },
       (response) => this.handleAcknowledgement(response),
     );
   }

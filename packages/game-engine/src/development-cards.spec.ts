@@ -26,13 +26,13 @@ describe("V2 production card catalog", () => {
 
   it("has the explicit target size for Core and every optional set", () => {
     const expected = {
-      CORE: [80, 192],
+      CORE: [81, 194],
       COMPANIONS: [12, 24],
-      ARSENAL: [16, 36],
+      ARSENAL: [18, 40],
       DUAL_IDENTITY: [12, 24],
       CLASSIC_FANTASY: [16, 30],
-      CLERICAL_ERRORS: [15, 29],
-      STEED_HIRELINGS: [14, 27],
+      CLERICAL_ERRORS: [17, 33],
+      STEED_HIRELINGS: [16, 31],
     } as const;
     for (const setId of Object.values(CardSetId)) {
       const ids = new Set(
@@ -104,7 +104,7 @@ describe("V2 production card catalog", () => {
         ].includes(card.type),
       ),
     ).toBe(6);
-    expect(count((card) => card.type === CardType.UTILITY)).toBe(6);
+    expect(count((card) => card.type === CardType.UTILITY)).toBe(7);
     expect(
       core
         .filter((card) => card.type === CardType.MONSTER)
@@ -224,7 +224,7 @@ describe("V2 production card catalog", () => {
       set(CardSetId.STEED_HIRELINGS).filter(
         (card) => card.companion !== undefined,
       ),
-    ).toHaveLength(6);
+    ).toHaveLength(8);
     for (const definition of [
       ...set(CardSetId.CLASSIC_FANTASY),
       ...set(CardSetId.CLERICAL_ERRORS),
@@ -251,7 +251,7 @@ describe("V2 production card catalog", () => {
       id: parseGameId("expanded-catalog"),
       config: { mode: "BALANCED", enabledSetIds: Object.values(CardSetId) },
     });
-    expect(expanded.cardDefinitions).toHaveLength(165);
+    expect(expanded.cardDefinitions).toHaveLength(171);
     expect(
       new Set(expanded.cardDefinitions.map((definition) => definition.setId)),
     ).toEqual(new Set(Object.values(CardSetId)));

@@ -609,7 +609,7 @@ describe("V2 recovery and sale", () => {
     expect(result.state.players[0]?.hand).toEqual([recovered]);
     expect(
       executeCommand(
-        { ...result.state, phase: GamePhase.POST_DOOR },
+        result.state,
         {
           type: "SELL_ITEMS",
           actorId: heroId,
@@ -651,7 +651,7 @@ describe("V2 recovery and sale", () => {
     });
     const cards = [card("sale-shot", oneShot), card("sale-item", equipment)];
     const initial = state([oneShot, equipment], {
-      phase: GamePhase.TURN_START,
+      phase: GamePhase.END_TURN,
       players: [player(heroId, { level: 2, hand: cards })],
     });
     const sold = executeCommand(
@@ -670,7 +670,7 @@ describe("V2 recovery and sale", () => {
     });
     const victoryAttempt = executeCommand(
       state([equipment], {
-        phase: GamePhase.TURN_START,
+        phase: GamePhase.END_TURN,
         players: [player(heroId, { level: 9, hand: [cards[1]!] })],
       }),
       { type: "SELL_ITEMS", actorId: heroId, cardIds: [cards[1]!.instanceId] },

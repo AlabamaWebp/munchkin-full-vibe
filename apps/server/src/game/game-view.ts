@@ -18,12 +18,17 @@ import {
   calculateMonsterTreasures,
   canLookForTrouble,
   canScavenge,
+  capacityFor,
+  CardPlayTiming,
   CardType,
   equipmentConflict,
   equipmentCombatBonus,
   equipmentRestriction,
+  hasPermanentCombatUpgrade,
+  permanentCombatUpgradeOutcome,
   GamePhase,
   HAND_LIMIT,
+  companionCards,
   resolveConditionalModifier,
   type CardInstance,
   type GameLogEntry,
@@ -87,6 +92,9 @@ function cardView(state: GameState, card: CardInstance): GameCardView {
       : { goldValue: definition.goldValue }),
     ...(definition.play === undefined ? {} : { play: definition.play }),
     effects: definition.effects,
+    ...(definition.capacityModifiers === undefined
+      ? {}
+      : { capacityModifiers: definition.capacityModifiers }),
     ...(definition.equipment === undefined
       ? {}
       : {
@@ -204,8 +212,8 @@ function cardById(state: GameState, cardId: string): GameCardView | null {
       ...player.raceCards,
       ...player.rolePermissionCards,
       ...player.equipmentAttachments.map((attachment) => attachment.card),
-      ...(player.hirelingCard === null ? [] : [player.hirelingCard]),
-      ...(player.mountCard === null ? [] : [player.mountCard]),
+      ...companionCards(player, 'HIRELING'),
+      ...companionCards(player, 'MOUNT'),
     ]),
     ...(state.combat === null
       ? []
@@ -283,6 +291,7 @@ function projectLogEntry(
     case 'CURSE_RESOLVED':
     case 'ITEM_EQUIPPED':
     case 'ITEM_UNEQUIPPED':
+    case 'COMPANION_UNSLOTTED':
       return {
         ...base,
         playerId: event.playerId,
@@ -530,6 +539,29 @@ function projectLogEntry(
         targetPlayerId: event.recipientId,
         card: requiredLogCard(state, event.cardId),
       };
+    case 'EQUIPPED_ITEM_THEFT_ATTEMPTED':
+      return {
+        ...base,
+        playerId: event.playerId,
+        targetPlayerId: event.victimPlayerId,
+        card: requiredLogCard(state, event.cardId),
+        outcome: event.succeeded ? 'SUCCEEDED' : 'FAILED',
+      };
+    case 'RANDOM_HAND_THEFT':
+      return {
+        ...base,
+        playerId: event.playerId,
+        targetPlayerId: event.victimPlayerId,
+        count: 1,
+      };
+    case 'STOLEN_HAND_CARD_REVEALED':
+      return {
+        ...base,
+        playerId: event.playerId,
+        targetPlayerId: event.victimPlayerId,
+        card: requiredLogCard(state, event.cardId),
+        count: 1,
+      };
     case 'CHARITY_RESOLVED':
       return {
         ...base,
@@ -638,6 +670,7 @@ export const EVENT_IMPORTANCE = {
   ROLE_ABILITY_USED: 'IMPORTANT',
   ITEM_EQUIPPED: 'ROUTINE',
   ITEM_UNEQUIPPED: 'ROUTINE',
+  COMPANION_UNSLOTTED: 'IMPORTANT',
   ROLE_PLAYED: 'IMPORTANT',
   ROLE_DISCARDED: 'IMPORTANT',
   CARDS_SOLD: 'IMPORTANT',
@@ -646,6 +679,9 @@ export const EVENT_IMPORTANCE = {
   ROLE_RETENTION_REQUIRED: 'IMPORTANT',
   ROLE_RETAINED: 'IMPORTANT',
   ITEM_TRADED: 'ROUTINE',
+  EQUIPPED_ITEM_THEFT_ATTEMPTED: 'IMPORTANT',
+  RANDOM_HAND_THEFT: 'IMPORTANT',
+  STOLEN_HAND_CARD_REVEALED: 'IMPORTANT',
   CHARITY_RESOLVED: 'IMPORTANT',
   CHARITY_CARDS_REVEALED: 'ROUTINE',
   PLAYER_DIED: 'IMPORTANT',
@@ -833,6 +869,8 @@ function unavailableCardReason(
   if (definition.type === CardType.EQUIPMENT) {
     if (
       canEquipItem(state, viewerPlayerId, card.instanceId) ||
+      permanentCombatUpgradeOutcome(state, viewerPlayerId, card.instanceId) !==
+        null ||
       canUnequipItem(state, viewerPlayerId, card.instanceId)
     )
       return null;
@@ -995,6 +1033,27 @@ function roleAbilityIntents(
       });
       if (alreadyUsed) return [];
       const cost = { count: ability.cost.count, eligibleCardIds };
+      if (ability.type === 'STEAL_EQUIPPED_ITEM') {
+        if (!canChangeEquipment(state, viewerPlayerId) || state.combat !== null)
+          return [];
+        return state.players
+          .filter((player) => player.id !== viewerPlayerId)
+          .flatMap((player) =>
+            player.equipment.map((card) => ({
+              id: `role-ability:${roleCard.instanceId}:theft:${card.instanceId}:turn:${state.turnNumber}`,
+              kind: 'USE_ROLE_ABILITY' as const,
+              reasonCode: 'OPTIONAL_CARD_PLAY' as const,
+              roleCardId: roleCard.instanceId,
+              abilityType: ability.type,
+              cost,
+              target: {
+                type: 'EQUIPMENT' as const,
+                cardId: card.instanceId,
+                playerId: player.id,
+              },
+            })),
+          );
+      }
       if (ability.type === 'DRAW_CARDS') {
         if (!canChangeEquipment(state, viewerPlayerId) || state.combat !== null)
           return [];
@@ -1276,6 +1335,22 @@ function availableIntents(
           reasonCode: 'OPTIONAL_CARD_PLAY',
           cardId: card.instanceId,
         });
+      else {
+        const upgrade = permanentCombatUpgradeOutcome(
+          state,
+          viewerPlayerId,
+          card.instanceId,
+        );
+        if (upgrade !== null)
+          intents.push({
+            id: `equip:${card.instanceId}:replace:${upgrade.replaceCardIds.join(',')}`,
+            kind: 'EQUIP_ITEM',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: card.instanceId,
+            replaceCardIds: upgrade.replaceCardIds,
+            permanentCombatPowerIncrease: upgrade.combatPowerIncrease,
+          });
+      }
       if (
         definition?.type === CardType.CLASS ||
         definition?.type === CardType.RACE
@@ -1311,18 +1386,66 @@ function availableIntents(
             cardId: card.instanceId,
             target: { type: 'PLAYER', playerId: player.id },
           });
+      if (definition?.type === CardType.UTILITY) {
+        if (
+          definition.play !== undefined &&
+          !definition.play.timings.includes(CardPlayTiming.TURN)
+        )
+          continue;
+        if (
+          definition.effects.some(
+            (effect) => effect.type === 'STEAL_RANDOM_HAND_CARD',
+          )
+        ) {
+          for (const player of state.players.filter(
+            (candidate) =>
+              candidate.id !== viewerPlayerId && candidate.hand.length > 0,
+          ))
+            intents.push({
+              id: `play:${card.instanceId}:player:${player.id}`,
+              kind: 'PLAY_CARD',
+              reasonCode: 'OPTIONAL_CARD_PLAY',
+              cardId: card.instanceId,
+              target: { type: 'PLAYER', playerId: player.id },
+            });
+        } else
+          intents.push({
+            id: `play:${card.instanceId}:self`,
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: card.instanceId,
+            target: { type: 'SELF' },
+          });
+      }
       if (
-        definition?.type === CardType.UTILITY ||
         definition?.type === CardType.HIRELING ||
         definition?.type === CardType.MOUNT
-      )
-        intents.push({
-          id: `play:${card.instanceId}:self`,
-          kind: 'PLAY_CARD',
-          reasonCode: 'OPTIONAL_CARD_PLAY',
-          cardId: card.instanceId,
-          target: { type: 'SELF' },
-        });
+      ) {
+        const kind =
+          definition.type === CardType.HIRELING ? 'HIRELING' : 'MOUNT';
+        const active = companionCards(self, kind);
+        const capacity = capacityFor(state, self, kind);
+        if (active.length < capacity)
+          intents.push({
+            id: `play:${card.instanceId}:self`,
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: card.instanceId,
+            target: { type: 'SELF' },
+          });
+        else
+          for (const replacement of active)
+            intents.push({
+              id: `play:${card.instanceId}:companion:${replacement.instanceId}`,
+              kind: 'PLAY_CARD',
+              reasonCode: 'OPTIONAL_CARD_PLAY',
+              cardId: card.instanceId,
+              target: {
+                type: 'COMPANION',
+                cardId: replacement.instanceId,
+              },
+            });
+      }
       if (definition?.type === CardType.ATTACHMENT && definition.attachment)
         for (const host of self.equipment) {
           const hostDefinition = state.cardDefinitions.find(
@@ -1384,7 +1507,11 @@ function availableIntents(
         );
       })
       .map((card) => card.instanceId);
-    if (sellable.length > 0 && self.level < 9)
+    if (
+      state.phase === GamePhase.END_TURN &&
+      sellable.length > 0 &&
+      self.level < 9
+    )
       intents.push({
         id: `sell:${state.turnNumber}`,
         kind: 'SELL_CARDS',
@@ -1413,11 +1540,9 @@ function availableIntents(
           });
       }
   }
-  const excess = Math.max(0, self.hand.length - HAND_LIMIT);
-  if (
-    excess > 0 &&
-    (state.phase === GamePhase.POST_DOOR || state.phase === GamePhase.END_TURN)
-  ) {
+  const handLimit = state.config.maxHandSize ?? HAND_LIMIT;
+  const excess = Math.max(0, self.hand.length - handLimit);
+  if (excess > 0 && state.phase === GamePhase.END_TURN) {
     const minimum = Math.min(...state.players.map((player) => player.level));
     intents.push({
       id: `charity:${state.turnNumber}`,
@@ -1434,10 +1559,7 @@ function availableIntents(
       randomDefault: self.level === minimum,
     });
   }
-  if (
-    self.hand.length <= HAND_LIMIT &&
-    (state.phase === GamePhase.POST_DOOR || state.phase === GamePhase.END_TURN)
-  )
+  if (self.hand.length <= handLimit && state.phase === GamePhase.END_TURN)
     intents.push({
       id: `end-turn:${state.turnNumber}`,
       kind: 'END_TURN',
@@ -1493,11 +1615,19 @@ export function createGameView(
       cardView(state, card),
     ),
     hirelingCard:
-      player.hirelingCard === null
+      companionCards(player, 'HIRELING')[0] === undefined
         ? null
-        : cardView(state, player.hirelingCard),
+        : cardView(state, companionCards(player, 'HIRELING')[0]!),
     mountCard:
-      player.mountCard === null ? null : cardView(state, player.mountCard),
+      companionCards(player, 'MOUNT')[0] === undefined
+        ? null
+        : cardView(state, companionCards(player, 'MOUNT')[0]!),
+    hirelingCards: companionCards(player, 'HIRELING').map((card) =>
+      cardView(state, card),
+    ),
+    mountCards: companionCards(player, 'MOUNT').map((card) =>
+      cardView(state, card),
+    ),
     isDead: player.isDead,
   }));
   const ownPublic = publicPlayers.find(
@@ -1527,7 +1657,19 @@ export function createGameView(
     players: publicPlayers,
     self: {
       ...ownPublic,
-      hand: self.hand.map((card) => cardView(state, card)),
+      hand: self.hand.map((card) => {
+        const view = cardView(state, card);
+        return view.type === CardType.EQUIPMENT
+          ? {
+              ...view,
+              permanentCombatUpgrade: hasPermanentCombatUpgrade(
+                state,
+                viewerPlayerId,
+                card.instanceId,
+              ),
+            }
+          : view;
+      }),
     },
     combat:
       state.combat === null

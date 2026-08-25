@@ -1,6 +1,6 @@
 # Project status
 
-Status date: 2026-08-24
+Status date: 2026-08-25
 Current baseline: schema-5 V2 game is ready for internal LAN live playtesting;
 single-origin production packaging and real-device validation remain.
 
@@ -40,6 +40,14 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-25: added the next authoritative gameplay foundations: exact-side
+  combat interference, bounded equipped and hidden-hand theft with reconnect-safe
+  privacy, typed Head/Hands/Hireling/Mount capacity modifiers and revalidation,
+  configurable hand limit, optional atomic two-Monster ambush Doors, non-combat
+  level-9 cap, mandatory post-Door progression, and server-derived Equipment
+  upgrade/replacement hints. New optional-set cards use original project names
+  and text; deterministic engine/server coverage exercises randomness,
+  atomicity, privacy, reconnect, and legality.
 - 2026-08-25: completed the final browser command-path verification: active
   role abilities, exact-Monster modifiers, a real level-9 combat victory to
   level 10 across two clients, and one-player combat. Role-action sheets now

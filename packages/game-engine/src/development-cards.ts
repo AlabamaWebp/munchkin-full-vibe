@@ -116,6 +116,10 @@ function effectText(effect: CardDefinition["effects"][number]): string {
       return `lose ${effect.amount} level`;
     case "DRAW_CARDS":
       return `draw ${effect.count} ${effect.deck} card`;
+    case "STEAL_RANDOM_HAND_CARD":
+      return "steal one engine-random card from another player's hand";
+    case "AMBUSH_MONSTERS":
+      return "start combat with two engine-selected Monsters";
     case "DISCARD_RANDOM_CARDS":
       return `discard ${effect.count} random ${effect.zone.toLowerCase()} card`;
     case "DISCARD_CHOSEN_CARDS":
@@ -316,7 +320,9 @@ function r(
         ? ` Discard ${activeAbility.cost.count} hand card(s) to draw ${activeAbility.count} ${activeAbility.deck} card(s), once per turn.`
         : activeAbility.type === "RUN_AWAY_BONUS"
           ? ` Discard ${activeAbility.cost.count} hand card(s) for ${activeAbility.amount >= 0 ? "+" : ""}${activeAbility.amount} to your Run Away roll, once per combat.`
-          : ` Discard ${activeAbility.cost.count} hand card(s) for ${activeAbility.amount >= 0 ? "+" : ""}${activeAbility.amount} to the player side, once per combat.`;
+          : activeAbility.type === "STEAL_EQUIPPED_ITEM"
+            ? ` Discard ${activeAbility.cost.count} hand card(s) to attempt taking one exact equipped item (${activeAbility.successChance.numerator}/${activeAbility.successChance.denominator}), once per turn.`
+            : ` Discard ${activeAbility.cost.count} hand card(s) for ${activeAbility.amount >= 0 ? "+" : ""}${activeAbility.amount} to the player side, once per combat.`;
   return e(
     {
       id: idValue,
@@ -2189,6 +2195,150 @@ const catalog: readonly Entry[] = [
   ...classicFantasy,
   ...clericalErrors,
   ...steedHirelings,
+  e(
+    {
+      id: "quiet-acquisition-office",
+      artKey: "door.class.quiet-acquisition-office",
+      setId: CardSetId.CLERICAL_ERRORS,
+      tier: 2,
+      name: "Quiet Acquisition Office",
+      description:
+        "+1 against Constructs. Discard 1 hand card to attempt taking one exact equipped item (1/6), once per turn.",
+      type: CardType.CLASS,
+      deck: DeckType.DOOR,
+      tags: [],
+      play: ownTurn,
+      effects: [],
+      role: {
+        role: "CLASS",
+        modifier: condition("COMBAT_POWER", 1, [
+          { type: "MONSTER_HAS_TAG", anyOf: ["CONSTRUCT"] },
+        ]),
+        activeAbility: {
+          type: "STEAL_EQUIPPED_ITEM",
+          target: "EQUIPMENT",
+          successChance: { numerator: 1, denominator: 6 },
+          cost: { type: "DISCARD_HAND", count: 1 },
+          usage: "ONCE_PER_TURN",
+        },
+      },
+    },
+    2,
+  ),
+  a({
+    id: "wrong-pocket-courier",
+    name: "Wrong-Pocket Courier",
+    type: CardType.UTILITY,
+    tier: 2,
+    copies: 2,
+    deck: DeckType.TREASURE,
+    gold: 300,
+    setId: CardSetId.CLERICAL_ERRORS,
+    play: { timings: [CardPlayTiming.TURN], target: CardPlayTarget.ANY_PLAYER },
+    effects: [{ type: "STEAL_RANDOM_HAND_CARD" }],
+  }),
+  e(
+    {
+      id: "crossed-door-signals",
+      artKey: "door.action.crossed-door-signals",
+      setId: CardSetId.CORE,
+      tier: 2,
+      name: "Crossed Door Signals",
+      description: "When opened, two engine-selected Monsters arrive together.",
+      type: CardType.UTILITY,
+      deck: DeckType.DOOR,
+      tags: [],
+      play: {
+        timings: [CardPlayTiming.WHEN_DRAWN],
+        target: CardPlayTarget.SELF,
+      },
+      effects: [{ type: "AMBUSH_MONSTERS", count: 2 }],
+      requiredGameOption: "DOUBLE_MONSTER_AMBUSH",
+    },
+    2,
+  ),
+  e(
+    {
+      id: "stacked-hat-rail",
+      artKey: "treasure.equipment.stacked-hat-rail",
+      setId: CardSetId.ARSENAL,
+      tier: 2,
+      name: "Stacked Hat Rail",
+      description: "+1 body Equipment. Grants one additional Head capacity.",
+      type: CardType.EQUIPMENT,
+      deck: DeckType.TREASURE,
+      tags: ["ARMOR"],
+      goldValue: 500,
+      starterEligible: false,
+      play: ownTurn,
+      effects: [],
+      capacityModifiers: [{ capacity: "HEAD", amount: 1 }],
+      equipment: { slot: EquipmentSlot.BODY, hands: 0, combatBonus: 1 },
+    },
+    2,
+  ),
+  e(
+    {
+      id: "foldout-grip-harness",
+      artKey: "treasure.equipment.foldout-grip-harness",
+      setId: CardSetId.ARSENAL,
+      tier: 2,
+      name: "Foldout Grip Harness",
+      description: "+1 body Equipment. Grants one additional Hand capacity.",
+      type: CardType.EQUIPMENT,
+      deck: DeckType.TREASURE,
+      tags: ["ARMOR"],
+      goldValue: 500,
+      starterEligible: false,
+      play: ownTurn,
+      effects: [],
+      capacityModifiers: [{ capacity: "HANDS", amount: 1 }],
+      equipment: { slot: EquipmentSlot.BODY, hands: 0, combatBonus: 1 },
+    },
+    2,
+  ),
+  e(
+    {
+      id: "roster-clerk",
+      artKey: "treasure.companion.roster-clerk",
+      setId: CardSetId.STEED_HIRELINGS,
+      tier: 2,
+      name: "Roster Clerk",
+      description: "+1 companion. Grants one additional Hireling capacity.",
+      type: CardType.HIRELING,
+      deck: DeckType.TREASURE,
+      tags: [],
+      goldValue: 0,
+      sellable: false,
+      tradeable: false,
+      play: ownTurn,
+      effects: [],
+      capacityModifiers: [{ capacity: "HIRELING", amount: 1 }],
+      companion: { kind: "HIRELING", combatBonus: 1 },
+    },
+    2,
+  ),
+  e(
+    {
+      id: "caravan-wrangler",
+      artKey: "treasure.companion.caravan-wrangler",
+      setId: CardSetId.STEED_HIRELINGS,
+      tier: 2,
+      name: "Caravan Wrangler",
+      description: "+1 companion. Grants one additional Mount capacity.",
+      type: CardType.MOUNT,
+      deck: DeckType.TREASURE,
+      tags: [],
+      goldValue: 0,
+      sellable: false,
+      tradeable: false,
+      play: ownTurn,
+      effects: [],
+      capacityModifiers: [{ capacity: "MOUNT", amount: 1 }],
+      companion: { kind: "MOUNT", combatBonus: 1 },
+    },
+    2,
+  ),
 ];
 
 export function validateProductionCardDefinitions(
@@ -2205,6 +2355,9 @@ export function validateProductionCardDefinitions(
   for (const definition of definitions) {
     require(definition, definition.artKey.trim().length > 0, "missing art key");
     require(definition, definition.name.trim().length > 0, "missing name");
+    for (const modifier of definition.capacityModifiers ?? [])
+      require(definition, Number.isSafeInteger(modifier.amount) &&
+        modifier.amount !== 0, "capacity modifier has an invalid amount");
     require(definition, definition.play !== undefined &&
       definition.play.timings.length >
         0, "action has no typed timing/target metadata");
@@ -2243,7 +2396,13 @@ export function validateProductionCardDefinitions(
               0, "role ability has an invalid hand-card cost");
           require(definition, ability.type === "DRAW_CARDS"
             ? Number.isSafeInteger(ability.count) && ability.count > 0
-            : ability.amount !== 0, "role ability has no meaningful result");
+            : ability.type === "STEAL_EQUIPPED_ITEM"
+              ? Number.isSafeInteger(ability.successChance.numerator) &&
+                Number.isSafeInteger(ability.successChance.denominator) &&
+                ability.successChance.numerator > 0 &&
+                ability.successChance.numerator <
+                  ability.successChance.denominator
+              : ability.amount !== 0, "role ability has no meaningful result");
         }
         break;
       case CardType.HIRELING:

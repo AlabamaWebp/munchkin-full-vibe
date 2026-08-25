@@ -127,6 +127,32 @@
                 Классический хаос
               </button>
             </div>
+            <span class="settings-hint">Максимум карт в руке</span>
+            <div class="settings-options">
+              @for (limit of [3, 4, 5, 6, 7, 8, 9, 10]; track limit) {
+                <button
+                  type="button"
+                  [class.active]="(room.settings?.maxHandSize ?? 5) === limit"
+                  [attr.aria-pressed]="(room.settings?.maxHandSize ?? 5) === limit"
+                  (click)="setMaxHandSize(limit)"
+                >
+                  {{ limit }}
+                </button>
+              }
+            </div>
+            <span class="settings-hint">Особые двери</span>
+            <div class="settings-options">
+              <button
+                type="button"
+                [class.active]="room.settings?.doubleMonsterAmbushEnabled === true"
+                [attr.aria-pressed]="room.settings?.doubleMonsterAmbushEnabled === true"
+                (click)="
+                  setDoubleMonsterAmbush(!(room.settings?.doubleMonsterAmbushEnabled ?? false))
+                "
+              >
+                Двойная засада
+              </button>
+            </div>
             <span class="settings-hint">Наборы карт</span>
             <div class="settings-options sets">
               @for (set of optionalSets; track set.id) {
@@ -146,8 +172,8 @@
           </fieldset>
         } @else if (room.settings; as settings) {
           <p class="settings-readonly">
-            {{ settings.mode === 'BALANCED' ? 'Баланс' : 'Классический хаос' }} ·
-            {{ settings.enabledSetIds.length }} набора
+            {{ settings.mode === 'BALANCED' ? 'Баланс' : 'Классический хаос' }} · рука
+            {{ settings.maxHandSize }} · {{ settings.enabledSetIds.length }} набора
           </p>
         }
         @if (isHost() && !hasStarted()) {

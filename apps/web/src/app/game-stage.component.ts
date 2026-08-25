@@ -125,10 +125,13 @@ import { LocalizationService } from './localization';
               } @else if (game().lastRunAwayResult; as result) {
                 <h2>Результат побега</h2>
                 <div class="attempts">
-                  @for (attempt of result.attempts; track attempt.combatantId + attempt.encounterId) {
+                  @for (
+                    attempt of result.attempts;
+                    track attempt.combatantId + attempt.encounterId
+                  ) {
                     <span [class.failed]="!attempt.escaped">
-                      {{ playerName(attempt.combatantId) }} · {{ cardName(attempt.monster) }} ·
-                      d6 {{ attempt.roll }} ·
+                      {{ playerName(attempt.combatantId) }} · {{ cardName(attempt.monster) }} · d6
+                      {{ attempt.roll }} ·
                       {{ attempt.escaped ? 'успех' : 'неудача' }}
                       @if (attempt.badStuffApplied) {
                         · Непотребство применено
@@ -166,12 +169,14 @@ import { LocalizationService } from './localization';
             <div class="message">
               <p class="eyebrow">ЗАВЕРШЕНИЕ ХОДА</p>
               <h2>
-                {{ game().self.handCount > 5 ? 'Слишком много карт' : 'Можно завершать ход' }}
+                {{
+                  game().self.handCount > handLimit() ? 'Слишком много карт' : 'Можно завершать ход'
+                }}
               </h2>
               <p>
                 {{
-                  game().self.handCount > 5
-                    ? 'Оставьте не больше пяти карт или раздайте милостыню.'
+                  game().self.handCount > handLimit()
+                    ? 'Оставьте не больше ' + handLimit() + ' карт или раздайте милостыню.'
                     : 'Проверьте снаряжение и передайте ход.'
                 }}
               </p>
@@ -533,6 +538,9 @@ export class GameStageComponent {
   readonly helpOpened = output<void>();
   readonly rematchRequested = output<void>();
   readonly returnToLobbyRequested = output<void>();
+  protected handLimit(): number {
+    return this.game().config?.maxHandSize ?? 5;
+  }
   protected readonly focusedStageCardId = signal<string | null>(null);
   protected readonly focusedReceiptSequence = signal<number | null>(null);
   protected readonly stageCardEvent = computed(() => latestStageCardEvent(this.game()));

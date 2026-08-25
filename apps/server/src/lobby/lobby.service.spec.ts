@@ -145,10 +145,19 @@ describe('LobbyService', () => {
       playerId: created.acknowledgement.playerId,
       mode: 'CLASSIC_CHAOS',
       enabledSetIds,
+      maxHandSize: 7,
+      doubleMonsterAmbushEnabled: true,
     });
     expect(configured).toMatchObject({
       success: true,
-      state: { settings: { mode: 'CLASSIC_CHAOS', enabledSetIds } },
+      state: {
+        settings: {
+          mode: 'CLASSIC_CHAOS',
+          enabledSetIds,
+          maxHandSize: 7,
+          doubleMonsterAmbushEnabled: true,
+        },
+      },
     });
     service.setPlayerSex('socket-host', {
       roomCode: 'ABCD',
@@ -167,6 +176,8 @@ describe('LobbyService', () => {
         playerId: created.acknowledgement.playerId,
         mode: 'BALANCED',
         enabledSetIds: ['CORE'],
+        maxHandSize: 5,
+        doubleMonsterAmbushEnabled: false,
       }),
     ).toMatchObject({
       acknowledgement: { error: { code: 'GAME_ALREADY_STARTED' } },
@@ -178,8 +189,33 @@ describe('LobbyService', () => {
     });
     expect(resumed).toMatchObject({
       success: true,
-      state: { settings: { mode: 'CLASSIC_CHAOS', enabledSetIds } },
+      state: {
+        settings: {
+          mode: 'CLASSIC_CHAOS',
+          enabledSetIds,
+          maxHandSize: 7,
+          doubleMonsterAmbushEnabled: true,
+        },
+      },
     });
+  });
+
+  it('rejects hand-limit settings outside the advertised bounds', () => {
+    const created = service.createRoom('socket-host', { playerName: 'Ada' });
+    if (!created.success) throw new Error('Expected room creation to succeed.');
+    for (const maxHandSize of [2, 11])
+      expect(
+        service.setSettings('socket-host', {
+          roomCode: 'ABCD',
+          playerId: created.acknowledgement.playerId,
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE'],
+          maxHandSize,
+          doubleMonsterAmbushEnabled: false,
+        }),
+      ).toMatchObject({
+        acknowledgement: { error: { code: 'INVALID_GAME_SETTINGS' } },
+      });
   });
 
   it('allows the host to start a one-player game and closes the room to joins', () => {

@@ -37,7 +37,7 @@ import { unavailableReason } from './game-ui.model';
             aria-label="Открыть меню руки"
             (click)="fullHandOpened.emit()"
           >
-            Рука {{ game().self.hand.length }}/5
+            Рука {{ game().self.hand.length }}/{{ game().config?.maxHandSize ?? 5 }}
           </button>
         }
       </div>

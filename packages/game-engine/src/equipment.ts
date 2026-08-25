@@ -1,6 +1,7 @@
 import {
   CardType,
   EquipmentSlot,
+  type CapacityType,
   type CardDefinition,
   type CardInstance,
 } from "./cards.js";
@@ -10,6 +11,48 @@ import { resolveConditionalModifier } from "./conditions.js";
 
 export type EquipmentConflict = "SLOT_OCCUPIED" | "NOT_ENOUGH_FREE_HANDS";
 export type EquipmentRestriction = "CLASS_REQUIRED" | "RACE_REQUIRED";
+
+export function companionCards(
+  player: PlayerState,
+  kind: "HIRELING" | "MOUNT",
+): readonly CardInstance[] {
+  const plural = kind === "HIRELING" ? player.hirelingCards : player.mountCards;
+  const singular = kind === "HIRELING" ? player.hirelingCard : player.mountCard;
+  if (plural !== undefined && (plural.length > 0 || singular === null))
+    return plural;
+  return singular === null ? [] : [singular];
+}
+
+function activePublicCards(player: PlayerState): readonly CardInstance[] {
+  return [
+    ...player.equipment,
+    ...player.classCards,
+    ...player.raceCards,
+    ...player.rolePermissionCards,
+    ...companionCards(player, "HIRELING"),
+    ...companionCards(player, "MOUNT"),
+  ];
+}
+
+export function capacityFor(
+  state: GameState,
+  player: PlayerState,
+  capacity: CapacityType,
+): number {
+  const base = capacity === "HANDS" ? 2 : 1;
+  return Math.max(
+    0,
+    activePublicCards(player).reduce((total, card) => {
+      const definition = getCardDefinition(state, card);
+      return (
+        total +
+        (definition.capacityModifiers ?? [])
+          .filter((modifier) => modifier.capacity === capacity)
+          .reduce((sum, modifier) => sum + modifier.amount, 0)
+      );
+    }, base),
+  );
+}
 
 export function getCardDefinition(
   state: GameState,
@@ -77,8 +120,8 @@ function passiveModifierLines(
     ...player.equipment,
     ...player.classCards,
     ...player.raceCards,
-    ...(player.hirelingCard === null ? [] : [player.hirelingCard]),
-    ...(player.mountCard === null ? [] : [player.mountCard]),
+    ...companionCards(player, "HIRELING"),
+    ...companionCards(player, "MOUNT"),
   ];
   const lines: CombatPowerBreakdownLine[] = [];
   for (const card of sources) {
@@ -297,11 +340,15 @@ export function equipmentConflict(
     return null;
 
   if (equipment.slot !== EquipmentSlot.HANDS) {
-    const occupied = player.equipment.some(
+    const occupiedCount = player.equipment.filter(
       (card) =>
         getCardDefinition(state, card).equipment?.slot === equipment.slot,
-    );
-    return occupied ? "SLOT_OCCUPIED" : null;
+    ).length;
+    const capacity =
+      equipment.slot === EquipmentSlot.HEAD
+        ? capacityFor(state, player, "HEAD")
+        : 1;
+    return occupiedCount >= capacity ? "SLOT_OCCUPIED" : null;
   }
 
   const usedHands = player.equipment.reduce((total, card) => {
@@ -310,7 +357,8 @@ export function equipmentConflict(
       ? total + (equipped.hands ?? 1)
       : total;
   }, 0);
-  return usedHands + (equipment.hands ?? 1) > 2
+  return usedHands + (equipment.hands ?? 1) >
+    capacityFor(state, player, "HANDS")
     ? "NOT_ENOUGH_FREE_HANDS"
     : null;
 }
@@ -342,6 +390,114 @@ export function equipmentRestriction(
   )
     return "RACE_REQUIRED";
   return null;
+}
+
+function equipmentLayoutLegal(state: GameState, player: PlayerState): boolean {
+  if (
+    player.equipment.some(
+      (card) =>
+        equipmentRestriction(player, getCardDefinition(state, card)) !== null,
+    )
+  )
+    return false;
+  const counts = new Map<EquipmentSlot, number>();
+  let usedHands = 0;
+  for (const card of player.equipment) {
+    const equipment = getCardDefinition(state, card).equipment;
+    if (equipment === undefined) return false;
+    if (equipment.slot === EquipmentSlot.HANDS)
+      usedHands += equipment.hands ?? 1;
+    else counts.set(equipment.slot, (counts.get(equipment.slot) ?? 0) + 1);
+  }
+  return (
+    (counts.get(EquipmentSlot.HEAD) ?? 0) <=
+      capacityFor(state, player, "HEAD") &&
+    (counts.get(EquipmentSlot.BODY) ?? 0) <= 1 &&
+    (counts.get(EquipmentSlot.FEET) ?? 0) <= 1 &&
+    usedHands <= capacityFor(state, player, "HANDS")
+  );
+}
+
+export function hasPermanentCombatUpgrade(
+  state: GameState,
+  playerId: PlayerId,
+  cardId: CardInstanceId,
+): boolean {
+  return permanentCombatUpgradeOutcome(state, playerId, cardId) !== null;
+}
+
+export interface PermanentCombatUpgradeOutcome {
+  readonly replaceCardIds: readonly CardInstanceId[];
+  readonly combatPowerIncrease: number;
+}
+
+export function permanentCombatUpgradeOutcome(
+  state: GameState,
+  playerId: PlayerId,
+  cardId: CardInstanceId,
+): PermanentCombatUpgradeOutcome | null {
+  if (!canChangeEquipment(state, playerId)) return null;
+  const player = state.players.find((candidate) => candidate.id === playerId);
+  const candidate = player?.hand.find((card) => card.instanceId === cardId);
+  if (player === undefined || candidate === undefined) return null;
+  const definition = getCardDefinition(state, candidate);
+  if (
+    definition.type !== CardType.EQUIPMENT ||
+    definition.equipment === undefined ||
+    equipmentRestriction(player, definition) !== null
+  )
+    return null;
+
+  const currentPower = permanentCombatPower(state, playerId);
+  const equipment = [...player.equipment];
+  const candidateSlot = definition.equipment.slot;
+  const replaceable = equipment.filter((card) => {
+    const slot = getCardDefinition(state, card).equipment?.slot;
+    return slot === candidateSlot;
+  });
+  const fixed = equipment.filter((card) => !replaceable.includes(card));
+  const outcomeCount = 2 ** replaceable.length;
+  let best: PermanentCombatUpgradeOutcome | null = null;
+  for (let removedMask = 0; removedMask < outcomeCount; removedMask += 1) {
+    const retained = [
+      ...fixed,
+      ...replaceable.filter(
+        (_card, index) => Math.floor(removedMask / 2 ** index) % 2 === 0,
+      ),
+    ];
+    const retainedIds = new Set(retained.map((card) => card.instanceId));
+    const hypotheticalPlayer: PlayerState = {
+      ...player,
+      hand: player.hand.filter(
+        (card) => card.instanceId !== candidate.instanceId,
+      ),
+      equipment: [...retained, candidate],
+      equipmentAttachments: player.equipmentAttachments.filter((attachment) =>
+        retainedIds.has(attachment.attachedToCardId),
+      ),
+    };
+    if (!equipmentLayoutLegal(state, hypotheticalPlayer)) continue;
+    const hypotheticalState: GameState = {
+      ...state,
+      players: state.players.map((entry) =>
+        entry.id === playerId ? hypotheticalPlayer : entry,
+      ),
+    };
+    const increase =
+      permanentCombatPower(hypotheticalState, playerId) - currentPower;
+    if (increase <= 0) continue;
+    const replaceCardIds = equipment
+      .filter((card) => !retainedIds.has(card.instanceId))
+      .map((card) => card.instanceId);
+    if (
+      best === null ||
+      replaceCardIds.length < best.replaceCardIds.length ||
+      (replaceCardIds.length === best.replaceCardIds.length &&
+        increase > best.combatPowerIncrease)
+    )
+      best = { replaceCardIds, combatPowerIncrease: increase };
+  }
+  return best;
 }
 
 export function canChangeEquipment(

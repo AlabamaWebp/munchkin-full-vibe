@@ -48,6 +48,8 @@ export type PlayerColor =
 export interface GameConfig {
   readonly mode: GameMode;
   readonly enabledSetIds: readonly CardSetId[];
+  readonly maxHandSize?: number;
+  readonly doubleMonsterAmbushEnabled?: boolean;
 }
 
 export type ActiveEffect =
@@ -98,6 +100,9 @@ export interface PlayerState {
   readonly rolePermissionCards: readonly CardInstance[];
   readonly hirelingCard: CardInstance | null;
   readonly mountCard: CardInstance | null;
+  /** Schema-5-compatible plural companions; singular fields mirror the first. */
+  readonly hirelingCards?: readonly CardInstance[];
+  readonly mountCards?: readonly CardInstance[];
   readonly isDead: boolean;
   readonly activeEffects: readonly ActiveEffect[];
   /** Generic serializable once-per-turn/once-per-combat usage ledger. */
