@@ -374,7 +374,7 @@ export function createDevelopmentScenario(
           claimantId: active.id,
           confirmedPlayerIds: [],
           eligiblePlayerIds: [active.id, helper.id, third.id],
-          expiresAtEpochMs: now + 20_000,
+          expiresAtEpochMs: now + 120_000,
         },
       },
       pendingDecision: null,

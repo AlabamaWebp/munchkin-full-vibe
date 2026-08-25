@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -10,6 +11,13 @@ import {
 import type { GameBadStuffEffectView, GameCardView, GameView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
 import { LocalizationService } from './localization';
+
+export function formatReactionCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1_000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 @Component({
   selector: 'app-combat-stage',
@@ -27,8 +35,8 @@ import { LocalizationService } from './localization';
               >Ответили {{ combat.reactionWindow?.confirmedPlayerIds?.length ?? 0 }} · ждём
               {{ combat.reactionWindow?.waitingPlayerIds?.length ?? 0 }}</span
             >
-            @if (combat.reactionWindow; as window) {
-              <small>Ответ до {{ deadlineLabel(window.expiresAtEpochMs) }}</small>
+            @if (reactionCountdown(); as countdown) {
+              <small class="reaction-countdown">Осталось {{ countdown }}</small>
             }
             @if (
               !viewerMustReact() &&
@@ -130,7 +138,8 @@ import { LocalizationService } from './localization';
           @if (combat.helpAgreement; as agreement) {
             <span class="agreement"
               >{{ playerName(agreement.helperId) }} помогает · получит
-              {{ agreement.promisedTreasures }} {{ treasureLabel(agreement.promisedTreasures) }}</span
+              {{ agreement.promisedTreasures }}
+              {{ treasureLabel(agreement.promisedTreasures) }}</span
             >
           } @else if (combat.helperId) {
             <span>{{ playerName(combat.helperId) }} помогает</span>
@@ -181,6 +190,11 @@ import { LocalizationService } from './localization';
     .reaction span,
     .reaction small {
       font-size: 0.68rem;
+    }
+    .reaction-countdown {
+      color: #fff1c8;
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
     }
     .score {
       position: relative;
@@ -515,6 +529,40 @@ export class CombatStageComponent {
   readonly helpOpened = output<void>();
   readonly cardOpened = output<GameCardView>();
   protected readonly focusedId = signal<string | null>(null);
+  private readonly reactionNowEpochMs = signal(Date.now());
+  private readonly currentReactionWindow = computed(() => {
+    const combat = this.game().combat;
+    if (combat === null || combat.reactionWindow === null) return null;
+    return {
+      key: `${combat.combatId}:${combat.revision}:${combat.reactionWindow.windowId}`,
+      expiresAtEpochMs: combat.reactionWindow.expiresAtEpochMs,
+    };
+  });
+  protected readonly reactionCountdown = computed(() => {
+    const reactionWindow = this.currentReactionWindow();
+    return reactionWindow === null
+      ? null
+      : formatReactionCountdown(reactionWindow.expiresAtEpochMs - this.reactionNowEpochMs());
+  });
+
+  constructor() {
+    effect((onCleanup) => {
+      const reactionWindow = this.currentReactionWindow();
+      if (reactionWindow === null) return;
+
+      const updateNow = (): boolean => {
+        const now = Date.now();
+        this.reactionNowEpochMs.set(now);
+        return now < reactionWindow.expiresAtEpochMs;
+      };
+      if (!updateNow()) return;
+
+      const timer = setInterval(() => {
+        if (!updateNow()) clearInterval(timer);
+      }, 1_000);
+      onCleanup(() => clearInterval(timer));
+    });
+  }
 
   protected readonly focused = computed(() => {
     const monsters = this.game().combat?.monsters ?? [];
@@ -569,13 +617,6 @@ export class CombatStageComponent {
   }
   protected signed(value: number): string {
     return value > 0 ? `+${value}` : `${value}`;
-  }
-  protected deadlineLabel(expiresAtEpochMs: number): string {
-    return new Date(expiresAtEpochMs).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
   }
   protected badStuff(): string {
     const effects = this.focused().monster.monster?.badStuff ?? [];

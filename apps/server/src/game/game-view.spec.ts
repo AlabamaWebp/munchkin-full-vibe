@@ -869,6 +869,78 @@ describe('createGameView', () => {
     expect(view.self.mountCard?.companion?.combatBonus).toBeGreaterThan(0);
   });
 
+  it('projects legal Hireling and Mount plays from every enabled companion set', () => {
+    const playerId = parsePlayerId('companion-intents');
+    const random = createSeededRandomSource(241);
+    let state = createGame({
+      id: parseGameId('CMPI'),
+      config: {
+        mode: GameMode.BALANCED,
+        enabledSetIds: Object.values(CardSetId),
+      },
+    });
+    const added = executeCommand(
+      state,
+      { type: 'ADD_PLAYER', actorId: playerId, name: 'Ada', sex: 'FEMALE' },
+      { random },
+    );
+    if (!added.success) throw new Error(added.error.message);
+    const started = executeCommand(
+      added.state,
+      { type: 'START_GAME', actorId: playerId },
+      { random },
+    );
+    if (!started.success) throw new Error(started.error.message);
+    const pony = [
+      ...started.state.treasureDeck,
+      ...started.state.treasureDiscard,
+      ...started.state.players[0]!.hand,
+    ].find((card) => card.definitionId === 'stubborn-pony');
+    const hireling = [
+      ...started.state.treasureDeck,
+      ...started.state.treasureDiscard,
+      ...started.state.players[0]!.hand,
+    ].find((card) => card.definitionId === 'eager-intern');
+    if (pony === undefined || hireling === undefined)
+      throw new Error('Expected enabled companion cards are missing.');
+    const usedIds = new Set([pony.instanceId, hireling.instanceId]);
+    state = {
+      ...started.state,
+      activePlayerId: playerId,
+      phase: GamePhase.TURN_START,
+      treasureDeck: started.state.treasureDeck.filter(
+        (card) => !usedIds.has(card.instanceId),
+      ),
+      treasureDiscard: started.state.treasureDiscard.filter(
+        (card) => !usedIds.has(card.instanceId),
+      ),
+      players: started.state.players.map((player) => ({
+        ...player,
+        hand: [
+          ...player.hand.filter((card) => !usedIds.has(card.instanceId)),
+          pony,
+          hireling,
+        ],
+      })),
+    };
+
+    const view = createGameView(state, playerId);
+    expect(view.availableIntents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'PLAY_CARD',
+          cardId: pony.instanceId,
+          target: { type: 'SELF' },
+        }),
+        expect.objectContaining({
+          kind: 'PLAY_CARD',
+          cardId: hireling.instanceId,
+          target: { type: 'SELF' },
+        }),
+      ]),
+    );
+  });
+
   it('does not project item transfer actions outside the viewer turn', () => {
     const adaId = parsePlayerId('trade-ada');
     const graceId = parsePlayerId('trade-grace');

@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import type { GameCardView, GamePlayerView, GameView } from '@munchkin-lan/contracts';
+import { formatReactionCountdown } from './combat-stage.component';
 import { GameShellComponent } from './game-shell.component';
 import { LobbyClient, type ConnectionState } from './lobby-client';
 
@@ -551,6 +552,180 @@ describe('GameShellComponent', () => {
       combatRevision: 4,
       reactionWindowId: 7,
     });
+  });
+
+  it('formats and clamps the remaining combat reaction time', () => {
+    expect(formatReactionCountdown(120_000)).toBe('2:00');
+    expect(formatReactionCountdown(102_001)).toBe('1:43');
+    expect(formatReactionCountdown(-1)).toBe('0:00');
+  });
+
+  it('reconstructs and resets the countdown from each authoritative reaction projection', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(1_000));
+    try {
+      const grace = player({ playerId: 'p2', name: 'Grace' });
+      const firstWindow = {
+        windowId: 7,
+        claimantId: 'p1',
+        confirmedPlayerIds: ['p1'],
+        waitingPlayerIds: ['p2'],
+        expiresAtEpochMs: 121_000,
+      };
+      const projection = base({
+        viewerPlayerId: 'p2',
+        activePlayerId: 'p1',
+        players: [base().self, grace],
+        self: { ...grace, hand: [] },
+        combat: combat({ reactionWindow: firstWindow }),
+        availableIntents: [],
+      });
+      const fixture = render(projection);
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(root.querySelector('.reaction-countdown')?.textContent).toContain('Осталось 2:00');
+      vi.advanceTimersByTime(18_000);
+      fixture.detectChanges();
+      expect(root.querySelector('.reaction-countdown')?.textContent).toContain('Осталось 1:42');
+
+      fixture.componentRef.setInput('game', {
+        ...projection,
+        combat: combat({
+          revision: 5,
+          reactionWindow: { ...firstWindow, windowId: 8, expiresAtEpochMs: 139_000 },
+        }),
+      });
+      fixture.detectChanges();
+      expect(root.querySelector('.reaction-countdown')?.textContent).toContain('Осталось 2:00');
+      expect(vi.getTimerCount()).toBe(1);
+
+      fixture.componentRef.setInput('game', { ...projection, combat: combat() });
+      fixture.detectChanges();
+      expect(root.querySelector('.reaction-countdown')).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      fixture.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('submits a targetted combat reaction with its exact projected window address', () => {
+    const interference = card({
+      instanceId: 'interference',
+      name: 'Monster Pressure',
+      play: { timings: ['VICTORY_REACTION'], target: 'MONSTER_ENCOUNTER' },
+    });
+    const reaction = {
+      windowId: 7,
+      claimantId: 'p1',
+      confirmedPlayerIds: ['p1'],
+      waitingPlayerIds: ['p2'],
+      expiresAtEpochMs: 10_000,
+    };
+    const grace = player({ playerId: 'p2', name: 'Grace', handCount: 1 });
+    const fixture = render(
+      base({
+        viewerPlayerId: 'p2',
+        activePlayerId: 'p1',
+        players: [base().self, grace],
+        self: { ...grace, hand: [interference] },
+        combat: combat({ reactionWindow: reaction }),
+        availableIntents: [
+          {
+            id: 'play:interference:monster:e1:4',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'interference',
+            target: { type: 'MONSTER', encounterId: 'e1' },
+            combatId: 'combat-1',
+            combatRevision: 4,
+            reactionWindowId: 7,
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.card-action')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Сыграть на монстра'))!
+      .click();
+
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PLAY_CARD',
+      cardId: 'interference',
+      target: { type: 'MONSTER', encounterId: 'e1' },
+      combatId: 'combat-1',
+      combatRevision: 4,
+      reactionWindowId: 7,
+    });
+  });
+
+  it('discards a target picker after a newer combat-reaction projection', () => {
+    const interference = card({
+      instanceId: 'interference',
+      name: 'Monster Pressure',
+      play: { timings: ['VICTORY_REACTION'], target: 'MONSTER_ENCOUNTER' },
+    });
+    const reaction = {
+      windowId: 7,
+      claimantId: 'p1',
+      confirmedPlayerIds: ['p1'],
+      waitingPlayerIds: ['p2'],
+      expiresAtEpochMs: 10_000,
+    };
+    const grace = player({ playerId: 'p2', name: 'Grace', handCount: 1 });
+    const projected = base({
+      viewerPlayerId: 'p2',
+      activePlayerId: 'p1',
+      players: [base().self, grace],
+      self: { ...grace, hand: [interference] },
+      combat: combat({
+        reactionWindow: reaction,
+        monsters: [encounter('e1'), encounter('e2')],
+      }),
+      availableIntents: ['e1', 'e2'].map((encounterId) => ({
+        id: `play:interference:monster:${encounterId}:4`,
+        kind: 'PLAY_CARD' as const,
+        reasonCode: 'OPTIONAL_CARD_PLAY' as const,
+        cardId: 'interference',
+        target: { type: 'MONSTER' as const, encounterId },
+        combatId: 'combat-1',
+        combatRevision: 4,
+        reactionWindowId: 7,
+      })),
+    });
+    const fixture = render(projected);
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.card-action')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Сыграть на монстра'))!
+      .click();
+    fixture.detectChanges();
+    expect(root.querySelector('#target-title')?.textContent).toContain('Выберите монстра');
+
+    fixture.componentRef.setInput('game', {
+      ...projected,
+      combat: combat({
+        revision: 5,
+        reactionWindow: { ...reaction, windowId: 8 },
+        monsters: [encounter('e1'), encounter('e2')],
+      }),
+      availableIntents: ['e1', 'e2'].map((encounterId) => ({
+        id: `play:interference:monster:${encounterId}:5`,
+        kind: 'PLAY_CARD' as const,
+        reasonCode: 'OPTIONAL_CARD_PLAY' as const,
+        cardId: 'interference',
+        target: { type: 'MONSTER' as const, encounterId },
+        combatId: 'combat-1',
+        combatRevision: 5,
+        reactionWindowId: 8,
+      })),
+    });
+    fixture.detectChanges();
+
+    expect(root.querySelector('#target-title')).toBeNull();
   });
 
   it('keeps the monster and combat layout visible while a run-away result is resolving', () => {
@@ -1321,6 +1496,108 @@ describe('GameShellComponent', () => {
       type: 'PLAY_CARD',
       cardId: 'attachment',
       target: { type: 'EQUIPMENT', cardId: 'weapon' },
+    });
+  });
+
+  it('uses projected Mount intents for both a free slot and an authored replacement', () => {
+    const pony = card({
+      instanceId: 'pony',
+      definitionId: 'stubborn-pony',
+      name: 'Stubborn Pony',
+      type: 'MOUNT',
+      companion: { combatBonus: 2 },
+    });
+    const fixture = render(
+      base({
+        self: { ...player({ handCount: 1 }), hand: [pony] },
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: [
+            'CORE',
+            'COMPANIONS',
+            'ARSENAL',
+            'DUAL_IDENTITY',
+            'CLASSIC_FANTASY',
+            'CLERICAL_ERRORS',
+            'STEED_HIRELINGS',
+          ],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
+        availableIntents: [
+          {
+            id: 'play:pony:self',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'pony',
+            target: { type: 'SELF' },
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.card-action')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Призвать спутника'))!
+      .click();
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PLAY_CARD',
+      cardId: 'pony',
+      target: { type: 'SELF' },
+    });
+  });
+
+  it('consumes a projected companion replacement instead of dropping the legal intent', () => {
+    const oldMount = card({
+      instanceId: 'old-mount',
+      name: 'Old Mount',
+      type: 'MOUNT',
+      companion: { combatBonus: 1 },
+    });
+    const replacement = card({
+      instanceId: 'new-mount',
+      name: 'New Mount',
+      type: 'MOUNT',
+      companion: { combatBonus: 2 },
+    });
+    const self = player({
+      handCount: 1,
+      mountCard: oldMount,
+      mountCards: [oldMount],
+    });
+    const fixture = render(
+      base({
+        self: { ...self, hand: [replacement] },
+        players: [self],
+        config: {
+          mode: 'BALANCED',
+          enabledSetIds: ['CORE', 'COMPANIONS'],
+          maxHandSize: 5,
+          doubleMonsterAmbushEnabled: false,
+        },
+        availableIntents: [
+          {
+            id: 'play:new-mount:companion:old-mount',
+            kind: 'PLAY_CARD',
+            reasonCode: 'OPTIONAL_CARD_PLAY',
+            cardId: 'new-mount',
+            target: { type: 'COMPANION', cardId: 'old-mount' },
+          },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.card-action')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'))
+      .find((button) => button.textContent?.includes('Заменить спутника'))!
+      .click();
+
+    expect(client.sendGameCommand).toHaveBeenCalledWith({
+      type: 'PLAY_CARD',
+      cardId: 'new-mount',
+      target: { type: 'COMPANION', cardId: 'old-mount' },
     });
   });
 

@@ -1,7 +1,10 @@
 import { GameService } from './game.service';
 import {
+  CardType,
   GamePhase,
   GameStatus,
+  parseCombatId,
+  parseEncounterId,
   parsePlayerId,
   parsePendingDecisionId,
   type GameState,
@@ -210,6 +213,166 @@ describe('GameService equipment transport', () => {
       success: false,
       error: { code: 'INVALID_RECIPIENT' },
     });
+  });
+
+  it('accepts an opponent intervention through the projected reaction address and refreshes it', () => {
+    const service = new GameService();
+    const players = [
+      { playerId: 'player-1', name: 'Ada' },
+      { playerId: 'player-2', name: 'Grace' },
+    ];
+    expect(service.startGame('REACT', players)).toEqual({ success: true });
+    const games = (service as unknown as { games: Map<string, GameState> })
+      .games;
+    const started = games.get('REACT')!;
+    const definitionFor = (card: GameState['treasureDeck'][number]) =>
+      started.cardDefinitions.find(
+        (definition) => definition.id === card.definitionId,
+      )!;
+    const intervention = started.treasureDeck.find((card) => {
+      const definition = definitionFor(card);
+      return (
+        definition.type === CardType.TEMPORARY_BONUS &&
+        definition.play?.target === 'COMBAT_SIDE'
+      );
+    });
+    const monster = started.doorDeck
+      .map((card) => ({ card, definition: definitionFor(card) }))
+      .filter(({ definition }) => definition.type === CardType.MONSTER)
+      .sort(
+        (left, right) =>
+          (left.definition.monster?.strength ?? Number.MAX_SAFE_INTEGER) -
+          (right.definition.monster?.strength ?? Number.MAX_SAFE_INTEGER),
+      )[0];
+    if (intervention === undefined || monster === undefined)
+      throw new Error('Reaction regression fixture cards are missing.');
+    const usedIds = new Set([intervention.instanceId, monster.card.instanceId]);
+    games.set('REACT', {
+      ...started,
+      activePlayerId: parsePlayerId('player-1'),
+      phase: GamePhase.DOOR_RESOLUTION,
+      doorDeck: started.doorDeck.filter(
+        (card) => !usedIds.has(card.instanceId),
+      ),
+      treasureDeck: started.treasureDeck.filter(
+        (card) => !usedIds.has(card.instanceId),
+      ),
+      players: started.players.map((player) => ({
+        ...player,
+        level: player.id === parsePlayerId('player-1') ? 9 : player.level,
+        hand:
+          player.id === parsePlayerId('player-2')
+            ? [...player.hand, intervention]
+            : player.hand,
+      })),
+      combat: {
+        combatId: parseCombatId('combat-reaction'),
+        playerId: parsePlayerId('player-1'),
+        revision: 4,
+        monsters: [
+          {
+            encounterId: parseEncounterId('encounter-1'),
+            monster: monster.card,
+            sourceCard: monster.card,
+            clonedFromEncounterId: null,
+            tier: monster.definition.tier,
+            baseStrength: monster.definition.monster!.strength,
+            strengthModifier: 0,
+            baseLevelRewards: monster.definition.monster!.levelRewards,
+            baseTreasureRewards: monster.definition.monster!.treasureRewards,
+            treasureModifier: 0,
+            playedCards: [],
+          },
+        ],
+        nextEncounterSequence: 2,
+        nextHelpOfferSequence: 1,
+        nextReactionWindowSequence: 1,
+        reactionWindow: null,
+        helpOffer: null,
+        helpAgreement: null,
+        runAway: null,
+        history: [],
+      },
+    });
+
+    const heroView = service.getView('REACT', 'player-1')!;
+    const declaration = heroView.availableIntents.find(
+      (
+        intent,
+      ): intent is Extract<
+        (typeof heroView.availableIntents)[number],
+        { kind: 'DECLARE_COMBAT_VICTORY' }
+      > => intent.kind === 'DECLARE_COMBAT_VICTORY',
+    );
+    if (declaration === undefined)
+      throw new Error('Winning combat declaration was not projected.');
+    expect(
+      service.execute('REACT', 'player-1', {
+        type: 'DECLARE_COMBAT_VICTORY',
+        combatId: declaration.combatId,
+        combatRevision: declaration.combatRevision,
+      }),
+    ).toEqual({ success: true });
+
+    const before = service.getView('REACT', 'player-2')!;
+    const play = before.availableIntents.find(
+      (
+        intent,
+      ): intent is Extract<
+        (typeof before.availableIntents)[number],
+        { kind: 'PLAY_CARD'; target: { type: 'MONSTER' } }
+      > =>
+        intent.kind === 'PLAY_CARD' &&
+        intent.cardId === intervention.instanceId &&
+        intent.target.type === 'MONSTER',
+    );
+    if (play === undefined)
+      throw new Error('Opponent interference was not projected.');
+
+    expect(
+      service.execute('REACT', 'player-2', {
+        type: 'PLAY_CARD',
+        cardId: play.cardId,
+        target: play.target,
+        combatId: play.combatId,
+        combatRevision: play.combatRevision,
+        reactionWindowId: play.reactionWindowId,
+      }),
+    ).toEqual({ success: true });
+
+    const refreshed = service.getView('REACT', 'player-2')!;
+    const pass = refreshed.availableIntents.find(
+      (
+        intent,
+      ): intent is Extract<
+        (typeof refreshed.availableIntents)[number],
+        { kind: 'PASS_COMBAT_REACTION' }
+      > => intent.kind === 'PASS_COMBAT_REACTION',
+    );
+    expect(pass).toMatchObject({
+      combatId: 'combat-reaction',
+      combatRevision: 5,
+      reactionWindowId: 2,
+    });
+    if (pass === undefined)
+      throw new Error('Refreshed reaction pass was not projected.');
+
+    expect(
+      service.execute('REACT', 'player-2', {
+        type: 'PASS_COMBAT_REACTION',
+        combatId: play.combatId,
+        combatRevision: play.combatRevision,
+        reactionWindowId: play.reactionWindowId!,
+      }),
+    ).toMatchObject({ success: false, error: { code: 'STALE_COMBAT_STATE' } });
+    expect(
+      service.execute('REACT', 'player-2', {
+        type: 'PASS_COMBAT_REACTION',
+        combatId: pass.combatId,
+        combatRevision: pass.combatRevision,
+        reactionWindowId: pass.reactionWindowId,
+      }),
+    ).toEqual({ success: true });
   });
 
   it('validates selected charity cards and recipient at the transport boundary', () => {

@@ -125,6 +125,12 @@ cards remain illegal on the other side. All choices retain combat revision and
 reaction-window stale-command protection; resulting sources appear in the
 authoritative power breakdown and combat history.
 
+Every target picker sends the exact authoritative combat/reaction address from
+its available intent. When an intervention changes combat revision, the server
+projects a new window/address and the client discards any picker or role action
+that was based on the superseded intent. Delayed or duplicate old commands
+continue to fail atomically.
+
 An apparent win requires `DECLARE_COMBAT_VICTORY`; a reaction window lets all
 eligible players pass or intervene. The final pass atomically rechecks power and
 reward availability. A successful help offer is bounded by the current total

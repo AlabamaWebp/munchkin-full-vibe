@@ -783,7 +783,7 @@ The main Stage has one state at a time:
 2. `DOOR_REVEAL` — revealed card and its resolved consequence;
 3. `POST_DOOR_CHOICE` — mandatory trouble, loot, or eligible Scavenge;
 4. `COMBAT_OPEN` — score, encounters, offers/agreement, legal interference;
-5. `COMBAT_REACTION` — score plus deadline and viewer-specific reaction state;
+5. `COMBAT_REACTION` — score plus remaining reaction countdown and viewer-specific reaction state;
 6. `RUN_AWAY_SEQUENCE` — current combatant/encounter and completed result matrix;
 7. `BLOCKING_DECISION` — discard, Curse defense, or role retention;
 8. `TURN_CLEANUP` — hand limit/charity and End Turn;
@@ -792,8 +792,9 @@ The main Stage has one state at a time:
    other players remain on the same results view while waiting.
 
 Server state selects the Stage state. Local UI state may select a focused
-encounter or open a sheet, but may not invent a gameplay phase. On reconnect, a
-blocking decision opens first and stale local pickers are discarded.
+encounter or open a sheet, but may not invent a gameplay phase. On reconnect or
+when a newer authoritative snapshot supersedes its projected intent, a blocking
+decision opens first and stale local pickers/actions are discarded.
 
 ### Combat Stage
 
@@ -808,6 +809,12 @@ companions, temporary effects, and helper contribution are distinct lines.
 Every Monster immediately exposes current Strength, Treasure count, level
 reward, short Bad Stuff, and modifier chips. The immutable help agreement is
 displayed beside the helper.
+
+During `COMBAT_REACTION`, the banner shows the projected deadline only as a
+local remaining-time countdown (`Осталось m:ss`), never as an absolute clock.
+It resets when the authoritative reaction-window id/revision changes and clamps
+at zero while the server authoritatively resolves expiry; the client never
+decides that the window has expired.
 
 ### Interaction rules
 
@@ -856,7 +863,7 @@ auto-expiry emits a durable event and the complete entry remains in history.
 
 To prevent a disconnected phone from freezing a six-player match:
 
-- combat reaction windows have a fixed 20-second authoritative deadline;
+- combat reaction windows have a fixed two-minute authoritative deadline;
 - destructive private choices have a 60-second deadline;
 - Curse protection defaults to decline;
 - chosen discard defaults to server-random legal cards;
@@ -931,7 +938,7 @@ cancel or continue. Accepted agreements have no deadline.
 
 ### Six-player flow
 
-- One simultaneous 20-second reaction deadline replaces sequential waiting for
+- One simultaneous two-minute reaction deadline replaces sequential waiting for
   five manual passes.
 - Top HUD fits six status cells without page or rail scrolling.
 - Only one help offer exists at once, and offers do not gate interference.

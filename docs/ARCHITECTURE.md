@@ -127,6 +127,11 @@ and focused presentational components render the server-projected game view,
 manage local-only UI state (sheets, focused card/encounter, locale, fullscreen),
 and translate an available intent into a contract command.
 
+Target pickers retain the exact command created from their projected intent,
+including combat revision and reaction-window ids. A later `GameView` that no
+longer contains those intent ids closes the local picker/role action, so a
+superseded snapshot cannot submit a mixed or stale combat address.
+
 The UI is mobile-first and uses a fixed game viewport with bounded sheets and
 horizontally scrollable rails where needed. Display-only arithmetic such as a
 shown power difference is allowed; changing state or deciding that a card is

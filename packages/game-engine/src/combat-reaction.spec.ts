@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CardType, DeckType, type CardDefinition } from "./cards.js";
 import type { GameCommand } from "./commands.js";
+import { COMBAT_REACTION_TIMEOUT_MS } from "./engine.js";
 import { executeCommand } from "./legacy-test-command.js";
 import { GamePhase, GameStatus, type GameState } from "./game-state.js";
 import {
@@ -289,6 +290,45 @@ function declare(state: GameState) {
 }
 
 describe("combat victory reaction window", () => {
+  it("gives declared and recreated windows a fresh two-minute authoritative deadline", () => {
+    let now = 1_000;
+    const context = { random, clock: { now: () => now } };
+    const declared = executeCommand(
+      combatState(),
+      {
+        type: "DECLARE_COMBAT_VICTORY",
+        actorId: heroId,
+        combatRevision: 1,
+      },
+      context,
+    );
+    expect(declared.success).toBe(true);
+    if (!declared.success) throw new Error(declared.error.message);
+    expect(declared.state.combat?.reactionWindow?.expiresAtEpochMs).toBe(
+      now + COMBAT_REACTION_TIMEOUT_MS,
+    );
+
+    now = 9_000;
+    const intervened = executeCommand(
+      declared.state,
+      {
+        type: "PLAY_CARD",
+        actorId: secondResponderId,
+        cardId: cards.monsterBonus.instanceId,
+        target: { type: "COMBAT", side: "MONSTER", encounterId },
+        reactionWindowId: 1,
+      },
+      context,
+    );
+    expect(intervened.success).toBe(true);
+    if (!intervened.success) throw new Error(intervened.error.message);
+    expect(intervened.state.combat?.reactionWindow).toMatchObject({
+      windowId: 2,
+      declaredAtRevision: 2,
+      expiresAtEpochMs: now + COMBAT_REACTION_TIMEOUT_MS,
+    });
+  });
+
   it("persists the claimant confirmation and waits for every other player", () => {
     const declared = declare(combatState());
     expect(declared).toMatchObject({

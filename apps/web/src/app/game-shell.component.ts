@@ -45,6 +45,8 @@ interface PickerOption {
   readonly facts?: string;
   readonly playerColor?: GameView['players'][number]['color'];
   readonly card?: GameCardView;
+  /** A command built from the exact server-projected intent for this target. */
+  readonly command?: GameClientCommand;
 }
 
 interface TargetPickerState {
@@ -57,9 +59,12 @@ interface TargetPickerState {
     | 'MONSTER'
     | 'HAND_MONSTER'
     | 'EQUIPMENT'
+    | 'COMPANION'
     | 'THEFT'
     | 'TRADE';
   readonly options: readonly PickerOption[];
+  /** Intent identities whose continued presence keeps this local picker valid. */
+  readonly intentIds?: readonly string[];
   readonly theftIntents?: readonly Extract<
     AvailableIntentView,
     { readonly kind: 'USE_ROLE_ABILITY' }
@@ -1271,6 +1276,17 @@ export class GameShellComponent {
       this.saleSelection.update((ids) => ids.filter((id) => validSaleIds.has(id)));
       const validHandIds = new Set(game.self.hand.map((card) => card.instanceId));
       this.charitySelection.update((ids) => ids.filter((id) => validHandIds.has(id)));
+
+      const currentIntentIds = new Set(game.availableIntents.map((intent) => intent.id));
+      const picker = this.targetPicker();
+      if (
+        picker?.intentIds !== undefined &&
+        !picker.intentIds.every((intentId) => currentIntentIds.has(intentId))
+      )
+        this.targetPicker.set(null);
+
+      const roleAbility = this.roleAbilityIntent();
+      if (roleAbility !== null && !currentIntentIds.has(roleAbility.id)) this.closeRoleAbility();
     });
   }
 
@@ -1401,6 +1417,11 @@ export class GameShellComponent {
 
   protected chooseTarget(picker: TargetPickerState, id: string): void {
     this.targetPicker.set(null);
+    const option = picker.options.find((candidate) => candidate.id === id);
+    if (option?.command !== undefined) {
+      this.send(option.command);
+      return;
+    }
     if (picker.kind === 'THEFT') {
       const theftIntent = picker.theftIntents?.find(
         (intent) => intent.target.type === 'EQUIPMENT' && intent.target.cardId === id,
@@ -2212,6 +2233,10 @@ export class GameShellComponent {
       (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
         intent.kind === 'PLAY_CARD' && intent.target.type === 'EQUIPMENT',
     );
+    const companionIntents = intents.filter(
+      (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
+        intent.kind === 'PLAY_CARD' && intent.target.type === 'COMPANION',
+    );
     const curseIntents = intents.filter(
       (intent): intent is Extract<AvailableIntentView, { kind: 'PLAY_CARD' }> =>
         intent.kind === 'PLAY_CARD' && intent.target.type === 'PLAYER' && !('combatId' in intent),
@@ -2312,16 +2337,19 @@ export class GameShellComponent {
         label: 'Сбросить разрешение роли',
         command: { type: 'DISCARD_ROLE_PERMISSION', cardId: card.instanceId },
       });
-    if (selfIntent)
-      uses.push({
-        label:
-          card.type === 'HIRELING' || card.type === 'MOUNT'
-            ? 'Призвать спутника'
-            : card.effects.some((effect) => effect.type === 'STEAL_RANDOM_HAND_CARD')
-              ? 'Украсть карту вслепую'
-              : 'Сыграть карту',
-        command: { type: 'PLAY_CARD', cardId: card.instanceId, target: { type: 'SELF' } },
-      });
+    if (selfIntent) {
+      const command = this.commandForIntent(selfIntent);
+      if (command !== null)
+        uses.push({
+          label:
+            card.type === 'HIRELING' || card.type === 'MOUNT'
+              ? 'Призвать спутника'
+              : card.effects.some((effect) => effect.type === 'STEAL_RANDOM_HAND_CARD')
+                ? 'Украсть карту вслепую'
+                : 'Сыграть карту',
+          command,
+        });
+    }
     if (equipmentIntents.length > 0)
       uses.push(
         this.useWithTargets(
@@ -2339,6 +2367,30 @@ export class GameShellComponent {
               ...(target === undefined ? {} : { card: target }),
             };
           }),
+        ),
+      );
+    if (companionIntents.length > 0)
+      uses.push(
+        this.useWithTargets(
+          'Заменить спутника',
+          'Выберите спутника для замены',
+          card,
+          'COMPANION',
+          companionIntents.map((intent) => {
+            const targetId = intent.target.type === 'COMPANION' ? intent.target.cardId : '';
+            const target = [
+              ...(game.self.hirelingCards ?? []),
+              ...(game.self.mountCards ?? []),
+            ].find((candidate) => candidate.instanceId === targetId);
+            return {
+              id: targetId,
+              label: target === undefined ? 'Спутник' : this.cardName(target),
+              facts: target === undefined ? '' : this.cardFacts(target).join(' · '),
+              ...(target === undefined ? {} : { card: target }),
+              command: this.commandForIntent(intent) ?? undefined,
+            };
+          }),
+          companionIntents.map((intent) => intent.id),
         ),
       );
     if (curseIntents.length > 0) {
@@ -2378,7 +2430,9 @@ export class GameShellComponent {
             playerColor: this.playerColor(
               intent.target.type === 'PLAYER' ? intent.target.playerId : '',
             ),
+            command: this.commandForIntent(intent) ?? undefined,
           })),
+          combatCurseIntents.map((intent) => intent.id),
         ),
       );
     }
@@ -2427,7 +2481,9 @@ export class GameShellComponent {
                 monster.encounterId ===
                 (intent.target.type === 'MONSTER' ? intent.target.encounterId : ''),
             )?.monster,
+            command: this.commandForIntent(intent) ?? undefined,
           })),
+          monsterIntents.map((intent) => intent.id),
         ),
       );
     }
@@ -2460,7 +2516,9 @@ export class GameShellComponent {
                   value.instanceId ===
                   (intent.target.type === 'HAND_MONSTER' ? intent.target.monsterCardId : ''),
               ) ?? card,
+            command: this.commandForIntent(intent) ?? undefined,
           })),
+          addIntents.map((intent) => intent.id),
         ),
       );
     }
@@ -2472,9 +2530,11 @@ export class GameShellComponent {
     card: GameCardView,
     kind: TargetPickerState['kind'],
     options: readonly PickerOption[],
+    intentIds?: readonly string[],
   ): CardUse {
     if (options.length === 1) {
       const option = options[0]!;
+      if (option.command !== undefined) return { label, command: option.command };
       if (kind === 'CURSE')
         return {
           label,
@@ -2524,7 +2584,16 @@ export class GameShellComponent {
           },
         };
     }
-    return { label, picker: { title, card, kind, options } };
+    return {
+      label,
+      picker: {
+        title,
+        card,
+        kind,
+        options,
+        ...(intentIds === undefined ? {} : { intentIds }),
+      },
+    };
   }
   private playerColor(playerId: string): GameView['players'][number]['color'] {
     return this.game().players.find((player) => player.playerId === playerId)?.color;

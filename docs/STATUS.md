@@ -40,6 +40,19 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-25: combat victory reaction windows now use a serialized,
+  engine-owned two-minute deadline on declaration and on each valid
+  post-intervention reset. The combat UI renders the projected deadline only as
+  a local remaining-time countdown; expiry continues to be resolved by the
+  authoritative engine after server wake-up/reconnect.
+- 2026-08-25: live two-player regressions closed. Legal typed Hireling/Mount
+  plays are now covered from all enabled sets and the shell also consumes
+  server-projected companion replacement intents. Targeted combat reactions now
+  retain the exact projected combat revision and reaction-window id; a newer
+  snapshot closes superseded pickers/actions, while server stale-address
+  rejection remains intact. Engine/server/web regression coverage follows a
+  winning declaration, opponent intervention, refreshed reaction window, and
+  rejection of the old address.
 - 2026-08-25: completed the projected-state frontend pass. Lobby hand-limit and
   double-ambush controls now follow host-only settings; combat filtering is
   derived from current legal intents (including Clone), and eligible equipment
