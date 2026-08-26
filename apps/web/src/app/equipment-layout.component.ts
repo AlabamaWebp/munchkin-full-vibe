@@ -155,9 +155,9 @@ export interface EquipmentLayoutLabels {
       padding: 0.55rem;
       flex-direction: column;
       gap: 0.35rem;
-      border: 1px dashed #806343;
+      border: 1px dashed var(--color-brass);
       border-radius: 0.75rem;
-      background: rgba(30, 19, 11, 0.78);
+      background: rgba(20, 13, 8, 0.74);
     }
     .slot.head {
       grid-area: head;
@@ -193,13 +193,13 @@ export interface EquipmentLayoutLabels {
       grid-area: left;
       grid-column: 1 / 3;
       border-style: solid;
-      border-color: #efc66d;
+      border-color: var(--color-gold);
     }
     .slot.hand-overflow {
       grid-column: 1 / 3;
     }
     small {
-      color: #bda987;
+      color: var(--color-text-muted);
       font-size: 0.62rem;
       font-weight: 800;
       letter-spacing: 0.08em;
@@ -214,8 +214,8 @@ export interface EquipmentLayoutLabels {
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      color: #f4e7ce;
-      background: #49301a;
+      color: var(--color-text);
+      background: var(--raised-fill);
       text-align: left;
     }
     button strong {
@@ -224,11 +224,11 @@ export interface EquipmentLayoutLabels {
       line-height: 1.25;
     }
     button span {
-      color: #efc66d;
+      color: var(--color-gold);
       white-space: nowrap;
     }
     button.enhanced {
-      border-left: 3px solid #efc66d;
+      border-left: 3px solid var(--color-gold);
     }
     button.passive {
       box-shadow: inset 0 0 0 1px rgba(106, 190, 164, 0.62);
@@ -254,7 +254,7 @@ export interface EquipmentLayoutLabels {
       display: grid;
       min-height: 2.75rem;
       place-items: center;
-      color: #9e896b;
+      color: var(--color-text-muted);
       font-size: 0.72rem;
     }
     @media (min-width: 42rem) {

@@ -143,6 +143,13 @@ single-origin production packaging and real-device validation remain.
   isolation, reconnect-safe deadlines, target-only Curse responses, and unified
   intent/event presentation. See [v2-release-audit.md](v2-release-audit.md).
 
+- 2026-08-26: extended the combat tabletop presentation system across the
+  entry/create/join flow, lobby and host settings, stage messaging, finished
+  results, character equipment, and card details. Shared semantic tokens now
+  drive the warm timber, brass, and leather surfaces while the existing
+  GameView/available-intent interaction paths and fixed-height game shell stay
+  unchanged.
+
 ## Next evidence to collect
 
 1. Execute real 3–6 player LAN playtests and record balance/UX defects. Prioritize

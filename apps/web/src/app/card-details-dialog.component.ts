@@ -86,7 +86,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       display: grid;
       padding: 1rem;
       place-items: center;
-      background: rgba(3, 8, 5, 0.8);
+      background: rgba(15, 9, 5, 0.82);
       backdrop-filter: blur(0.35rem);
     }
     .card-dialog {
@@ -97,10 +97,12 @@ import { CardArtworkComponent } from './card-artwork.component';
       flex-direction: column;
       gap: 0.8rem;
       overflow: hidden;
-      border: 1px solid #647268;
+      border: 1px solid var(--surface-frame);
       border-radius: 1.15rem;
-      background: #111d16;
-      box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.48);
+      background: var(--panel-fill);
+      box-shadow:
+        inset 0 1px var(--tabletop-highlight),
+        0 1.5rem 4rem rgba(0, 0, 0, 0.58);
     }
     header {
       display: flex;
@@ -111,7 +113,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     header p {
       margin: 0 0 0.25rem;
-      color: #efc66d;
+      color: var(--color-gold);
       font-size: 0.7rem;
       font-weight: 800;
       letter-spacing: 0.1em;
@@ -120,7 +122,7 @@ import { CardArtworkComponent } from './card-artwork.component';
     h2,
     h3 {
       margin: 0;
-      font-family: Georgia, serif;
+      font-family: var(--ui-serif);
       overflow-wrap: anywhere;
     }
     .close {
@@ -129,27 +131,27 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-height: 2.75rem;
       margin: 0;
       color: #fff;
-      background: #2b3930;
+      background: var(--color-surface-raised);
       font-size: 1.3rem;
     }
     .event-meta,
     .event-result {
       padding: 0.65rem 0.75rem;
       border-radius: 0.7rem;
-      color: #bec9c1;
-      background: #18261e;
+      color: var(--color-text-muted);
+      background: rgba(28, 18, 11, 0.74);
       font-size: 0.78rem;
       line-height: 1.4;
     }
     .event-result {
-      border-left: 3px solid #efc66d;
+      border-left: 3px solid var(--color-gold);
       color: #fff3d3;
     }
     .card-copy {
       padding: 1rem;
-      border: 1px solid #76623a;
+      border: 1px solid var(--surface-frame);
       border-radius: 0.95rem;
-      background: linear-gradient(150deg, #39472f, #18241c 70%);
+      background: linear-gradient(150deg, rgba(73, 51, 27, 0.98), rgba(25, 16, 10, 0.98) 70%);
     }
     .card-copy[data-card-type='MONSTER'] {
       border-color: #a95b52;

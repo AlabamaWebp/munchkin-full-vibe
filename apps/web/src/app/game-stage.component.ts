@@ -292,24 +292,35 @@ import { motionClass } from './motion';
     .message,
     .run-away {
       display: grid;
-      height: 100%;
-      padding: 0.8rem;
+      width: min(100%, 27rem);
+      height: min(100%, 19rem);
+      min-height: 10.5rem;
+      margin: auto;
+      padding: clamp(0.9rem, 4vw, 1.35rem);
       place-content: center;
       gap: 0.35rem;
       overflow: hidden;
-      // border: 1px solid #405448;
-      // border-radius: 0.9rem;
-      // background:
-      //   radial-gradient(circle at 50% 0%, rgba(149, 97, 48, 0.22), transparent 70%), #21150d;
+      border: 1px solid var(--surface-frame);
+      border-radius: 1rem;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(217, 165, 75, 0.16), transparent 66%),
+        var(--panel-fill);
+      box-shadow:
+        inset 0 1px var(--tabletop-highlight),
+        var(--surface-shadow);
       text-align: center;
     }
     .message.blocking {
-      border-color: #bd8e4b;
-      background: #302618;
+      border-color: var(--color-gold);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(226, 179, 87, 0.2), transparent 66%),
+        var(--raised-fill);
     }
     .message.victory {
-      border-color: #d8b252;
-      background: radial-gradient(circle, #59461e, #1d1b13 72%);
+      border-color: var(--color-gold);
+      background:
+        radial-gradient(circle at 50% 20%, rgba(224, 184, 86, 0.38), transparent 65%),
+        var(--raised-fill);
     }
     .message.results {
       align-content: center;
@@ -330,13 +341,15 @@ import { motionClass } from './motion';
       gap: 0.45rem;
       align-items: baseline;
       padding: 0.42rem 0.5rem;
+      border-left: 2px solid var(--color-brass);
       border-radius: 0.5rem;
-      background: rgba(0, 0, 0, 0.22);
+      background: rgba(12, 8, 5, 0.45);
       font-size: 0.75rem;
     }
     .results-list li.winner {
       color: #ffe29a;
-      background: rgba(216, 178, 82, 0.25);
+      border-left-color: var(--color-gold);
+      background: rgba(216, 178, 82, 0.22);
     }
     .results-list span {
       min-width: 0;
@@ -354,10 +367,10 @@ import { motionClass } from './motion';
     }
     .lifecycle-actions button {
       padding: 0.5rem 0.7rem;
-      border: 1px solid #d8b252;
+      border: 1px solid var(--color-gold);
       border-radius: 0.5rem;
       color: #fff0bf;
-      background: #3b2d13;
+      background: linear-gradient(145deg, #594020, #2b1b0d);
       font-weight: 800;
     }
     .waiting-host {
@@ -372,9 +385,7 @@ import { motionClass } from './motion';
     }
     h2 {
       margin: 0;
-      font:
-        850 clamp(1.05rem, 5vw, 1.55rem)/1.08 Georgia,
-        serif;
+      font: 850 clamp(1.2rem, 5.6vw, 1.65rem)/1.08 var(--ui-serif);
     }
     p {
       margin: 0;
@@ -551,12 +562,14 @@ import { motionClass } from './motion';
       padding: 0.35rem 0.45rem;
       border-radius: 0.45rem;
       color: #dff0e3;
-      background: #24422e;
+      border-left: 2px solid var(--color-success);
+      background: rgba(25, 61, 39, 0.8);
       font-size: 0.68rem;
     }
     .attempts span.failed {
       color: #ffd8cf;
-      background: #562e27;
+      border-left-color: var(--color-danger);
+      background: rgba(86, 46, 39, 0.8);
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
