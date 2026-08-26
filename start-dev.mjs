@@ -14,8 +14,40 @@ if (process.platform === "win32") {
     ],
     { cwd: import.meta.dirname, stdio: "inherit" },
   );
+
+  let stopping = false;
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+
+    // Ctrl+C is delivered to this Node process first when npm is the console
+    // entry point. Closing PowerShell closes its Job Object, which terminates
+    // npm, Angular, NestJS, and any descendants that they created.
+    if (launcher.exitCode === null) {
+      launcher.kill();
+
+      // `kill()` can only signal the PowerShell process. If Windows keeps the
+      // console host alive, explicitly terminate its process tree as a
+      // fallback so npm cannot leave NestJS or Angular behind.
+      setTimeout(() => {
+        if (launcher.exitCode === null && launcher.pid !== undefined) {
+          spawn("taskkill.exe", ["/PID", String(launcher.pid), "/T", "/F"], {
+            stdio: "ignore",
+          });
+        }
+      }, 1000).unref();
+    }
+  };
+
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
+  process.on("SIGHUP", stop);
+
   launcher.once("exit", (code) => {
     process.exitCode = code ?? 1;
+  });
+  launcher.once("error", () => {
+    process.exitCode = 1;
   });
 } else {
   const children = new Set();

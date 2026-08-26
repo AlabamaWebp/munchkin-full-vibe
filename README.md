@@ -33,8 +33,8 @@ npm run typecheck
 
 `npm run dev` uses the root `start-dev.mjs` launcher. On Windows it delegates to
 `start-dev.ps1`, which places both servers in a kill-on-close process job.
-Stopping the launcher, closing it, or losing either child process terminates
-both the Angular and NestJS process trees.
+Pressing `Ctrl+C`, stopping/closing the launcher, or losing either child process
+terminates both the Angular and NestJS process trees.
 
 `npm run dev` first builds the two shared packages, then starts:
 
