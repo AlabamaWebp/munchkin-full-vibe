@@ -40,6 +40,12 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-26: extended the shared combat stage across active reaction, pending
+  help, and serialized escape workflows. One compact status-strip pattern keeps
+  the encounter and authoritative totals visible while exposing only projected
+  workflow facts; reaction countdown rows no longer overlap after a response.
+  Focused web coverage now exercises the help/escape status alongside the
+  existing multi-Monster, exact-target, reaction, and reconnect flows.
 - 2026-08-26: refocused the mobile combat shell around the local-card-art stage:
   the top HUD and single authoritative event capsule are compact, the public
   player rail scrolls instead of squeezing identities, and the encounter now

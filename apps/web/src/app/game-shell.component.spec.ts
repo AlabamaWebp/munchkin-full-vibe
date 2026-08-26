@@ -508,6 +508,29 @@ describe('GameShellComponent', () => {
     });
   });
 
+  it('keeps a pending help offer visible in the shared combat status area', () => {
+    const grace = player({ playerId: 'p2', name: 'Grace', combatPower: 7 });
+    const root = render(
+      base({
+        players: [base().self, grace],
+        combat: combat({
+          helpOffer: {
+            offerId: 'help-1',
+            helperId: 'p2',
+            proposedBy: 'ACTIVE',
+            treasureCount: 2,
+            expiresAtEpochMs: 10_000,
+          },
+        }),
+      }),
+    ).nativeElement as HTMLElement;
+
+    expect(root.querySelector('.help-offer-status')?.textContent).toContain(
+      'Ожидается ответ помощника',
+    );
+    expect(root.querySelector('.help-offer-status')?.textContent).toContain('Grace · обещано 2');
+  });
+
   it('restores help agreement and reaction-required/answered states', () => {
     const grace = player({ playerId: 'p2', name: 'Grace', combatPower: 7 });
     const agreement = {
@@ -800,6 +823,7 @@ describe('GameShellComponent', () => {
       root.querySelector('[data-stage="COMBAT_OPEN"] app-combat-stage .monster'),
     ).not.toBeNull();
     expect(root.querySelector('.monster')?.textContent).toContain('Archive Dragon');
+    expect(root.querySelector('.run-away-status')?.textContent).toContain('пытается сбежать');
   });
 
   it('opens a reconnect-safe blocking discard picker and confirms exact cards', () => {

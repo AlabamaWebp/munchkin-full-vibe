@@ -855,7 +855,7 @@ select:focus-visible {
 }
 @media (max-height: 42rem) {
   .game-shell {
-    grid-template-rows: 4.65rem 3.7rem minmax(8rem, 1fr) 3.5rem 8.6rem;
+    grid-template-rows: 4.65rem 3.7rem minmax(8rem, 1fr) 3.5rem 3.5rem;
     gap: 0.25rem;
   }
 }

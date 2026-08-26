@@ -94,8 +94,10 @@ height through `minmax(0, 1fr)`. The recent-event capsule shows the single highe
 priority summary and opens complete history on tap. The hand rail is always
 visible on mobile and scrolls horizontally rather than shrinking cards into fixed
 columns. At compact heights, remove decorative padding, reduce the event to one
-line, and shorten secondary Monster copy. Do not reduce touch targets below
-`44px` and do not introduce body scrolling.
+line, and shorten secondary Monster copy. If full card previews would be
+clipped, collapse the rail to the persistent character summary and full-hand
+button rather than showing unreadable partial cards. Do not reduce touch targets
+below `44px` and do not introduce body scrolling.
 
 ### Turn banner
 
@@ -151,6 +153,19 @@ Show:
 Tapping opens the existing power-breakdown sheet. That sheet uses the projected
 player breakdown, helper contribution, and encounter values; it does not
 recalculate domain power.
+
+### Workflow status strip
+
+The encounter card and totals remain mounted through combat workflows. A compact
+shared strip directly above them gives reaction, pending-help, and active
+run-away context without replacing the combat stage:
+
+- reaction: required/sent state, response counts, and the projected countdown;
+- help offer: named helper and promised Treasure count;
+- run away: current combatant, exact Monster, and completed-attempt count.
+
+This strip only formats the projected workflow state. It never creates an
+action, predicts a result, or duplicates combat calculations.
 
 ### Action dock
 
@@ -209,10 +224,10 @@ claim through the next authoritative view.
 ### Escape
 
 Before the command, show Monster Bad Stuff rather than a guaranteed penalty.
-During serialized escape, replace the normal action dock with progress for the
-current combatant and encounter. Render completed attempts from `runAway` in
-encounter/combatant order. After combat cleanup, render `lastRunAwayResult` until
-the next authoritative transition.
+During serialized escape, retain the encounter and total stage and show progress
+for the current combatant and encounter in the workflow status strip. Render
+completed attempts from `runAway` in encounter/combatant order. After combat
+cleanup, render `lastRunAwayResult` until the next authoritative transition.
 
 ### Own character summary and hand
 

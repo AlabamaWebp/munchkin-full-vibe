@@ -222,6 +222,16 @@ import { unavailableReason } from './game-ui.model';
       outline-offset: 2px;
     }
     @media (max-height: 42rem) {
+      .hand-dock {
+        grid-template-rows: 1fr;
+      }
+      .hand-header {
+        align-self: stretch;
+      }
+      .cards,
+      .empty {
+        display: none;
+      }
       .character-summary {
         min-height: 3.25rem;
         padding: 0.25rem 0.35rem;

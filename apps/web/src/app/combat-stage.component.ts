@@ -31,7 +31,7 @@ export function formatReactionCountdown(remainingMs: number): string {
             <strong>{{
               viewerMustReact() ? 'Объявлена победа — нужна ваша реакция' : 'Победа объявлена'
             }}</strong>
-            <span
+            <span class="combat-status-detail"
               >Ответили {{ combat.reactionWindow?.confirmedPlayerIds?.length ?? 0 }} · ждём
               {{ combat.reactionWindow?.waitingPlayerIds?.length ?? 0 }}</span
             >
@@ -44,6 +44,24 @@ export function formatReactionCountdown(remainingMs: number): string {
             ) {
               <small>Вы ответили. Ждём остальных.</small>
             }
+          </div>
+        }
+        @if (!reactionMode() && combat.runAway; as runAway) {
+          <div class="combat-status run-away-status">
+            <strong>{{ playerName(runAway.currentCombatantId) }} пытается сбежать</strong>
+            <span class="combat-status-detail"
+              >От {{ monsterName(runAway.currentEncounterId) }} · попыток:
+              {{ runAway.attempts.length }}</span
+            >
+          </div>
+        }
+        @if (!reactionMode() && combat.helpOffer; as offer) {
+          <div class="combat-status help-offer-status">
+            <strong>Ожидается ответ помощника</strong>
+            <span class="combat-status-detail"
+              >{{ playerName(offer.helperId) }} · обещано {{ offer.treasureCount }}
+              {{ treasureLabel(offer.treasureCount) }}</span
+            >
           </div>
         }
         <div class="monster-zone">
@@ -166,6 +184,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       grid-template-rows: minmax(0, 1fr) auto auto auto auto;
       gap: 0.28rem;
     }
+    .combat:has(.combat-status),
     .combat:has(.reaction) {
       grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
     }
@@ -176,6 +195,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       grid-template-rows: auto minmax(0, 1fr);
       gap: 0.32rem;
     }
+    .combat-status,
     .reaction {
       display: grid;
       padding: 0.32rem 0.5rem;
@@ -187,6 +207,16 @@ export function formatReactionCountdown(remainingMs: number): string {
       color: #ffe9ad;
       background: #3b321d;
     }
+    .combat-status {
+      border-color: #6e814b;
+      color: #e4f0d2;
+      background: linear-gradient(100deg, rgba(22, 55, 38, 0.94), rgba(29, 34, 21, 0.94));
+    }
+    .combat-status.help-offer-status {
+      border-color: #b38343;
+      color: #ffe5b4;
+      background: linear-gradient(100deg, rgba(79, 49, 22, 0.94), rgba(35, 27, 17, 0.94));
+    }
     .reaction.required {
       border-color: #e3bc5d;
       box-shadow: 0 0 0 2px rgba(227, 188, 93, 0.16);
@@ -194,16 +224,23 @@ export function formatReactionCountdown(remainingMs: number): string {
     .reaction strong {
       font-size: 0.78rem;
     }
-    .reaction span,
+    .combat-status-detail,
     .reaction small {
       font-size: 0.68rem;
     }
-    .reaction span {
+    .combat-status-detail {
       grid-column: 1;
     }
     .reaction small {
       grid-column: 2;
-      grid-row: 1 / span 2;
+      grid-row: 2;
+    }
+    .reaction strong {
+      grid-column: 1 / -1;
+    }
+    .reaction small:not(.reaction-countdown) {
+      grid-column: 1 / -1;
+      grid-row: 3;
     }
     .reaction-countdown {
       color: #fff1c8;
@@ -633,8 +670,15 @@ export class CombatStageComponent {
     );
     return intent?.kind === 'PROPOSE_HELP' && intent.helperIds.length > 0;
   }
-  protected playerName(id: string): string {
+  protected playerName(id: string | null): string {
     return this.game().players.find((player) => player.playerId === id)?.name ?? 'Игрок';
+  }
+  protected monsterName(encounterId: string | null): string {
+    if (encounterId === null) return 'монстра';
+    const encounter = this.game().combat?.monsters.find(
+      (candidate) => candidate.encounterId === encounterId,
+    );
+    return encounter === undefined ? 'монстра' : this.cardName(encounter.monster);
   }
   protected treasureLabel(count: number): string {
     const lastTwo = count % 100;
