@@ -16,7 +16,7 @@ import type { PresentedEvent } from './game-ui.model';
         <span class="empty">Игра начинается…</span>
       } @else {
         <span class="event-list">
-          @for (event of events(); track event.entry.sequence) {
+          @for (event of events().slice(0, 1); track event.entry.sequence) {
             <span [class.important]="event.priority !== 'ROUTINE'">{{ event.summary }}</span>
           }
         </span>
@@ -36,29 +36,25 @@ import type { PresentedEvent } from './game-ui.model';
       width: 100%;
       height: 100%;
       min-height: 0;
-      padding: 0.4rem 0.75rem;
-      grid-template-rows: auto minmax(0, 1fr);
-      align-items: stretch;
+      padding: 0.42rem 0.65rem;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 0.55rem;
       overflow: hidden;
-      border: 1px solid #876033;
-      border-radius: 0.85rem;
+      border: 1px solid rgba(141, 99, 46, 0.62);
+      border-radius: 0.7rem;
       color: #ead5ad;
-      background: linear-gradient(
-        100deg,
-        rgba(24, 17, 11, 0.96),
-        rgba(48, 32, 19, 0.93),
-        rgba(19, 14, 10, 0.96)
-      );
-      box-shadow:
-        inset 0 1px rgba(255, 220, 151, 0.14),
-        0 0.25rem 0.7rem rgba(0, 0, 0, 0.38);
+      background: rgba(23, 16, 10, 0.88);
+      box-shadow: inset 0 1px var(--tabletop-highlight);
       text-align: left;
     }
     .title {
       min-width: 0;
       overflow: hidden;
       color: #d9b76f;
-      font-size: 0.78rem;
+      flex: 0 0 auto;
+      color: var(--color-text-muted);
+      font-size: 0.58rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -66,9 +62,8 @@ import type { PresentedEvent } from './game-ui.model';
       white-space: nowrap;
     }
     .event-list {
-      display: grid;
+      display: block;
       min-height: 0;
-      grid-auto-rows: minmax(0, 1fr);
       overflow: hidden;
     }
     .event-list span,
@@ -76,15 +71,11 @@ import type { PresentedEvent } from './game-ui.model';
       width: 100%;
       min-width: 0;
       overflow: hidden;
-      display: flex;
-      align-items: center;
-      font-size: clamp(0.76rem, 2.3vw, 0.92rem);
-      line-height: 1;
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1.25;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    .event-list span + span {
-      border-top: 1px solid rgba(190, 132, 55, 0.28);
     }
     .important {
       color: #ffe5a4;

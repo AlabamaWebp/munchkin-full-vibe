@@ -66,16 +66,14 @@ authoritative.
 
 ## Mobile layout
 
-The shell remains a fixed grid. Suggested height budget at `390 x 844` is a
+The shell remains a fixed grid. The implemented `390 x 844` budget is a
 starting point for visual QA, not a new hard-coded game rule:
 
 ```text
 ┌──────────────────────────────────────┐
-│ Turn banner + menu/history       52px│
+│ Turn banner + public player rail 89px│
 ├──────────────────────────────────────┤
-│ Public player rail               54px│
-├──────────────────────────────────────┤
-│ Prioritized recent event         44px│
+│ Prioritized recent event         70px│
 ├──────────────────────────────────────┤
 │                                      │
 │ Encounter stage              minmax()│
@@ -83,18 +81,21 @@ starting point for visual QA, not a new hard-coded game rule:
 │  total score · state/help summary     │
 │                                      │
 ├──────────────────────────────────────┤
-│ Contextual combat actions        60px│
+│ Contextual combat actions        75px│
 ├──────────────────────────────────────┤
-│ Own character summary           64px│
+│ Own character summary            52px│
 ├──────────────────────────────────────┤
-│ Hand rail                  128-152px│
+│ Hand rail                       144px│
 └──────────────────────────────────────┘
 ```
 
 Use `100dvh` minus safe-area padding. The encounter stage receives all remaining
-height through `minmax(0, 1fr)`. At compact heights, remove decorative padding,
-reduce the event to one line, and shorten secondary Monster copy. Do not reduce
-touch targets below `44px` and do not introduce body scrolling.
+height through `minmax(0, 1fr)`. The recent-event capsule shows the single highest
+priority summary and opens complete history on tap. The hand rail is always
+visible on mobile and scrolls horizontally rather than shrinking cards into fixed
+columns. At compact heights, remove decorative padding, reduce the event to one
+line, and shorten secondary Monster copy. Do not reduce touch targets below
+`44px` and do not introduce body scrolling.
 
 ### Turn banner
 

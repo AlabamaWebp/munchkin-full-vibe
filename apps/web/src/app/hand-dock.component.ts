@@ -66,7 +66,7 @@ import { unavailableReason } from './game-ui.model';
     }
     .hand-dock {
       display: grid;
-      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-rows: auto minmax(0, 1fr);
       height: 100%;
       min-height: 0;
       overflow: hidden;
@@ -74,7 +74,7 @@ import { unavailableReason } from './game-ui.model';
     .hand-header {
       display: grid;
       min-width: 0;
-      grid-row: 2;
+      grid-row: 1;
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: stretch;
       gap: 0.35rem;
@@ -83,11 +83,11 @@ import { unavailableReason } from './game-ui.model';
       display: flex;
       justify-content: space-between;
       min-width: 0;
-      min-height: 3.5rem;
+      min-height: 3.25rem;
       padding: 0.25rem 0.4rem;
       align-items: stretch;
       gap: 0.25rem;
-      border: 1px solid #b17a38;
+      border: 1px solid var(--surface-frame);
       border-radius: 0.95rem;
       color: #f3e4c7;
       background: linear-gradient(
@@ -97,8 +97,8 @@ import { unavailableReason } from './game-ui.model';
         rgba(14, 11, 8, 0.97)
       );
       box-shadow:
-        inset 0 1px rgba(255, 220, 149, 0.18),
-        0 0.35rem 0.9rem rgba(0, 0, 0, 0.48);
+        inset 0 1px var(--tabletop-highlight),
+        var(--surface-shadow);
       text-align: left;
     }
     .summary-initial {
@@ -172,12 +172,12 @@ import { unavailableReason } from './game-ui.model';
         serif;
     }
     .cards {
-      display: none;
-      grid-row: 1;
+      display: grid;
+      grid-row: 2;
       height: 100%;
       min-width: 0;
       grid-auto-flow: column;
-      grid-auto-columns: clamp(5.25rem, 24vw, 6.25rem);
+      grid-auto-columns: clamp(4.85rem, 23vw, 5.65rem);
       gap: 0.45rem;
       overflow-x: auto;
       padding: 0 0.25rem 0.15rem 0;
@@ -212,7 +212,7 @@ import { unavailableReason } from './game-ui.model';
     .empty {
       display: grid;
       height: 100%;
-      grid-row: 1;
+      grid-row: 2;
       place-items: center;
       color: #8e9e93;
       font-size: 0.7rem;

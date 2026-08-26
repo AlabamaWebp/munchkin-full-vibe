@@ -315,7 +315,7 @@ describe('GameShellComponent', () => {
     expect(root.textContent).toContain('Lose one item');
   });
 
-  it('shows the five newest actions, including routine ones, in the recent-actions panel', () => {
+  it('shows the highest-priority recent action in the compact event capsule', () => {
     const root = render(
       base({
         presentation: {
@@ -349,7 +349,8 @@ describe('GameShellComponent', () => {
     ).nativeElement as HTMLElement;
 
     const events = root.querySelectorAll('app-recent-events .event-list span');
-    expect(events).toHaveLength(5);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.textContent).toContain('вступил в бой');
   });
 
   it('uses the next distinct event when the stage already shows a played card', () => {

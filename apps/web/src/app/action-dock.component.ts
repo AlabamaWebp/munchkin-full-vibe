@@ -81,19 +81,19 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     .actions {
       display: grid;
-      min-height: 3.8rem;
+      min-height: 4.7rem;
       grid-auto-flow: column;
-      grid-auto-columns: minmax(6.5rem, 1fr);
+      grid-auto-columns: minmax(7.15rem, 1fr);
       gap: 0.35rem;
       align-items: stretch;
       overflow-x: auto;
     }
     button {
       min-width: 0;
-      min-height: 3.8rem;
-      padding: 0.3rem 0.45rem;
+      min-height: 4.7rem;
+      padding: 0.4rem 0.45rem;
       overflow: hidden;
-      border: 1px solid #806343;
+      border: 1px solid var(--surface-frame);
       border-radius: 0.85rem;
       color: #e5ede7;
       background: linear-gradient(145deg, #49301a, #21140c);

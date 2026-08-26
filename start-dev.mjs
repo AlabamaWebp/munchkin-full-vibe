@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 if (process.platform === "win32") {
   const launcher = spawn(
@@ -16,35 +16,34 @@ if (process.platform === "win32") {
   );
 
   let stopping = false;
+  const terminateLauncherTree = () => {
+    if (launcher.pid === undefined || launcher.exitCode !== null) return;
+
+    // On Windows, killing a child process does not recursively kill its
+    // descendants. taskkill does, including npm's cmd.exe and the Node
+    // processes started by Angular/NestJS.
+    spawnSync("taskkill.exe", ["/PID", String(launcher.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
+  };
+
   const stop = () => {
     if (stopping) return;
     stopping = true;
 
     // Ctrl+C is delivered to this Node process first when npm is the console
-    // entry point. Closing PowerShell closes its Job Object, which terminates
-    // npm, Angular, NestJS, and any descendants that they created.
-    if (launcher.exitCode === null) {
-      launcher.kill();
-
-      // `kill()` can only signal the PowerShell process. If Windows keeps the
-      // console host alive, explicitly terminate its process tree as a
-      // fallback so npm cannot leave NestJS or Angular behind.
-      setTimeout(() => {
-        if (launcher.exitCode === null && launcher.pid !== undefined) {
-          spawn("taskkill.exe", ["/PID", String(launcher.pid), "/T", "/F"], {
-            stdio: "ignore",
-          });
-        }
-      }, 1000).unref();
-    }
+    // entry point. Kill the whole launcher tree immediately so npm cannot
+    // leave NestJS or Angular behind.
+    terminateLauncherTree();
   };
 
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
   process.on("SIGHUP", stop);
+  process.once("exit", terminateLauncherTree);
 
   launcher.once("exit", (code) => {
-    process.exitCode = code ?? 1;
+    process.exitCode = stopping ? 0 : (code ?? 1);
   });
   launcher.once("error", () => {
     process.exitCode = 1;

@@ -116,7 +116,7 @@ export function formatReactionCountdown(remainingMs: number): string {
           <span
             ><small>СИЛА ИГРОКОВ</small><b>{{ combat.playerPower }}</b></span
           >
-          <strong>⚔</strong>
+          <strong aria-hidden="true">VS</strong>
           <span
             ><small>СИЛА МОНСТРА</small><b>{{ combat.monsterPower }}</b></span
           >
@@ -164,7 +164,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       height: 100%;
       min-height: 0;
       grid-template-rows: minmax(0, 1fr) auto auto auto auto;
-      gap: 0.32rem;
+      gap: 0.28rem;
     }
     .combat:has(.reaction) {
       grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
@@ -178,8 +178,10 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .reaction {
       display: grid;
-      padding: 0.45rem 0.6rem;
-      gap: 0.1rem;
+      padding: 0.32rem 0.5rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: 0.5rem;
       border: 1px solid #806f42;
       border-radius: 0.6rem;
       color: #ffe9ad;
@@ -196,6 +198,13 @@ export function formatReactionCountdown(remainingMs: number): string {
     .reaction small {
       font-size: 0.68rem;
     }
+    .reaction span {
+      grid-column: 1;
+    }
+    .reaction small {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
     .reaction-countdown {
       color: #fff1c8;
       font-variant-numeric: tabular-nums;
@@ -205,11 +214,11 @@ export function formatReactionCountdown(remainingMs: number): string {
       position: relative;
       display: grid;
       width: 100%;
-      min-height: 4.5rem;
+      min-height: 4.15rem;
       padding: 0.32rem 2.65rem 0.32rem 0.55rem;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      border: 1px solid #8e6734;
+      border: 1px solid var(--surface-frame);
       border-radius: 0.9rem;
       color: #fff;
       background: linear-gradient(
@@ -239,7 +248,8 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .score > strong {
       color: #edc978;
-      font-size: 1.1rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
     }
     .score-reward {
       grid-column: 1 / -1;
@@ -351,7 +361,7 @@ export function formatReactionCountdown(remainingMs: number): string {
     .monster {
       position: relative;
       display: grid;
-      width: min(100%, 20rem);
+      width: min(100%, 15.5rem);
       min-height: 0;
       height: 100%;
       max-height: none;
@@ -384,8 +394,8 @@ export function formatReactionCountdown(remainingMs: number): string {
     .monster-art {
       position: relative;
       display: grid;
-      width: min(100%, 12rem);
-      height: min(100%, 16rem);
+      width: min(100%, 12.4rem);
+      height: 100%;
       max-height: 100%;
       aspect-ratio: 3 / 4;
       align-self: center;

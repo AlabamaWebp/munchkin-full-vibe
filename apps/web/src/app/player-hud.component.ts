@@ -30,7 +30,7 @@ import type { ConnectionState } from './lobby-client';
           </button>
         }
       </div>
-      <div class="players">
+      <div class="players" [class.solo]="game().players.length === 1">
         @for (player of orderedPlayers(); track player.playerId) {
           <button
             type="button"
@@ -69,7 +69,7 @@ import type { ConnectionState } from './lobby-client';
     }
     .turn-line {
       display: flex;
-      min-height: 3rem;
+      min-height: 2.65rem;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
@@ -77,15 +77,15 @@ import type { ConnectionState } from './lobby-client';
     .turn-line > div {
       display: grid;
       min-width: 0;
-      min-height: 3rem;
-      padding: 0.35rem 0.8rem 0.42rem;
+      min-height: 2.65rem;
+      padding: 0.27rem 0.65rem 0.32rem;
       flex: 1;
-      border: 1px solid #a77a35;
+      border: 1px solid var(--surface-frame);
       border-radius: 0.75rem 0.75rem 1.1rem 1.1rem;
-      background: linear-gradient(100deg, rgba(91, 57, 27, 0.97), rgba(42, 25, 14, 0.97));
+      background: linear-gradient(100deg, rgba(24, 70, 42, 0.96), rgba(15, 40, 27, 0.96));
       box-shadow:
-        inset 0 1px rgba(255, 223, 135, 0.22),
-        0 0.25rem 0.65rem rgba(0, 0, 0, 0.45);
+        inset 0 1px var(--tabletop-highlight),
+        var(--surface-shadow);
       text-align: center;
       order: 2;
     }
@@ -99,16 +99,16 @@ import type { ConnectionState } from './lobby-client';
     }
     .turn-line span {
       color: #dac78e;
-      font-size: 0.78rem;
+      font-size: 0.68rem;
     }
     .turn-line button {
-      width: 2.75rem;
-      min-width: 2.75rem;
-      min-height: 2.75rem;
-      border: 1px solid #886233;
-      border-radius: 0.7rem;
+      width: 2.55rem;
+      min-width: 2.55rem;
+      min-height: 2.55rem;
+      border: 1px solid var(--surface-frame);
+      border-radius: 50%;
       color: #f5f8f6;
-      background: linear-gradient(145deg, #332b20, #11120f);
+      background: var(--raised-fill);
     }
     .turn-line button[aria-label='Открыть меню'] {
       order: 1;
@@ -124,11 +124,18 @@ import type { ConnectionState } from './lobby-client';
     }
     .players {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+      grid-auto-columns: minmax(10.5rem, 1fr);
+      grid-auto-flow: column;
       min-width: 0;
       min-height: 0;
       height: 100%;
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x proximity;
+      scrollbar-width: thin;
+    }
+    .players.solo {
+      grid-auto-columns: 1fr;
     }
     .player {
       display: grid;
@@ -141,16 +148,11 @@ import type { ConnectionState } from './lobby-client';
       grid-template-rows: 1fr 1fr;
       column-gap: 0.35rem;
       text-align: left;
-      border: 1px solid #846337;
-      border-radius: 0;
+      border: 1px solid var(--surface-frame);
+      border-radius: 0.75rem;
       color: #eef4ef;
-      background: linear-gradient(105deg, rgba(22, 17, 12, 0.94), rgba(52, 35, 21, 0.9));
-    }
-    .player:first-child {
-      border-radius: 0.8rem 0 0 0.8rem;
-    }
-    .player:last-child {
-      border-radius: 0 0.8rem 0.8rem 0;
+      background: var(--panel-fill);
+      scroll-snap-align: start;
     }
     .player.active {
       border-color: #e5bd62;

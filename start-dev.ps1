@@ -59,6 +59,12 @@ function Add-ProcessToJob([IntPtr]$Job, [Diagnostics.Process]$Process) {
     }
 }
 
+function Stop-ProcessTree([Diagnostics.Process]$Process) {
+    if ($null -ne $Process -and -not $Process.HasExited) {
+        & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+    }
+}
+
 Push-Location $projectRoot
 try {
     & npm run build:packages
@@ -89,6 +95,8 @@ try {
         if ($server.HasExited -and $server.ExitCode -ne 0) { $exitCode = $server.ExitCode }
     }
     finally {
+        Stop-ProcessTree $web
+        Stop-ProcessTree $server
         [ProcessJob]::CloseHandle($job) | Out-Null
     }
     exit $exitCode

@@ -40,6 +40,14 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-26: refocused the mobile combat shell around the local-card-art stage:
+  the top HUD and single authoritative event capsule are compact, the public
+  player rail scrolls instead of squeezing identities, and the encounter now
+  receives the remaining table height. The contextual-action dock and a
+  persistent horizontally scrollable hand sit beneath it; the character summary
+  remains compact. Shared tabletop CSS tokens now drive the common surfaces,
+  while the existing projected `GameView`, intent, command, privacy, reconnect,
+  and accessibility flows remain unchanged.
 - 2026-08-25: combat victory reaction windows now use a serialized,
   engine-owned two-minute deadline on declaration and on each valid
   post-intervention reset. The combat UI renders the projected deadline only as
