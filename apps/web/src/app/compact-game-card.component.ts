@@ -115,7 +115,8 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     app-card-artwork {
       width: 100%;
-      height: 100%;
+      height: auto;
+      aspect-ratio: 3 / 4;
       min-height: 0;
     }
     strong {
@@ -147,6 +148,24 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     .unavailable {
       filter: saturate(0.75);
+    }
+    :host-context(.hand-dock) .card-action {
+      min-height: 0;
+      padding: 0.2rem;
+    }
+    :host-context(.hand-dock) app-card-artwork {
+      width: auto;
+      height: 100%;
+      aspect-ratio: 3 / 4;
+      justify-self: center;
+    }
+    :host-context(.hand-dock) strong {
+      min-height: 1.8em;
+      max-height: 1.8em;
+      font-size: 0.72rem;
+    }
+    :host-context(.hand-dock) .facts span {
+      font-size: 0.66rem;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;

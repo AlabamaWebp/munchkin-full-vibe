@@ -106,6 +106,7 @@ interface CardUse {
         [fullscreen]="isFullscreen()"
         (playerOpened)="selectedPlayerId.set($event)"
         (menuOpened)="menuOpen.set(true)"
+        (historyOpened)="historyOpen.set(true)"
         (fullscreenOpened)="toggleFullscreen()"
       />
       <app-recent-events [events]="recentEvents()" (historyOpened)="historyOpen.set(true)" />

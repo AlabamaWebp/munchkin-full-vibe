@@ -37,27 +37,31 @@ import type { PresentedEvent } from './game-ui.model';
       height: 100%;
       min-height: 0;
       min-height: 2.75rem;
-      padding: 0.35rem 0.6rem;
+      padding: 0.25rem 0.55rem;
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
       gap: 0.55rem;
       overflow: hidden;
       border: 0;
-      border-left: 2px solid rgba(173, 132, 67, 0.72);
-      border-radius: 0.35rem;
+      border: 1px solid rgba(173, 132, 67, 0.48);
+      border-left: 3px solid rgba(173, 132, 67, 0.78);
+      border-radius: 0.7rem;
       color: #ead5ad;
-      background: rgba(23, 16, 10, 0.88);
-      box-shadow: none;
+      background: rgba(23, 16, 10, 0.78);
+      box-shadow: inset 0 1px rgba(255, 225, 159, 0.08);
       text-align: left;
     }
     .title {
-      min-width: 0;
-      overflow: hidden;
-      color: #d9b76f;
       flex: 0 0 auto;
-      color: var(--color-text-muted);
+      min-width: 0;
+      padding: 0.18rem 0.35rem;
+      overflow: hidden;
+      border: 1px solid rgba(173, 132, 67, 0.38);
+      border-radius: 999px;
+      color: #c7b697;
+      background: rgba(61, 42, 23, 0.65);
       font-family: var(--ui-sans);
-      font-size: 0.75rem;
+      font-size: 0.62rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -71,15 +75,16 @@ import type { PresentedEvent } from './game-ui.model';
     }
     .event-list span,
     .empty {
+      display: -webkit-box;
       width: 100%;
       min-width: 0;
       overflow: hidden;
-      display: block;
       font-family: var(--ui-sans);
-      font-size: 0.8rem;
-      line-height: 1.25;
+      font-size: 0.78rem;
+      line-height: 1.15;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
     .important {
       color: #ffe5a4;
@@ -94,14 +99,15 @@ import type { PresentedEvent } from './game-ui.model';
     @media (max-height: 42rem) {
       .strip {
         min-height: 0;
-        padding-block: 0.4rem;
+        padding-block: 0.25rem;
       }
       .title {
-        font-size: 0.74rem;
+        padding-inline: 0.3rem;
+        font-size: 0.6rem;
       }
       .event-list span,
       .empty {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
       }
     }
   `,

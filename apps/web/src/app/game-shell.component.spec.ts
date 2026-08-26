@@ -168,6 +168,16 @@ describe('GameShellComponent', () => {
     );
   });
 
+  it('keeps History reachable from the compact HUD', () => {
+    const fixture = render(base());
+    const root = fixture.nativeElement as HTMLElement;
+
+    root.querySelector<HTMLButtonElement>('[aria-label="Открыть историю"]')!.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('#history-title')?.textContent).toContain('История');
+  });
+
   it('requires an explicit Monster selection before looking for trouble', () => {
     const fixture = render(
       base({
@@ -219,10 +229,15 @@ describe('GameShellComponent', () => {
     expect(root.textContent).not.toContain('Продать карты');
   });
 
-  it('shows the character sex below the nickname', () => {
-    const fixture = render(base({ self: { ...player({ sex: 'FEMALE' }), hand: [] } }));
+  it('keeps the character sex available in the character sheet', () => {
+    const female = player({ sex: 'FEMALE' });
+    const fixture = render(base({ players: [female], self: { ...female, hand: [] } }));
 
-    expect(fixture.nativeElement.querySelector('.summary-sex')?.textContent).toContain('женский');
+    const root = fixture.nativeElement as HTMLElement;
+    const summary = root.querySelector<HTMLButtonElement>('.character-summary');
+    summary?.click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Пол: женский');
   });
 
   it('keeps six player chips in a horizontal rail', () => {
@@ -238,6 +253,7 @@ describe('GameShellComponent', () => {
   it('renders empty equipment, no class, and empty or full hands from the projected player view', () => {
     const empty = render(base()).nativeElement as HTMLElement;
     expect(empty.textContent).toContain('Рука пуста');
+    expect(empty.querySelector('.hand-menu')).not.toBeNull();
 
     const fiveCards = Array.from({ length: 5 }, (_, index) =>
       card({ instanceId: `card-${index}`, name: `Very long card name ${index}` }),
@@ -258,6 +274,21 @@ describe('GameShellComponent', () => {
     fixture.detectChanges();
     expect(root.textContent).toContain('Классы: нет · Расы: нет');
     expect(root.querySelectorAll('.equipment-grid .empty')).toHaveLength(7);
+  });
+
+  it('keeps projected equipment and role facts visible in the compact character strip', () => {
+    const equipment = card({ type: 'EQUIPMENT', name: 'Шлем испытаний' });
+    const classCard = card({ type: 'CLASS', name: 'Воин' });
+    const self = player({ equipment: [equipment], classCard, combatPower: 4 });
+    const root = render(
+      base({
+        players: [self],
+        self: { ...self, hand: [] },
+      }),
+    ).nativeElement as HTMLElement;
+
+    expect(root.querySelector('.summary-loadout')?.textContent).toContain('Шлем испытаний');
+    expect(root.querySelector('.summary-loadout')?.textContent).toContain('Воин');
   });
 
   it('shows Door reveal and immediate Curse consequence from the event log', () => {

@@ -1,6 +1,6 @@
 # Project status
 
-Status date: 2026-08-25
+Status date: 2026-08-26
 Current baseline: schema-5 V2 game is ready for internal LAN live playtesting;
 single-origin production packaging and real-device validation remain.
 
@@ -40,6 +40,23 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-26: completed the portrait mobile visual-polish pass across the
+  fixed game shell. The turn banner now groups menu, History, and fullscreen
+  controls into one compact HUD; the player rail and recent event are dense
+  status surfaces; combat keeps a larger 3:4 focused encounter visually tied
+  to a compact total/difference score; and the action dock uses icon-led
+  primary/secondary plaques. The own-character strip now shows projected
+  role/equipment facts and the hand remains a fixed-width portrait rail with a
+  persistent Full Hand gateway. No engine, rules, contract, projection, or
+  transport behavior changed.
+- 2026-08-26: completed the second mobile presentation pass for the fixed
+  `390×844` game scene. The event capsule, combat totals, focused Monster card,
+  contextual actions, character utility row, and hand dock now use the available
+  height more densely without changing projected intents or workflows. Single-
+  encounter rewards are shown only on the focused Monster; multi-Monster combat
+  retains the aggregate reward line. The shared artwork primitive now enforces
+  the canonical `3:4` portrait geometry across stage, hand, Full Hand, pickers,
+  breakdowns, and Details.
 - 2026-08-26: refined the shared mobile game shell hierarchy for the fixed
   `390×844` scene. Cleanup now gives the current hand-limit task the stage
   focus and keeps prior card receipts in the event capsule/history; charity is

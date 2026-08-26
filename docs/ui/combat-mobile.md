@@ -41,28 +41,28 @@ authoritative.
 
 ## Reference-to-model mapping
 
-| Reference element                 | Real source                                                                                                             | Decision                                                                                                                                                                      |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Ваш ход" banner                  | `activePlayerId`, `viewerPlayerId`, `turnNumber`, `phase`                                                               | Keep the banner style. Say "Ваш ход" only for the active viewer; otherwise show whose combat it is.                                                                           |
-| "Выбита дверь · Бой"              | `phase` plus `combat !== null`                                                                                          | Use localized real phase and a combat label. Do not create a new phase.                                                                                                       |
-| Menu                              | Existing menu sheet                                                                                                     | Keep, restyle.                                                                                                                                                                |
-| History button                    | `presentation` and `gameLog`                                                                                            | Keep. Open the existing bounded History sheet.                                                                                                                                |
-| "Показывать историю" checkbox     | No corresponding setting                                                                                                | Omit. One recent event stays visible; full history is opened explicitly.                                                                                                      |
-| Player-versus-Monster row         | `combat.playerId`, helper data, `combat.monsters`                                                                       | Rework as public player rail plus combat participants. A Monster has no Class/Race field; never show fictional role copy.                                                     |
-| Player color                      | Public player color selected in the lobby                                                                               | Use the selected color consistently in the player rail and character summary. Monster uses its real `artKey`; color remains cosmetic.                                         |
-| Recent actions with "minutes ago" | `presentation`, `gameLog`, `combat.history`                                                                             | Show authoritative summaries in sequence order, without relative time because events have no timestamp.                                                                       |
-| Large Monster card                | Focused `combat.monsters[]` encounter                                                                                   | Keep as the stage focus. Support multiple encounters via horizontal tabs/chips.                                                                                               |
-| Monster strength badge            | `currentStrength`                                                                                                       | Keep. Label it as focused-Monster strength, distinct from total Monster-side power.                                                                                           |
-| Reward strip                      | `currentTreasures`, `baseLevelRewards`                                                                                  | Keep. Values are per focused encounter. Show modifiers when present.                                                                                                          |
-| Info button                       | Projected `GameCardView`                                                                                                | Keep. Open existing card details.                                                                                                                                             |
-| Player/Monster score              | `combat.playerPower`, `combat.monsterPower`, `combat.monsters[].baseLevelRewards`, `combat.monsters[].currentTreasures` | Keep. Show total level and Treasure rewards for all encounters below the power totals. The signed difference is display-only. A tie is losing, so zero uses losing treatment. |
-| "Не хватает 2 силы"               | Difference of projected totals                                                                                          | Allowed as presentation: "Не хватает N" for `difference <= 0`, "Перевес N" for positive values. Do not use it to enable actions.                                              |
-| "Можно усилиться..." hint         | `availableIntents`                                                                                                      | Generate only from actual intent categories: playable combat cards, help, victory declaration, reaction, or escape. Otherwise show who is expected to act.                    |
-| "Сыграть карту"                   | One or more owned-card `PLAY_CARD` intents                                                                              | Keep as a gateway that opens the hand filtered to cards playable in this combat. Target selection uses the exact intent.                                                      |
-| "Позвать на помощь"               | `PROPOSE_HELP` and subsequent offer intents                                                                             | Keep only when projected. The sheet must support helper choice and the projected Treasure range.                                                                              |
-| "Сбежать" with fixed level loss   | `RUN_AWAY`; Monster Bad Stuff and server roll                                                                           | Keep the action, replace the false fixed penalty with "Попытаться сбежать" and a Bad Stuff details route. Outcome is not predicted.                                           |
-| Own character/equipment bar       | `self`, equipment, roles, `combatPower`, `handCount`                                                                    | Keep as a compact summary. Detailed slots remain in the character sheet.                                                                                                      |
-| Five visible hand cards           | `self.hand`, card intents, reasons                                                                                      | Keep the prominent hand, but use a horizontally scrollable rail and do not assume exactly five cards. Show `count / 5`; an over-limit hand is valid until resolved.           |
+| Reference element                 | Real source                                                                                                             | Decision                                                                                                                                                                                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Ваш ход" banner                  | `activePlayerId`, `viewerPlayerId`, `turnNumber`, `phase`                                                               | Keep the banner style. Say "Ваш ход" only for the active viewer; otherwise show whose combat it is.                                                                                                                                                                    |
+| "Выбита дверь · Бой"              | `phase` plus `combat !== null`                                                                                          | Use localized real phase and a combat label. Do not create a new phase.                                                                                                                                                                                                |
+| Menu                              | Existing menu sheet                                                                                                     | Keep, restyle.                                                                                                                                                                                                                                                         |
+| History button                    | `presentation` and `gameLog`                                                                                            | Keep. Open the existing bounded History sheet.                                                                                                                                                                                                                         |
+| "Показывать историю" checkbox     | No corresponding setting                                                                                                | Omit. One recent event stays visible; full history is opened explicitly.                                                                                                                                                                                               |
+| Player-versus-Monster row         | `combat.playerId`, helper data, `combat.monsters`                                                                       | Rework as public player rail plus combat participants. A Monster has no Class/Race field; never show fictional role copy.                                                                                                                                              |
+| Player color                      | Public player color selected in the lobby                                                                               | Use the selected color consistently in the player rail and character summary. Monster uses its real `artKey`; color remains cosmetic.                                                                                                                                  |
+| Recent actions with "minutes ago" | `presentation`, `gameLog`, `combat.history`                                                                             | Show authoritative summaries in sequence order, without relative time because events have no timestamp.                                                                                                                                                                |
+| Large Monster card                | Focused `combat.monsters[]` encounter                                                                                   | Keep as the stage focus. Support multiple encounters via horizontal tabs/chips.                                                                                                                                                                                        |
+| Monster strength badge            | `currentStrength`                                                                                                       | Keep. Label it as focused-Monster strength, distinct from total Monster-side power.                                                                                                                                                                                    |
+| Reward strip                      | `currentTreasures`, `baseLevelRewards`                                                                                  | Keep. Values are per focused encounter. Show modifiers when present.                                                                                                                                                                                                   |
+| Info button                       | Projected `GameCardView`                                                                                                | Keep. Open existing card details.                                                                                                                                                                                                                                      |
+| Player/Monster score              | `combat.playerPower`, `combat.monsterPower`, `combat.monsters[].baseLevelRewards`, `combat.monsters[].currentTreasures` | Keep. Show total level and Treasure rewards only for multi-Monster aggregate context; a single encounter's reward stays on the focused card. The signed difference is display-only and stays compact under the totals. A tie is losing, so zero uses losing treatment. |
+| "Не хватает 2 силы"               | Difference of projected totals                                                                                          | Allowed as presentation: "Не хватает N" for `difference <= 0`, "Перевес N" for positive values. Do not use it to enable actions.                                                                                                                                       |
+| "Можно усилиться..." hint         | `availableIntents`                                                                                                      | Generate only from actual intent categories: playable combat cards, help, victory declaration, reaction, or escape. Otherwise show who is expected to act.                                                                                                             |
+| "Сыграть карту"                   | One or more owned-card `PLAY_CARD` intents                                                                              | Keep as a gateway that opens the hand filtered to cards playable in this combat. Target selection uses the exact intent.                                                                                                                                               |
+| "Позвать на помощь"               | `PROPOSE_HELP` and subsequent offer intents                                                                             | Keep only when projected. The sheet must support helper choice and the projected Treasure range.                                                                                                                                                                       |
+| "Сбежать" with fixed level loss   | `RUN_AWAY`; Monster Bad Stuff and server roll                                                                           | Keep the action, replace the false fixed penalty with "Попытаться сбежать" and a Bad Stuff details route. Outcome is not predicted.                                                                                                                                    |
+| Own character/equipment bar       | `self`, equipment, roles, `combatPower`, `handCount`                                                                    | Keep as a compact summary. Detailed slots remain in the character sheet.                                                                                                                                                                                               |
+| Five visible hand cards           | `self.hand`, card intents, reasons                                                                                      | Keep the prominent hand, but use a horizontally scrollable rail and do not assume exactly five cards. Show `count / 5`; an over-limit hand is valid until resolved.                                                                                                    |
 
 ## Mobile layout
 
@@ -73,7 +73,7 @@ starting point for visual QA, not a new hard-coded game rule:
 ┌──────────────────────────────────────┐
 │ Turn banner + public player rail 89px│
 ├──────────────────────────────────────┤
-│ Prioritized recent event         70px│
+│ Prioritized recent event         44px│
 ├──────────────────────────────────────┤
 │                                      │
 │ Encounter stage              minmax()│
@@ -81,31 +81,30 @@ starting point for visual QA, not a new hard-coded game rule:
 │  total score · state/help summary     │
 │                                      │
 ├──────────────────────────────────────┤
-│ Contextual combat actions        75px│
+│ Contextual combat actions        68px│
 ├──────────────────────────────────────┤
-│ Own character summary            52px│
-├──────────────────────────────────────┤
-│ Hand rail                       144px│
+│ Own summary + hand rail         148px│
 └──────────────────────────────────────┘
 ```
 
 Use `100dvh` minus safe-area padding. The encounter stage receives all remaining
 height through `minmax(0, 1fr)`. The recent-event capsule shows the single highest
-priority summary and opens complete history on tap. The hand rail is always
-visible on mobile and scrolls horizontally rather than shrinking cards into fixed
-columns. At compact heights, remove decorative padding, reduce the event to one
-line, and shorten secondary Monster copy. If full card previews would be
-clipped, collapse the rail to the persistent character summary and full-hand
-button rather than showing unreadable partial cards. Do not reduce touch targets
-below `44px` and do not introduce body scrolling.
+priority summary and opens complete history on tap. The hand rail shares a compact
+own-character utility row and is always visible on mobile; it scrolls horizontally
+with a fixed card width rather than enlarging a lone card. At compact heights,
+remove decorative padding, reduce the event to one line, and shorten secondary
+Monster copy while retaining a readable portrait card preview and the full-hand
+gateway. Do not reduce touch targets below `44px` and do not introduce body
+scrolling.
 
 ### Turn banner
 
-- Left: menu action.
+- Left: menu action; right: History and optional fullscreen actions, all inside
+  one restrained dark HUD surface.
 - Center: active context, for example "Ваш ход" / "Бой: Анна", followed by
   localized real phase and turn number.
-- Right: history action with an optional important-event indicator. A connection
-  warning replaces secondary subtitle space rather than adding height.
+- A connection warning replaces secondary subtitle space rather than adding
+  height. Icon artwork remains visually smaller than the 44px tap targets.
 
 ### Player rail
 
@@ -122,9 +121,11 @@ below `44px` and do not introduce body scrolling.
 ### Recent event
 
 Show at most one `presentation.blocking` or latest `important` summary on the
-table. Tapping opens History. If there is no important event, either show the
-latest meaningful routine event or a neutral "Бой начался" state. Do not invent
-an event time or locally acknowledge authoritative events.
+table in a compact capsule. The small label is secondary to the event copy;
+the copy may clamp to two lines. Tapping opens History. If there is no
+important event, either show the latest meaningful routine event or a neutral
+"Бой начался" state. Do not invent an event time or locally acknowledge
+authoritative events.
 
 ### Encounter stage
 
@@ -146,7 +147,8 @@ Show:
 
 - left: total player side `playerPower`;
 - right: total Monster side `monsterPower`;
-- status: positive lead or exact missing strength;
+- status: one compact signed difference beneath the totals; do not repeat the
+  same deficit as a second sentence or a separate reward/status panel;
 - combat owner and accepted helper below the totals;
 - promised helper Treasure when an agreement exists.
 
@@ -177,10 +179,14 @@ The dock is built from `availableIntents` for the viewer. Visual priority:
    primary action. If already confirmed, show a waiting state instead of another
    pass action.
 3. `DECLARE_COMBAT_VICTORY`, when projected, is the primary positive action.
-4. Playable combat cards, help negotiation, and `RUN_AWAY` are contextual
-   secondary actions.
+4. Playable combat cards and help negotiation are contextual constructive
+   actions; `RUN_AWAY` remains a restrained destructive-secondary action.
 5. If no intent belongs to the viewer, show `expectedAction` as a waiting
    message and keep the hand inspectable.
+
+The visible dock uses compact icon-led plaques with at least `44px` targets.
+It must not promote `RUN_AWAY` when it is the only legal intent; a playable
+card gateway may remain the constructive primary when it is available.
 
 "Play card" is a presentation gateway, not a new command. It appears only when
 at least one card in `self.hand` has a combat `PLAY_CARD` intent. Choosing a card
@@ -236,7 +242,8 @@ The character summary shows:
 - initial/name, level, and public role labels;
 - authoritative `self.combatPower` outside combined combat and the combat-side
   total separately when combat is active;
-- up to three compact equipment facts, with the remaining count indicated;
+- up to three compact equipment/role/companion facts, with the remaining count
+  indicated when the strip cannot show all of them;
 - `self.hand.length / 5` and an explicit over-limit warning when applicable.
 
 The hand rail sorts playable cards first without changing hand ownership or

@@ -28,18 +28,63 @@ const PRIORITY: readonly AvailableGameAction[] = [
   template: `
     <nav class="actions" aria-label="Доступные действия">
       @if (hasPlayableCombatCards()) {
-        <button type="button" class="card-gateway" (click)="playCardOpened.emit()">
-          <strong>Сыграть карту</strong><small>Карта из руки</small>
-        </button>
-      }
-      @for (action of visible(); track action; let first = $first) {
         <button
           type="button"
-          [class.primary]="first && primaryUtilityId() === null"
+          class="card-gateway"
+          [class.primary]="primaryCardGateway()"
+          (click)="playCardOpened.emit()"
+        >
+          <span class="action-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="m7 5 11 2v12L7 17z" />
+              <path d="M4 4v12l3 1" />
+            </svg>
+          </span>
+          <span class="action-copy"
+            ><strong>Сыграть карту</strong><small>Карта из руки</small></span
+          >
+        </button>
+      }
+      @for (action of visible(); track action) {
+        <button
+          type="button"
+          [class.primary]="primaryUtilityId() === null && primaryAction() === action"
+          [class.escape]="action === 'RUN_AWAY'"
           (click)="actionSelected.emit(action)"
         >
-          <strong>{{ label(action) }}</strong
-          ><small>{{ hint(action) }}</small>
+          <span class="action-icon" aria-hidden="true">
+            @switch (action) {
+              @case ('PROPOSE_HELP') {
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 12h16M7 8h10M7 16h7" />
+                  <path d="m17 15 3 3m0-3-3 3" />
+                </svg>
+              }
+              @case ('RUN_AWAY') {
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 12h13" />
+                  <path d="m13 7 5 5-5 5" />
+                  <path d="M4 6v12" />
+                </svg>
+              }
+              @case ('DECLARE_COMBAT_VICTORY') {
+                <svg viewBox="0 0 24 24">
+                  <path d="m12 3 2.2 5.2L20 10l-5.8 1.8L12 17l-2.2-5.2L4 10l5.8-1.8z" />
+                  <path d="M12 17v4" />
+                </svg>
+              }
+              @default {
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 5h14v14H5z" />
+                  <path d="M8 12h8M12 8v8" />
+                </svg>
+              }
+            }
+          </span>
+          <span class="action-copy"
+            ><strong>{{ label(action) }}</strong
+            ><small>{{ hint(action) }}</small></span
+          >
         </button>
       }
       @for (action of utilityActions(); track action.id) {
@@ -49,8 +94,16 @@ const PRIORITY: readonly AvailableGameAction[] = [
           [class.primary]="action.id === primaryUtilityId()"
           (click)="utilityActionSelected.emit(action.id)"
         >
-          <strong>{{ action.label }}</strong
-          ><small>{{ action.hint }}</small>
+          <span class="action-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 7h14M7 4h10v16H7z" />
+              <path d="M10 11h4M10 15h4" />
+            </svg>
+          </span>
+          <span class="action-copy"
+            ><strong>{{ action.label }}</strong
+            ><small>{{ action.hint }}</small></span
+          >
         </button>
       }
       @if (overflow().length > 0) {
@@ -90,17 +143,22 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     .actions {
       display: grid;
-      min-height: 4.7rem;
+      min-height: 4.25rem;
       grid-auto-flow: column;
-      grid-auto-columns: minmax(9rem, 1fr);
+      grid-auto-columns: minmax(8rem, 1fr);
       gap: 0.45rem;
       align-items: stretch;
       overflow-x: auto;
     }
     button {
       min-width: 0;
-      min-height: 4.7rem;
-      padding: 0.45rem 0.65rem;
+      min-height: 4.25rem;
+      padding: 0.35rem 0.55rem;
+      display: grid;
+      grid-template-columns: 1.45rem minmax(0, 1fr);
+      align-content: center;
+      align-items: center;
+      column-gap: 0.35rem;
       overflow: hidden;
       border: 1px solid rgba(141, 99, 46, 0.58);
       border-radius: 0.7rem;
@@ -110,6 +168,26 @@ const PRIORITY: readonly AvailableGameAction[] = [
       text-overflow: ellipsis;
       text-transform: none;
       white-space: normal;
+    }
+    .action-icon {
+      display: grid;
+      width: 1.4rem;
+      height: 1.4rem;
+      place-items: center;
+      color: #d8bd78;
+    }
+    .action-icon svg {
+      width: 1.25rem;
+      height: 1.25rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.65;
+    }
+    .action-copy {
+      display: block;
+      min-width: 0;
     }
     button strong,
     button small {
@@ -136,8 +214,19 @@ const PRIORITY: readonly AvailableGameAction[] = [
         inset 0 1px rgba(255, 255, 255, 0.35),
         0 0.25rem 0.55rem rgba(0, 0, 0, 0.36);
     }
+    button.escape {
+      border-color: rgba(177, 86, 65, 0.7);
+      color: #f0d4c9;
+      background: linear-gradient(145deg, rgba(77, 36, 30, 0.92), rgba(34, 20, 16, 0.94));
+    }
     button.primary small {
       color: #d7ecd2;
+    }
+    button.primary .action-icon {
+      color: #f0d58c;
+    }
+    button.escape .action-icon {
+      color: #db9b87;
     }
     p {
       margin: 0;
@@ -147,6 +236,11 @@ const PRIORITY: readonly AvailableGameAction[] = [
       text-align: center;
     }
     .card-gateway {
+      border-color: rgba(141, 99, 46, 0.58);
+      color: #e5ede7;
+      background: linear-gradient(145deg, #49301a, #21140c);
+    }
+    .card-gateway.primary {
       border-color: #d6bc69;
       color: #fff0bf;
       background: linear-gradient(145deg, #6b7a37, #29321a);
@@ -213,6 +307,13 @@ const PRIORITY: readonly AvailableGameAction[] = [
       button {
         min-height: 3.5rem;
       }
+      .actions {
+        grid-auto-columns: minmax(7.6rem, 1fr);
+      }
+      .action-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
       button small {
         display: none;
       }
@@ -238,6 +339,13 @@ export class ActionDockComponent {
   protected readonly overflow = computed(() =>
     this.ordered().slice(this.primaryUtilityId() === null ? 2 : 1),
   );
+  protected readonly primaryAction = computed(() => {
+    if (this.primaryUtilityId() !== null) return null;
+    return this.ordered().find((action) => action !== 'RUN_AWAY') ?? null;
+  });
+  protected readonly primaryCardGateway = computed(
+    () => this.primaryUtilityId() === null && this.primaryAction() === null,
+  );
   protected label(action: AvailableGameAction): string {
     const labels: Record<AvailableGameAction, string> = {
       KICK_DOOR: 'Открыть дверь',
@@ -258,7 +366,7 @@ export class ActionDockComponent {
   protected hint(action: AvailableGameAction): string {
     const hints: Partial<Record<AvailableGameAction, string>> = {
       PROPOSE_HELP: 'Другой игрок может помочь',
-      RUN_AWAY: 'Избежать непотребства',
+      RUN_AWAY: 'Попытаться сбежать',
       DECLARE_COMBAT_VICTORY: 'Завершить бой',
       PASS_COMBAT_REACTION: 'Не вмешиваться',
     };

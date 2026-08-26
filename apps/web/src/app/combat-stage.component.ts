@@ -97,6 +97,7 @@ export function formatReactionCountdown(remainingMs: number): string {
                   [label]="cardName(focused().monster)"
                   [compact]="true"
                 />
+                <span class="monster-info" aria-hidden="true">i</span>
               </button>
               <span class="monster-strength"
                 ><b>{{ focused().currentStrength }}</b
@@ -138,23 +139,18 @@ export function formatReactionCountdown(remainingMs: number): string {
           <span
             ><small>СИЛА МОНСТРА</small><b>{{ combat.monsterPower }}</b></span
           >
-          <span class="score-reward"
-            >НАГРАДА: +{{ totalLevelRewards() }} {{ totalLevelWord() }} ·
-            {{ totalTreasureRewards() }} {{ totalTreasureWord() }}</span
-          >
+          @if (combat.monsters.length > 1) {
+            <span class="score-reward"
+              >НАГРАДА: +{{ totalLevelRewards() }} {{ totalLevelWord() }} ·
+              {{ totalTreasureRewards() }} {{ totalTreasureWord() }}</span
+            >
+          }
           <em [class.losing]="difference() <= 0"
             >{{ difference() > 0 ? '+' : '' }}{{ difference() }}</em
           >
         </button>
-        <div class="outcome" [class.losing]="difference() <= 0">
-          {{
-            difference() > 0
-              ? 'Преимущество ' + difference()
-              : 'Не хватает ' + -difference() + ' силы'
-          }}
-        </div>
-        @if (difference() <= 0) {
-          <p class="combat-hint">Усильтесь картой, позовите на помощь или смойтесь</p>
+        @if (difference() <= 0 && combatHint(); as hint) {
+          <p class="combat-hint">{{ hint }}</p>
         }
         <div class="participants">
           <span>{{ playerName(combat.playerId) }}</span>
@@ -181,12 +177,12 @@ export function formatReactionCountdown(remainingMs: number): string {
       display: grid;
       height: 100%;
       min-height: 0;
-      grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+      grid-template-rows: minmax(0, 1fr) auto auto auto;
       gap: 0.28rem;
     }
     .combat:has(.combat-status),
     .combat:has(.reaction) {
-      grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+      grid-template-rows: auto minmax(0, 1fr) auto auto auto;
     }
     .monster-zone {
       display: grid;
@@ -194,6 +190,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       min-height: 0;
       grid-template-rows: auto minmax(0, 1fr);
       gap: 0.32rem;
+      align-content: center;
     }
     .combat-status,
     .reaction {
@@ -250,9 +247,10 @@ export function formatReactionCountdown(remainingMs: number): string {
     .score {
       position: relative;
       display: grid;
-      width: 100%;
-      min-height: 4.15rem;
-      padding: 0.32rem 2.65rem 0.32rem 0.55rem;
+      width: min(100%, 20rem);
+      min-height: 0;
+      justify-self: center;
+      padding: 0.28rem 0.45rem;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
       border: 1px solid var(--surface-frame);
@@ -274,12 +272,12 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .score small {
       color: #bdc9c0;
-      font-size: 0.72rem;
+      font-size: 0.64rem;
       letter-spacing: 0.08em;
     }
     .score b {
       font:
-        900 clamp(1.7rem, 9vw, 2.35rem)/1 Georgia,
+        900 clamp(1.55rem, 8vw, 2.05rem)/1 Georgia,
         serif;
       line-height: 1;
     }
@@ -290,24 +288,26 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .score-reward {
       grid-column: 1 / -1;
+      margin-top: 0.12rem;
       color: #e6c987;
-      font-size: 0.72rem;
+      font-size: 0.65rem;
       font-weight: 800;
       line-height: 1.1;
       text-align: center;
-      margin: 3px 0 0;
     }
     .score em {
-      position: absolute;
-      right: 0.55rem;
+      grid-column: 1 / -1;
+      justify-self: center;
       display: grid;
-      width: 2rem;
-      height: 2rem;
+      min-width: 3.1rem;
+      height: 1.35rem;
+      padding-inline: 0.35rem;
       place-items: center;
-      border-radius: 50%;
+      border-radius: 999px;
       color: #2b1b0d;
       background: #e0b85f;
       font-style: normal;
+      font-size: 0.78rem;
       font-weight: 950;
     }
     .score em.losing {
@@ -338,35 +338,17 @@ export function formatReactionCountdown(remainingMs: number): string {
       color: #2b1b0d;
       background: #dfbd78;
     }
-    .outcome {
-      justify-self: center;
-      margin: -0.5rem 0;
-      z-index: 2;
-      padding: 0.2rem 0.85rem;
-      border: 1px solid #b77b3d;
-      border-radius: 999px;
-      color: #ffe6b0;
-      background: #4b2d18;
-      box-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.4);
-      font-size: 0.72rem;
-      font-weight: 800;
-    }
-    .outcome.losing {
-      border-color: #ba6048;
-      color: #ffb49b;
-      background: #3b1d17;
-    }
     .combat-hint {
       display: block;
       width: min(100%, 22rem);
       justify-self: center;
-      padding: 0.42rem 0.8rem;
-      border: 1px solid rgba(163, 117, 52, 0.55);
-      border-radius: 0.7rem;
+      padding: 0.24rem 0.55rem;
+      border: 1px solid rgba(153, 124, 76, 0.4);
+      border-radius: 999px;
       color: #e1ceb0;
-      background: rgba(20, 15, 10, 0.86);
-      font-size: 0.76rem;
-      line-height: 1.3;
+      background: rgba(27, 20, 13, 0.72);
+      font-size: 0.7rem;
+      line-height: 1.15;
       text-align: center;
     }
     .encounter-tabs {
@@ -398,21 +380,23 @@ export function formatReactionCountdown(remainingMs: number): string {
     .monster {
       position: relative;
       display: grid;
-      width: min(100%, 15.5rem);
+      width: min(100%, clamp(12rem, 55vw, 15rem));
       min-height: 0;
-      height: 100%;
-      max-height: none;
-      padding: 0.38rem;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      height: auto;
+      max-height: 100%;
+      padding: 0.3rem;
+      grid-template-rows: auto auto auto;
+      align-self: center;
       justify-self: center;
-      gap: 0.28rem;
+      gap: 0.24rem;
       overflow: hidden;
-      border: 2px solid #b25637;
+      border: 1px solid #a95b52;
       border-radius: 0.95rem;
       background: linear-gradient(145deg, rgba(77, 35, 21, 0.96), rgba(17, 12, 9, 0.96));
       box-shadow:
-        inset 0 0 0 2px rgba(10, 7, 5, 0.82),
-        0 0.5rem 1.25rem rgba(0, 0, 0, 0.58),
+        inset 0 0 0 1px rgba(223, 159, 103, 0.16),
+        inset 0 1rem 2.5rem rgba(255, 210, 132, 0.05),
+        0 0.35rem 0.9rem rgba(0, 0, 0, 0.5),
         0 0 1rem rgba(113, 45, 25, 0.2);
     }
     .ui-combat-card-enter {
@@ -431,9 +415,8 @@ export function formatReactionCountdown(remainingMs: number): string {
     .monster-art {
       position: relative;
       display: grid;
-      width: min(100%, 12.4rem);
-      height: 100%;
-      max-height: 100%;
+      width: 100%;
+      height: auto;
       aspect-ratio: 3 / 4;
       align-self: center;
       justify-self: center;
@@ -453,6 +436,23 @@ export function formatReactionCountdown(remainingMs: number): string {
       min-height: 0;
       height: 100%;
     }
+    .monster-info {
+      position: absolute;
+      z-index: 2;
+      right: 0.4rem;
+      bottom: 0.4rem;
+      display: grid;
+      width: 1.35rem;
+      height: 1.35rem;
+      place-items: center;
+      border: 1px solid rgba(255, 235, 183, 0.75);
+      border-radius: 50%;
+      color: #fff0bc;
+      background: rgba(28, 19, 12, 0.8);
+      font:
+        900 0.82rem/1 Georgia,
+        serif;
+    }
     .monster-title,
     .monster-footer {
       display: grid;
@@ -465,62 +465,69 @@ export function formatReactionCountdown(remainingMs: number): string {
       margin: 0;
       overflow: hidden;
       font:
-        800 clamp(0.84rem, 4.2vw, 1rem)/1.05 Georgia,
+        800 clamp(0.9rem, 4.8vw, 1.08rem)/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      -webkit-box-orient: vertical;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      min-height: 2.1em;
     }
     .rewards {
-      display: grid;
-      padding: 0.18rem 0.3rem 0.22rem;
+      display: flex;
+      min-width: 0;
+      padding: 0.24rem 0.38rem;
       align-items: center;
       justify-content: center;
-      gap: 0.04rem;
-      border: 1px solid #c28b45;
-      border-radius: 0.42rem;
-      color: #26180c;
-      background: linear-gradient(145deg, #d1a45f, #8c5c28);
+      gap: 0.3rem;
+      border-top: 1px solid rgba(194, 139, 69, 0.62);
+      border-radius: 0.35rem;
+      color: #f0cf87;
+      background: linear-gradient(90deg, rgba(100, 65, 23, 0.78), rgba(47, 30, 17, 0.62));
     }
     .rewards b {
-      color: #2b1808;
-      font:
-        900 0.68rem Georgia,
-        serif;
+      color: #dcb76b;
+      font: 900 0.62rem/1 var(--ui-sans);
+      letter-spacing: 0.07em;
     }
     .rewards span {
-      font:
-        800 0.68rem Georgia,
-        serif;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font: 800 0.7rem/1 var(--ui-sans);
     }
     p {
       display: -webkit-box;
       margin: 0;
       overflow: hidden;
       color: #e2d4d1;
-      font-size: 0.74rem;
-      line-height: 1.2;
+      font-size: 0.7rem;
+      line-height: 1.15;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 2;
     }
     .monster-strength {
       position: absolute;
       z-index: 2;
-      top: 1.7rem;
-      right: 0.55rem;
+      top: 2.15rem;
+      right: 0.45rem;
       display: grid;
-      width: 2.5rem;
-      height: 3.15rem;
+      width: 2.15rem;
+      height: 2.55rem;
       place-items: center;
       align-content: center;
       border: 1px solid #d27751;
       border-radius: 0.35rem 0.35rem 45% 45%;
       color: #ffe7bd;
       background: linear-gradient(#8e3020, #3e160f);
-      box-shadow: 0 0.2rem 0.5rem #000;
+      box-shadow:
+        inset 0 1px rgba(255, 232, 186, 0.25),
+        0 0.16rem 0.35rem #000;
     }
     .monster-strength b {
       font:
-        900 1.55rem/1 Georgia,
+        900 1.25rem/1 Georgia,
         serif;
     }
     .monster-strength small {
@@ -547,19 +554,18 @@ export function formatReactionCountdown(remainingMs: number): string {
         padding: 0.5rem 0;
       }
       .monster {
-        width: min(100%, 12.5rem);
-        min-height: 20rem;
+        width: min(100%, 14rem);
+        min-height: 0;
         max-height: min(26rem, 50dvh);
       }
       h3 {
         font-size: 1rem;
       }
       .score {
-        min-height: 4.5rem;
+        min-height: 0;
       }
       .score small,
-      .combat-hint,
-      .outcome {
+      .combat-hint {
         font-size: 0.75rem;
       }
     }
@@ -568,20 +574,29 @@ export function formatReactionCountdown(remainingMs: number): string {
         gap: 0.2rem;
       }
       .monster {
-        width: min(100%, 12rem);
+        width: min(100%, clamp(10rem, 48vw, 12.5rem));
+        height: 100%;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+      .monster-art {
+        width: auto;
+        height: 100%;
+        max-width: 100%;
       }
       .score {
-        min-height: 3.35rem;
+        min-height: 0;
       }
       .score b {
         font-size: 1.7rem;
       }
-      .combat-hint,
+      .combat-hint {
+        display: none;
+      }
       .participants {
         display: none;
       }
-      .outcome {
-        margin-top: -0.65rem;
+      h3 {
+        font-size: 0.9rem;
       }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -669,6 +684,14 @@ export class CombatStageComponent {
       (candidate) => candidate.kind === 'PROPOSE_HELP',
     );
     return intent?.kind === 'PROPOSE_HELP' && intent.helperIds.length > 0;
+  }
+  protected combatHint(): string | null {
+    const intents = this.game().availableIntents;
+    const hint: string[] = [];
+    if (intents.some((intent) => intent.kind === 'PLAY_CARD')) hint.push('усилиться картой');
+    if (this.canRequestHelp()) hint.push('позвать на помощь');
+    if (intents.some((intent) => intent.kind === 'RUN_AWAY')) hint.push('попытаться сбежать');
+    return hint.length === 0 ? null : hint.join(' · ');
   }
   protected playerName(id: string | null): string {
     return this.game().players.find((player) => player.playerId === id)?.name ?? 'Игрок';

@@ -271,6 +271,10 @@ describe('App lobby', () => {
 
     expect(fixture.nativeElement.querySelector('app-game-shell')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('app-combat-stage .combat')).not.toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Не хватает 1 силы');
+    expect(fixture.nativeElement.querySelector('.score')?.textContent).toContain('-1');
+    expect(fixture.nativeElement.querySelector('.score-reward')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.combat-hint')?.textContent).toContain(
+      'попытаться сбежать',
+    );
   });
 });

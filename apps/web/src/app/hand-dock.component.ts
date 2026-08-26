@@ -11,7 +11,7 @@ import { unavailableReason } from './game-ui.model';
     <section class="hand-dock" aria-label="Ваша рука">
       <div class="hand-header">
         <button type="button" class="character-summary" (click)="characterOpened.emit()">
-          <span class="flex gap10">
+          <span class="summary-identity">
             <span
               class="summary-initial"
               [class]="
@@ -19,27 +19,31 @@ import { unavailableReason } from './game-ui.model';
               "
               >{{ game().self.name.charAt(0) }}</span
             >
-            <span
-              ><small>Ваш герой · ур. {{ game().self.level }}</small
+            <span class="summary-copy"
               ><strong>{{ game().self.name }}</strong
-              ><small class="summary-sex">{{ sexLabel(game().self.sex) }}</small></span
+              ><small>Уровень {{ game().self.level }}</small></span
             >
           </span>
+          @if (summaryFacts().length > 0) {
+            <span class="summary-loadout" aria-label="Снаряжение и роли">
+              @for (fact of summaryFacts(); track fact) {
+                <small class="summary-fact">{{ fact }}</small>
+              }
+            </span>
+          }
           <span class="summary-power"
             ><small>Сила</small
             ><b>{{ game().combat?.playerPower ?? game().self.combatPower }}</b></span
           >
         </button>
-        @if (game().self.hand.length > 0) {
-          <button
-            type="button"
-            class="hand-menu"
-            aria-label="Открыть меню руки"
-            (click)="fullHandOpened.emit()"
-          >
-            Рука {{ game().self.hand.length }}/{{ game().config?.maxHandSize ?? 5 }}
-          </button>
-        }
+        <button
+          type="button"
+          class="hand-menu"
+          aria-label="Открыть полную руку"
+          (click)="fullHandOpened.emit()"
+        >
+          Рука {{ game().self.hand.length }}/{{ game().config?.maxHandSize ?? 5 }}
+        </button>
       </div>
       <div class="cards">
         @for (card of preview(); track card.instanceId) {
@@ -76,15 +80,15 @@ import { unavailableReason } from './game-ui.model';
       min-width: 0;
       grid-row: 1;
       grid-template-columns: minmax(0, 1fr) auto;
-      align-items: stretch;
+      align-items: center;
       gap: 0.35rem;
     }
     .character-summary {
       display: flex;
       justify-content: space-between;
       min-width: 0;
-      min-height: 2.9rem;
-      padding: 0.25rem 0.4rem;
+      min-height: 2.75rem;
+      padding: 0.2rem 0.35rem;
       align-items: stretch;
       gap: 0.25rem;
       border: 0;
@@ -99,10 +103,16 @@ import { unavailableReason } from './game-ui.model';
       box-shadow: inset 0 1px var(--tabletop-highlight);
       text-align: left;
     }
+    .summary-identity {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 0.4rem;
+    }
     .summary-initial {
       display: grid;
-      width: 2.4rem;
-      height: 2.4rem;
+      width: 2.1rem;
+      height: 2.1rem;
       place-items: center;
       border: 2px solid #d2a253;
       border-radius: 50%;
@@ -112,7 +122,7 @@ import { unavailableReason } from './game-ui.model';
         0 0 0 2px #31200f,
         0 0.2rem 0.5rem #000;
       font:
-        900 1.05rem Georgia,
+        900 0.95rem Georgia,
         serif;
     }
     .player-color-pink {
@@ -141,31 +151,56 @@ import { unavailableReason } from './game-ui.model';
     .summary-initial.player-color-black {
       border-color: var(--player-color);
     }
+    .summary-copy {
+      display: grid;
+      min-width: 0;
+      gap: 0.08rem;
+    }
     .character-summary small {
       display: block;
       color: #c8b99d;
       font-family: var(--ui-sans);
-      font-size: 0.75rem;
+      font-size: 0.68rem;
       letter-spacing: 0.04em;
     }
     .character-summary strong {
       display: block;
       overflow: hidden;
-      font: 750 0.9rem/1.05 var(--ui-sans);
+      font: 750 0.82rem/1.05 var(--ui-sans);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .character-summary .summary-sex {
-      color: #e0c792;
-      font-size: 0.75rem;
-    }
     .summary-power {
+      display: grid;
+      min-width: 2.6rem;
+      align-content: center;
+      gap: 0.05rem;
       text-align: center;
+    }
+    .summary-loadout {
+      display: grid;
+      min-width: 0;
+      flex: 1;
+      align-content: center;
+      gap: 0.08rem;
+    }
+    .summary-fact {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      color: #e0c988 !important;
+      font-size: 0.62rem !important;
+      letter-spacing: 0 !important;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .summary-power small {
+      font-size: 0.62rem;
     }
     .summary-power b {
       color: #f7e4b8;
       font:
-        900 1.25rem Georgia,
+        900 1.08rem Georgia,
         serif;
     }
     .cards {
@@ -174,10 +209,10 @@ import { unavailableReason } from './game-ui.model';
       height: 100%;
       min-width: 0;
       grid-auto-flow: column;
-      grid-auto-columns: clamp(7rem, 36vw, 8rem);
+      grid-auto-columns: 7.25rem;
       gap: 0.45rem;
       overflow-x: auto;
-      padding: 0.35rem 0.25rem max(0.4rem, env(safe-area-inset-bottom)) 0;
+      padding: 0.25rem 0.2rem max(0.35rem, env(safe-area-inset-bottom)) 0;
       scroll-padding-inline: 0.25rem;
       scroll-snap-type: x mandatory;
       scrollbar-width: thin;
@@ -185,6 +220,7 @@ import { unavailableReason } from './game-ui.model';
     app-compact-game-card {
       min-width: 0;
       min-height: 0;
+      height: 100%;
       scroll-snap-align: start;
     }
     .hand-menu {
@@ -221,31 +257,26 @@ import { unavailableReason } from './game-ui.model';
     }
     @media (max-height: 42rem) {
       .hand-dock {
-        grid-template-rows: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
       }
       .hand-header {
         align-self: stretch;
       }
-      .cards,
-      .empty {
-        display: none;
-      }
       .character-summary {
-        min-height: 3.25rem;
+        min-height: 2.75rem;
         padding: 0.25rem 0.35rem;
-        grid-template-columns: 2.5rem minmax(0, 1fr) 2.8rem 2.8rem;
         gap: 0.2rem;
       }
       .summary-initial {
-        width: 2.35rem;
-        height: 2.35rem;
-        font-size: 1.15rem;
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.9rem;
       }
       .character-summary small {
-        font-size: 0.75rem;
+        font-size: 0.64rem;
       }
       .summary-power b {
-        font-size: 1.2rem;
+        font-size: 1.05rem;
       }
     }
     @media (min-width: 48rem) {
@@ -277,10 +308,24 @@ export class HandDockComponent {
         Number(this.playableIds().includes(a.instanceId)),
     ),
   );
+  protected readonly summaryFacts = computed(() => {
+    const self = this.game().self;
+    const classCards = self.classCards ?? (self.classCard === null ? [] : [self.classCard]);
+    const raceCards = self.raceCards ?? (self.raceCard === null ? [] : [self.raceCard]);
+    const companionCards = self.hirelingCards ?? (self.hirelingCard ? [self.hirelingCard] : []);
+    const mountCards = self.mountCards ?? (self.mountCard ? [self.mountCard] : []);
+    const candidates = [
+      ...self.equipment.map((card) => `Снаряжение · ${this.cardName()(card)}`),
+      ...classCards.map((card) => `Класс · ${this.cardName()(card)}`),
+      ...raceCards.map((card) => `Раса · ${this.cardName()(card)}`),
+      ...companionCards.map((card) => `Спутник · ${this.cardName()(card)}`),
+      ...mountCards.map((card) => `Ездовой · ${this.cardName()(card)}`),
+    ];
+    return candidates.length > 3
+      ? [...candidates.slice(0, 2), `+${candidates.length - 2} ещё`]
+      : candidates;
+  });
   protected reason(card: GameCardView): string {
     return unavailableReason(this.game(), card.instanceId);
-  }
-  protected sexLabel(sex: GameView['self']['sex']): string {
-    return sex === 'MALE' ? 'мужской' : sex === 'FEMALE' ? 'женский' : 'не выбран';
   }
 }

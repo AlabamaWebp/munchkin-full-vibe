@@ -8,15 +8,6 @@ import type { ConnectionState } from './lobby-client';
   template: `
     <header class="hud">
       <div class="turn-line">
-        <div>
-          <strong>{{
-            game().activePlayerId === game().viewerPlayerId ? 'Ваш ход' : 'Ходит ' + activeName()
-          }}</strong>
-          <span>Ход {{ game().turnNumber }} · {{ phaseLabel() }}</span>
-        </div>
-        @if (connection() !== 'CONNECTED') {
-          <span class="warning" role="status">Нет связи</span>
-        }
         <button
           type="button"
           class="icon-button"
@@ -25,10 +16,31 @@ import type { ConnectionState } from './lobby-client';
         >
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
         </button>
+        <div class="turn-context">
+          <strong>{{
+            game().activePlayerId === game().viewerPlayerId ? 'Ваш ход' : 'Ходит ' + activeName()
+          }}</strong>
+          <span>Ход {{ game().turnNumber }} · {{ phaseLabel() }}</span>
+          @if (connection() !== 'CONNECTED') {
+            <span class="warning" role="status">Нет связи</span>
+          }
+        </div>
+        <button
+          type="button"
+          class="icon-button"
+          aria-label="Открыть историю"
+          (click)="historyOpened.emit()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 7v5l3 2" />
+            <path d="M5.6 9.2A7.2 7.2 0 1 1 5 14" />
+            <path d="M5.5 5.5v3.7h3.7" />
+          </svg>
+        </button>
         @if (fullscreenSupported()) {
           <button
             type="button"
-            class="fullscreen-button"
+            class="icon-button fullscreen-button"
             [class.active]="fullscreen()"
             aria-label="Переключить полноэкранный режим"
             (click)="fullscreenOpened.emit()"
@@ -57,7 +69,16 @@ import type { ConnectionState } from './lobby-client';
               >{{ player.name.charAt(0).toUpperCase() }}</span
             >
             <span class="name">{{ player.name }}</span>
-            <small>ур. {{ player.level }} · {{ player.handCount }} карт</small>
+            <small>
+              ур. {{ player.level }} · {{ player.handCount }} карт
+              @if (player.playerId === game().activePlayerId) {
+                <b class="player-state">· ход</b>
+              } @else if (player.playerId === game().viewerPlayerId) {
+                <b class="player-state">· вы</b>
+              } @else if (player.isDead) {
+                <b class="player-state">· мёртв</b>
+              }
+            </small>
           </button>
         }
       </div>
@@ -77,29 +98,38 @@ import type { ConnectionState } from './lobby-client';
       min-width: 0;
     }
     .turn-line {
-      display: flex;
+      display: grid;
       min-height: 2.75rem;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
+      grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem auto;
+      align-items: stretch;
+      gap: 0.25rem;
+      padding: 0.12rem;
+      border: 1px solid rgba(110, 79, 39, 0.62);
+      border-radius: 0.82rem;
+      background: linear-gradient(180deg, rgba(28, 20, 13, 0.94), rgba(13, 10, 7, 0.96));
+      box-shadow:
+        inset 0 1px rgba(255, 220, 149, 0.13),
+        0 0.25rem 0.7rem rgba(0, 0, 0, 0.25);
     }
-    .turn-line > div {
+    .turn-line:not(:has(.fullscreen-button)) {
+      grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+    }
+    .turn-context {
       display: grid;
       min-width: 0;
       min-height: 2.75rem;
-      padding: 0.34rem 0.65rem;
-      flex: 1;
+      padding: 0.24rem 0.55rem;
+      align-content: center;
       border: 1px solid rgba(115, 157, 115, 0.52);
-      border-radius: 0.7rem;
+      border-radius: 0.62rem;
       background: linear-gradient(100deg, rgba(24, 70, 42, 0.96), rgba(15, 40, 27, 0.96));
       box-shadow: inset 0 1px var(--tabletop-highlight);
       text-align: center;
-      order: 2;
     }
     strong {
       overflow: hidden;
       font:
-        800 1.16rem/1.05 Georgia,
+        800 1.04rem/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -107,7 +137,7 @@ import type { ConnectionState } from './lobby-client';
     .turn-line span {
       color: #e4d2a5;
       font-family: var(--ui-sans);
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       font-weight: 650;
     }
     .turn-line button {
@@ -115,24 +145,22 @@ import type { ConnectionState } from './lobby-client';
       min-width: 2.75rem;
       min-height: 2.75rem;
       padding: 0;
-      border: 1px solid rgba(141, 99, 46, 0.7);
-      border-radius: 0.7rem;
+      border: 1px solid rgba(141, 99, 46, 0.6);
+      border-radius: 0.62rem;
       color: #f5f8f6;
-      background: var(--raised-fill);
+      background: rgba(59, 40, 22, 0.8);
+      box-shadow: inset 0 1px rgba(255, 220, 149, 0.12);
     }
     .icon-button svg {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1.1rem;
+      height: 1.1rem;
       fill: none;
       stroke: currentColor;
       stroke-linecap: round;
       stroke-width: 1.8;
     }
-    .turn-line button[aria-label='Открыть меню'] {
-      order: 1;
-    }
     .fullscreen-button {
-      order: 3;
+      grid-column: 4;
     }
     .warning {
       padding: 0.25rem 0.45rem;
@@ -142,7 +170,7 @@ import type { ConnectionState } from './lobby-client';
     }
     .players {
       display: grid;
-      grid-auto-columns: minmax(9.5rem, 1fr);
+      grid-auto-columns: minmax(8.5rem, 1fr);
       grid-auto-flow: column;
       min-width: 0;
       min-height: 0;
@@ -153,7 +181,16 @@ import type { ConnectionState } from './lobby-client';
       scrollbar-width: thin;
     }
     .players.solo {
-      grid-auto-columns: 1fr;
+      display: flex;
+      align-items: stretch;
+    }
+    .players.solo .player {
+      width: min(12rem, 100%);
+      flex: 0 0 min(12rem, 100%);
+      background: transparent;
+    }
+    .players.solo .player.self {
+      background: transparent;
     }
     .player {
       display: grid;
@@ -161,8 +198,9 @@ import type { ConnectionState } from './lobby-client';
       min-height: 0;
       height: 100%;
       box-sizing: border-box;
-      padding: 0.25rem 0.45rem;
-      grid-template-columns: 2rem minmax(0, 1fr);
+      min-height: 2.75rem;
+      padding: 0.2rem 0.35rem;
+      grid-template-columns: 1.8rem minmax(0, 1fr);
       grid-template-rows: 1fr 1fr;
       column-gap: 0.35rem;
       text-align: left;
@@ -183,15 +221,15 @@ import type { ConnectionState } from './lobby-client';
     }
     .avatar {
       display: grid;
-      width: 1.75rem;
-      height: 1.75rem;
+      width: 1.55rem;
+      height: 1.55rem;
       grid-row: 1 / -1;
       place-items: center;
       border-radius: 50%;
       border: 2px solid #e0b660;
       color: #2b1b0d;
       background: radial-gradient(circle at 35% 30%, #e0b660, #66411d 60%, #21140c);
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       font-weight: 900;
     }
     .player-color-pink {
@@ -224,16 +262,23 @@ import type { ConnectionState } from './lobby-client';
       display: block;
       width: 100%;
       overflow: hidden;
-      font: 750 0.78rem/1.05 var(--ui-sans);
+      font: 750 0.75rem/1.05 var(--ui-sans);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     small {
+      display: block;
+      overflow: hidden;
       color: #b9aa91;
       color: #d2b984;
       font-family: var(--ui-sans);
-      font-size: 0.75rem;
+      font-size: 0.68rem;
+      text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .player-state {
+      color: #f0cf7b;
+      font-weight: 850;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
@@ -248,6 +293,7 @@ export class PlayerHudComponent {
   readonly fullscreen = input(false);
   readonly playerOpened = output<string>();
   readonly menuOpened = output<void>();
+  readonly historyOpened = output<void>();
   readonly fullscreenOpened = output<void>();
 
   protected orderedPlayers() {

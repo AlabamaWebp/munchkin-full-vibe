@@ -42,13 +42,16 @@ function hashKey(value: string): number {
     :host {
       display: block;
       min-width: 0;
+      aspect-ratio: 3 / 4;
     }
     .artwork {
       position: relative;
       isolation: isolate;
       display: grid;
+      width: 100%;
       height: 100%;
-      min-height: 5.2rem;
+      min-height: 0;
+      aspect-ratio: 3 / 4;
       padding: 0.25rem;
       place-items: center;
       overflow: hidden;
@@ -130,6 +133,7 @@ function hashKey(value: string): number {
       min-height: 0;
       padding: 0.2rem;
       display: flex;
+      aspect-ratio: 3 / 4;
     }
     .artwork.compact .glyph {
       font-size: 1rem;
@@ -138,12 +142,15 @@ function hashKey(value: string): number {
       display: none;
     }
     .card-image {
+      position: absolute;
+      z-index: 0;
+      inset: 0;
       display: block;
       width: 100%;
       height: 100%;
       max-width: 100%;
       max-height: 100%;
-      object-fit: contain;
+      object-fit: cover;
       object-position: center;
       border-radius: 0.6rem;
     }

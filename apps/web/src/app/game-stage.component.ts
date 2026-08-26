@@ -525,7 +525,9 @@ import { motionClass } from './motion';
         800 clamp(0.84rem, 4.2vw, 1rem)/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
     .event-card-art {
       position: relative;
