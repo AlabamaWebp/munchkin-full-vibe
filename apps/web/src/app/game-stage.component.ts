@@ -405,10 +405,10 @@ import { motionClass } from './motion';
       overflow: hidden;
     }
     .ui-stage-enter {
-      animation: ui-stage-enter 190ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      animation: ui-stage-enter 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
     }
     .ui-stage-card-enter {
-      animation: ui-stage-card-enter 240ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
+      animation: ui-stage-card-enter 150ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
     }
     @keyframes ui-stage-enter {
       from {

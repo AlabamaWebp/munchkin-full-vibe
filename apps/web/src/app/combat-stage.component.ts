@@ -416,7 +416,7 @@ export function formatReactionCountdown(remainingMs: number): string {
         0 0 1rem rgba(113, 45, 25, 0.2);
     }
     .ui-combat-card-enter {
-      animation: ui-combat-card-enter 240ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
+      animation: ui-combat-card-enter 150ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
     }
     @keyframes ui-combat-card-enter {
       from {
