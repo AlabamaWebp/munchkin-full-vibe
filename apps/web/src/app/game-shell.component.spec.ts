@@ -560,6 +560,53 @@ describe('GameShellComponent', () => {
     expect(formatReactionCountdown(-1)).toBe('0:00');
   });
 
+  it('reconstructs, replaces, and cleans up the authoritative discard countdown', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(1_000));
+    try {
+      const first = base({
+        pendingDecision: {
+          decisionId: 'discard-1',
+          type: 'DISCARD_CARDS',
+          playerId: 'p1',
+          zone: 'HAND',
+          count: 1,
+          sourceCard: monster,
+          selectableCardIds: [],
+          expiresAtEpochMs: 121_000,
+        },
+        availableIntents: [],
+      });
+      const fixture = render(first);
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(root.querySelector('.decision-countdown')?.textContent).toContain('Осталось 2:00');
+      vi.advanceTimersByTime(18_000);
+      fixture.detectChanges();
+      expect(root.querySelector('.decision-countdown')?.textContent).toContain('Осталось 1:42');
+
+      fixture.componentRef.setInput('game', {
+        ...first,
+        pendingDecision: {
+          ...first.pendingDecision!,
+          decisionId: 'discard-2',
+          expiresAtEpochMs: 139_000,
+        },
+      });
+      fixture.detectChanges();
+      expect(root.querySelector('.decision-countdown')?.textContent).toContain('Осталось 2:00');
+      expect(vi.getTimerCount()).toBe(1);
+
+      fixture.componentRef.setInput('game', { ...first, pendingDecision: null });
+      fixture.detectChanges();
+      expect(root.querySelector('.decision-countdown')).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      fixture.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reconstructs and resets the countdown from each authoritative reaction projection', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(1_000));

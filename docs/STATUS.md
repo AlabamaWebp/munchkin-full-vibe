@@ -53,6 +53,12 @@ single-origin production packaging and real-device validation remain.
   rejection remains intact. Engine/server/web regression coverage follows a
   winning declaration, opponent intervention, refreshed reaction window, and
   rejection of the old address.
+- 2026-08-26: deadline-bearing blocking chosen-discard decisions now display a live
+  projected remaining-time countdown, using the combat reaction formatter and the
+  same replacement-safe interval pattern. Overlay and center-stage motion now uses
+  explicit Angular enter/leave hooks instead of passive base CSS animation rules;
+  initial reconnect rendering remains motion-free and reduced-motion still removes
+  decorative animation.
 - 2026-08-25: completed the projected-state frontend pass. Lobby hand-limit and
   double-ambush controls now follow host-only settings; combat filtering is
   derived from current legal intents (including Clone), and eligible equipment

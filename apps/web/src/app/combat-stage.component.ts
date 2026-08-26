@@ -60,47 +60,52 @@ export function formatReactionCountdown(remainingMs: number): string {
               }
             </div>
           }
-          <article class="monster">
-            <div class="monster-title">
-              <h3>{{ cardName(focused().monster) }}</h3>
-            </div>
-            <button
-              type="button"
-              class="monster-art"
-              [attr.aria-label]="'Подробнее: ' + cardName(focused().monster)"
-              (click)="cardOpened.emit(focused().monster)"
+          @for (encounter of focusedEncounters(); track encounter.encounterId) {
+            <article
+              class="monster"
+              [animate.enter]="motionEnabled() ? 'ui-combat-card-enter' : ''"
             >
-              <app-card-artwork
-                [artKey]="focused().monster.artKey"
-                [label]="cardName(focused().monster)"
-                [compact]="true"
-              />
-            </button>
-            <span class="monster-strength"
-              ><b>{{ focused().currentStrength }}</b
-              ><small>СИЛА</small></span
-            >
-            <div class="monster-footer">
-              <p><strong>Непотребство:</strong> {{ badStuff() }}</p>
-              <div class="rewards">
-                <b>НАГРАДА</b>
-                <span
-                  >+{{ focused().baseLevelRewards }} {{ levelWord() }} ·
-                  {{ focused().currentTreasures }} {{ treasureWord() }}</span
-                >
+              <div class="monster-title">
+                <h3>{{ cardName(focused().monster) }}</h3>
               </div>
-              @if (focused().strengthModifier !== 0 || focused().treasureModifier !== 0) {
-                <div class="modifiers">
-                  @if (focused().strengthModifier !== 0) {
-                    <span>Сила {{ signed(focused().strengthModifier) }}</span>
-                  }
-                  @if (focused().treasureModifier !== 0) {
-                    <span>Сокровища {{ signed(focused().treasureModifier) }}</span>
-                  }
+              <button
+                type="button"
+                class="monster-art"
+                [attr.aria-label]="'Подробнее: ' + cardName(focused().monster)"
+                (click)="cardOpened.emit(focused().monster)"
+              >
+                <app-card-artwork
+                  [artKey]="focused().monster.artKey"
+                  [label]="cardName(focused().monster)"
+                  [compact]="true"
+                />
+              </button>
+              <span class="monster-strength"
+                ><b>{{ focused().currentStrength }}</b
+                ><small>СИЛА</small></span
+              >
+              <div class="monster-footer">
+                <p><strong>Непотребство:</strong> {{ badStuff() }}</p>
+                <div class="rewards">
+                  <b>НАГРАДА</b>
+                  <span
+                    >+{{ focused().baseLevelRewards }} {{ levelWord() }} ·
+                    {{ focused().currentTreasures }} {{ treasureWord() }}</span
+                  >
                 </div>
-              }
-            </div>
-          </article>
+                @if (focused().strengthModifier !== 0 || focused().treasureModifier !== 0) {
+                  <div class="modifiers">
+                    @if (focused().strengthModifier !== 0) {
+                      <span>Сила {{ signed(focused().strengthModifier) }}</span>
+                    }
+                    @if (focused().treasureModifier !== 0) {
+                      <span>Сокровища {{ signed(focused().treasureModifier) }}</span>
+                    }
+                  </div>
+                }
+              </div>
+            </article>
+          }
         </div>
         <button
           type="button"
@@ -363,6 +368,19 @@ export function formatReactionCountdown(remainingMs: number): string {
         0 0.5rem 1.25rem rgba(0, 0, 0, 0.58),
         0 0 1rem rgba(113, 45, 25, 0.2);
     }
+    .ui-combat-card-enter {
+      animation: ui-combat-card-enter 240ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
+    }
+    @keyframes ui-combat-card-enter {
+      from {
+        opacity: 0;
+        transform: translateY(0.8rem) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
     .monster-art {
       position: relative;
       display: grid;
@@ -519,12 +537,18 @@ export function formatReactionCountdown(remainingMs: number): string {
         margin-top: -0.65rem;
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .ui-combat-card-enter {
+        animation: none;
+      }
+    }
   `,
 })
 export class CombatStageComponent {
   private readonly localization = inject(LocalizationService);
   readonly game = input.required<GameView>();
   readonly reactionMode = input(false);
+  readonly motionEnabled = input(false);
   readonly breakdownOpened = output<void>();
   readonly helpOpened = output<void>();
   readonly cardOpened = output<GameCardView>();
@@ -568,6 +592,7 @@ export class CombatStageComponent {
     const monsters = this.game().combat?.monsters ?? [];
     return monsters.find((entry) => entry.encounterId === this.focusedId()) ?? monsters[0]!;
   });
+  protected readonly focusedEncounters = computed(() => [this.focused()]);
 
   protected readonly difference = computed(
     () => (this.game().combat?.playerPower ?? 0) - (this.game().combat?.monsterPower ?? 0),

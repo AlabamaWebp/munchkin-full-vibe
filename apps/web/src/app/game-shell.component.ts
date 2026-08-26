@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   HostListener,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -38,6 +39,8 @@ import { LobbyClient, type ConnectionState, type UserFacingError } from './lobby
 import { LocalizationService } from './localization';
 import { PlayerHudComponent } from './player-hud.component';
 import { RecentEventsComponent } from './recent-events.component';
+import { formatReactionCountdown } from './combat-stage.component';
+import { motionClass } from './motion';
 
 interface PickerOption {
   readonly id: string;
@@ -138,7 +141,11 @@ interface CardUse {
       }
 
       @if (game().curseResponse; as response) {
-        <div class="backdrop blocking-backdrop">
+        <div
+          class="backdrop blocking-backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section class="sheet decision-sheet" appFocusTrap role="dialog" aria-modal="true">
             <header>
               <div>
@@ -178,7 +185,11 @@ interface CardUse {
       }
 
       @if (game().pendingDecision; as decision) {
-        <div class="backdrop blocking-backdrop">
+        <div
+          class="backdrop blocking-backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet decision-sheet"
             appFocusTrap
@@ -192,7 +203,13 @@ interface CardUse {
                 <h2 id="decision-title">
                   {{ decision.type === 'DISCARD_CARDS' ? 'Выберите карты' : 'Оставьте одну роль' }}
                 </h2>
-                <time>до {{ deadlineLabel(decision.expiresAtEpochMs) }}</time>
+                @if (decision.type === 'DISCARD_CARDS' && discardCountdown(); as countdown) {
+                  <time class="decision-countdown" aria-live="polite"
+                    >Осталось {{ countdown }}</time
+                  >
+                } @else {
+                  <time>до {{ deadlineLabel(decision.expiresAtEpochMs) }}</time>
+                }
               </div>
             </header>
             <div class="sheet-scroll">
@@ -266,7 +283,11 @@ interface CardUse {
       }
 
       @if (fullHandOpen()) {
-        <div class="backdrop full-hand-backdrop">
+        <div
+          class="backdrop full-hand-backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet full-hand-sheet"
             appFocusTrap
@@ -320,7 +341,11 @@ interface CardUse {
       }
 
       @if (targetPicker(); as picker) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -382,7 +407,11 @@ interface CardUse {
       }
 
       @if (roleAbilityIntent(); as intent) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -446,7 +475,11 @@ interface CardUse {
       }
 
       @if (cardUses(); as uses) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -475,7 +508,11 @@ interface CardUse {
       }
 
       @if (helpOpen()) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -565,7 +602,11 @@ interface CardUse {
       }
 
       @if (selectedCard(); as card) {
-        <div class="backdrop card-details-backdrop">
+        <div
+          class="backdrop card-details-backdrop"
+          [animate.enter]="motionClasses('details')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet"
             appFocusTrap
@@ -641,7 +682,11 @@ interface CardUse {
       }
 
       @if (historyOpen()) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet"
             appFocusTrap
@@ -699,7 +744,11 @@ interface CardUse {
 
       @if (breakdownOpen()) {
         @if (game().combat; as combat) {
-          <div class="backdrop">
+          <div
+            class="backdrop"
+            [animate.enter]="motionClasses('overlay')"
+            animate.leave="ui-overlay-leave"
+          >
             <section
               class="sheet compact-sheet"
               appFocusTrap
@@ -775,7 +824,11 @@ interface CardUse {
       }
 
       @if (selectedPlayerId(); as id) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -836,7 +889,11 @@ interface CardUse {
       }
 
       @if (menuOpen()) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet menu-sheet"
             appFocusTrap
@@ -869,7 +926,11 @@ interface CardUse {
       }
 
       @if (saleOpen()) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -949,7 +1010,11 @@ interface CardUse {
       }
 
       @if (charityOpen()) {
-        <div class="backdrop">
+        <div
+          class="backdrop"
+          [animate.enter]="motionClasses('overlay')"
+          animate.leave="ui-overlay-leave"
+        >
           <section
             class="sheet compact-sheet"
             appFocusTrap
@@ -1262,11 +1327,43 @@ export class GameShellComponent {
   protected readonly selectedHelperId = signal<string | null>(null);
   protected readonly helpTreasure = signal(0);
   protected readonly decisionSelection = signal<readonly string[]>([]);
+  private readonly discardNowEpochMs = signal(Date.now());
+  private readonly motionReady = signal(false);
+  private readonly currentDiscardDecision = computed(() => {
+    const decision = this.game().pendingDecision;
+    return decision?.type === 'DISCARD_CARDS' ? decision : null;
+  });
+  protected readonly discardCountdown = computed(() => {
+    const decision = this.currentDiscardDecision();
+    return decision === null
+      ? null
+      : formatReactionCountdown(decision.expiresAtEpochMs - this.discardNowEpochMs());
+  });
   protected readonly isFullscreen = signal(document.fullscreenElement !== null);
   protected readonly fullscreenSupported =
     typeof document.documentElement.requestFullscreen === 'function';
 
   constructor() {
+    // Do not replay entrance motion while reconnecting into an already-projected state.
+    afterNextRender(() => this.motionReady.set(true));
+
+    effect((onCleanup) => {
+      const decision = this.currentDiscardDecision();
+      if (decision === null) return;
+
+      const updateNow = (): boolean => {
+        const now = Date.now();
+        this.discardNowEpochMs.set(now);
+        return now < decision.expiresAtEpochMs;
+      };
+      if (!updateNow()) return;
+
+      const timer = setInterval(() => {
+        if (!updateNow()) clearInterval(timer);
+      }, 1_000);
+      onCleanup(() => clearInterval(timer));
+    });
+
     effect(() => {
       const game = this.game();
       if (this.saleOpen() && (game.self.level >= 9 || this.saleCards().length === 0))
@@ -1288,6 +1385,13 @@ export class GameShellComponent {
       const roleAbility = this.roleAbilityIntent();
       if (roleAbility !== null && !currentIntentIds.has(roleAbility.id)) this.closeRoleAbility();
     });
+  }
+
+  protected motionClasses(kind: 'overlay' | 'details'): string {
+    return motionClass(
+      this.motionReady(),
+      kind === 'details' ? 'ui-details-enter' : 'ui-overlay-enter',
+    );
   }
 
   protected sendAction(action: AvailableGameAction): void {

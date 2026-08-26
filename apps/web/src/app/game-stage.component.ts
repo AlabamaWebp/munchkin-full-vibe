@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -13,6 +14,7 @@ import { CombatStageComponent } from './combat-stage.component';
 import type { GameStageKind, StageCardReceipt } from './game-ui.model';
 import { latestStageCardEvent } from './game-ui.model';
 import { LocalizationService } from './localization';
+import { motionClass } from './motion';
 
 @Component({
   selector: 'app-game-stage',
@@ -22,7 +24,11 @@ import { LocalizationService } from './localization';
     <section class="stage" [attr.data-stage]="stage()">
       @if (showsStageCard() && stageCardEvent(); as event) {
         @if (focusedReceipt(); as receipt) {
-          <section class="card-event" aria-label="Последнее карточное действие">
+          <section
+            class="card-event"
+            aria-label="Последнее карточное действие"
+            [animate.enter]="stageMotionClass()"
+          >
             @if (event.receipts.length > 1) {
               <div class="card-tabs receipt-tabs" aria-label="Получатели карт">
                 @for (candidate of event.receipts; track candidate.entry.sequence) {
@@ -47,41 +53,43 @@ import { LocalizationService } from './localization';
                 <div class="hidden-card-art" aria-hidden="true">?</div>
                 <p>{{ hiddenCardDescription(hiddenCard.deck, hiddenCard.count) }}</p>
               </article>
-            } @else if (focusedStageCard(); as focused) {
-              @if (receipt.cards.length > 1) {
-                <div class="card-tabs" aria-label="Карты последнего действия">
-                  @for (card of receipt.cards; track card.instanceId) {
-                    <button
-                      type="button"
-                      [class.active]="focused.instanceId === card.instanceId"
-                      (click)="focusedStageCardId.set(card.instanceId)"
-                    >
-                      {{ cardName(card) }}
-                    </button>
-                  }
-                </div>
+            } @else {
+              @for (focused of focusedStageCards(); track focused.instanceId) {
+                @if (receipt.cards.length > 1) {
+                  <div class="card-tabs" aria-label="Карты последнего действия">
+                    @for (card of receipt.cards; track card.instanceId) {
+                      <button
+                        type="button"
+                        [class.active]="focused.instanceId === card.instanceId"
+                        (click)="focusedStageCardId.set(card.instanceId)"
+                      >
+                        {{ cardName(card) }}
+                      </button>
+                    }
+                  </div>
+                }
+                <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+                <h2 class="event-summary">{{ stageSummary(receipt.summary, receipt.cards) }}</h2>
+                <article class="event-card" animate.enter="ui-stage-card-enter">
+                  <div class="event-card-title">
+                    <small>{{ cardZone(focused) }}</small>
+                    <h3>{{ cardName(focused) }}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    class="event-card-art"
+                    [attr.aria-label]="'Подробнее: ' + cardName(focused)"
+                    (click)="cardOpened.emit(focused)"
+                  >
+                    <app-card-artwork
+                      [artKey]="focused.artKey"
+                      [label]="cardName(focused)"
+                      [compact]="true"
+                    />
+                  </button>
+                  <p>{{ cardDescription(focused) }}</p>
+                </article>
               }
-              <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
-              <h2 class="event-summary">{{ stageSummary(receipt.summary, receipt.cards) }}</h2>
-              <article class="event-card">
-                <div class="event-card-title">
-                  <small>{{ cardZone(focused) }}</small>
-                  <h3>{{ cardName(focused) }}</h3>
-                </div>
-                <button
-                  type="button"
-                  class="event-card-art"
-                  [attr.aria-label]="'Подробнее: ' + cardName(focused)"
-                  (click)="cardOpened.emit(focused)"
-                >
-                  <app-card-artwork
-                    [artKey]="focused.artKey"
-                    [label]="cardName(focused)"
-                    [compact]="true"
-                  />
-                </button>
-                <p>{{ cardDescription(focused) }}</p>
-              </article>
             }
           </section>
         }
@@ -90,6 +98,7 @@ import { LocalizationService } from './localization';
           @case ('COMBAT_OPEN') {
             <app-combat-stage
               [game]="game()"
+              [motionEnabled]="motionReady()"
               (breakdownOpened)="breakdownOpened.emit()"
               (helpOpened)="helpOpened.emit()"
               (cardOpened)="cardOpened.emit($event)"
@@ -98,6 +107,7 @@ import { LocalizationService } from './localization';
           @case ('COMBAT_REACTION') {
             <app-combat-stage
               [game]="game()"
+              [motionEnabled]="motionReady()"
               [reactionMode]="true"
               (breakdownOpened)="breakdownOpened.emit()"
               (cardOpened)="cardOpened.emit($event)"
@@ -383,6 +393,32 @@ import { LocalizationService } from './localization';
       gap: 0.35rem;
       overflow: hidden;
     }
+    .ui-stage-enter {
+      animation: ui-stage-enter 190ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+    .ui-stage-card-enter {
+      animation: ui-stage-card-enter 240ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
+    }
+    @keyframes ui-stage-enter {
+      from {
+        opacity: 0;
+        transform: translateY(0.35rem);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @keyframes ui-stage-card-enter {
+      from {
+        opacity: 0;
+        transform: translateY(0.7rem) scale(0.965);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
     .card-tabs {
       display: flex;
       width: 100%;
@@ -526,6 +562,12 @@ import { LocalizationService } from './localization';
       outline: 3px solid #fff2a8;
       outline-offset: 2px;
     }
+    @media (prefers-reduced-motion: reduce) {
+      .ui-stage-enter,
+      .ui-stage-card-enter {
+        animation: none;
+      }
+    }
   `,
 })
 export class GameStageComponent {
@@ -572,6 +614,19 @@ export class GameStageComponent {
       receipt.cards[0]!
     );
   });
+  protected readonly focusedStageCards = computed(() => {
+    const focused = this.focusedStageCard();
+    return focused === null ? [] : [focused];
+  });
+  protected readonly motionReady = signal(false);
+
+  constructor() {
+    afterNextRender(() => this.motionReady.set(true));
+  }
+
+  protected stageMotionClass(): string {
+    return motionClass(this.motionReady(), 'ui-stage-enter');
+  }
   protected showsStageCard(): boolean {
     return ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE', 'TURN_CLEANUP'].includes(this.stage());
   }

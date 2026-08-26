@@ -36,17 +36,12 @@ app-hand-dock {
   overflow: hidden;
   background: rgba(22, 12, 6, 0.78);
   backdrop-filter: blur(4px) saturate(0.9);
-  animation: ui-backdrop-in 140ms ease-out both;
 }
 .blocking-backdrop {
   z-index: 60;
 }
 .card-details-backdrop {
   z-index: 70;
-}
-.card-details-backdrop .sheet {
-  transform-origin: center;
-  animation-name: ui-details-in;
 }
 .sheet {
   display: grid;
@@ -60,7 +55,27 @@ app-hand-dock {
   background: linear-gradient(180deg, rgba(47, 30, 17, 0.98), rgba(20, 15, 10, 0.99));
   box-shadow: none;
   transform-origin: bottom center;
-  animation: ui-sheet-in 170ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.card-details-backdrop .sheet {
+  transform-origin: center;
+}
+.ui-overlay-enter {
+  animation: ui-backdrop-in 360ms ease-out both;
+}
+.ui-overlay-enter .sheet {
+  animation: ui-sheet-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.ui-details-enter {
+  animation: ui-backdrop-in 400ms ease-out both;
+}
+.ui-details-enter .sheet {
+  animation: ui-details-in 400ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.ui-overlay-leave {
+  animation: ui-backdrop-out 220ms ease-in both;
+}
+.ui-overlay-leave .sheet {
+  animation: ui-sheet-out 220ms ease-in both;
 }
 @keyframes ui-backdrop-in {
   from {
@@ -90,9 +105,16 @@ app-hand-dock {
     transform: translateY(0) scale(1);
   }
 }
-.card-details-backdrop .sheet {
-  transform-origin: center;
-  animation-name: ui-details-in;
+@keyframes ui-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ui-sheet-out {
+  to {
+    opacity: 0;
+    transform: translateY(0.55rem) scale(0.99);
+  }
 }
 .full-hand-sheet {
   width: 100%;
