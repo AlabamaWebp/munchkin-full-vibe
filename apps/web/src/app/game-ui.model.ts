@@ -37,6 +37,13 @@ export interface StageCardReceipt {
   readonly summary: string;
 }
 
+/** Card receipts remain a stage focus until the turn enters cleanup. */
+export function stageShowsCard(stage: GameStageKind): boolean {
+  return (
+    stage !== 'TURN_CLEANUP' && ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE'].includes(stage)
+  );
+}
+
 export function selectStage(game: GameView): GameStageKind {
   if (game.status === 'FINISHED' || game.phase === 'FINISHED') return 'FINISHED';
   if (game.combat?.reactionWindow !== null && game.combat?.reactionWindow !== undefined)
@@ -168,7 +175,11 @@ function isSupersededReward(
 }
 
 /** Event sequences already explained by the persistent stage card surface. */
-export function stageExplainedEventSequences(game: GameView): readonly number[] {
+export function stageExplainedEventSequences(
+  game: GameView,
+  stage?: GameStageKind,
+): readonly number[] {
+  if (stage !== undefined && !stageShowsCard(stage)) return [];
   return latestStageCardEvent(game)?.receipts.map((receipt) => receipt.entry.sequence) ?? [];
 }
 

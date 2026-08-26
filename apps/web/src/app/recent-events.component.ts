@@ -11,7 +11,7 @@ import type { PresentedEvent } from './game-ui.model';
       aria-label="Открыть историю игры"
       (click)="historyOpened.emit()"
     >
-      <strong class="title">ПОСЛЕДНИЕ ДЕЙСТВИЯ</strong>
+      <strong class="title">Последнее</strong>
       @if (events().length === 0) {
         <span class="empty">Игра начинается…</span>
       } @else {
@@ -36,16 +36,18 @@ import type { PresentedEvent } from './game-ui.model';
       width: 100%;
       height: 100%;
       min-height: 0;
-      padding: 0.42rem 0.65rem;
+      min-height: 2.75rem;
+      padding: 0.35rem 0.6rem;
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
       gap: 0.55rem;
       overflow: hidden;
-      border: 1px solid rgba(141, 99, 46, 0.62);
-      border-radius: 0.7rem;
+      border: 0;
+      border-left: 2px solid rgba(173, 132, 67, 0.72);
+      border-radius: 0.35rem;
       color: #ead5ad;
       background: rgba(23, 16, 10, 0.88);
-      box-shadow: inset 0 1px var(--tabletop-highlight);
+      box-shadow: none;
       text-align: left;
     }
     .title {
@@ -54,7 +56,8 @@ import type { PresentedEvent } from './game-ui.model';
       color: #d9b76f;
       flex: 0 0 auto;
       color: var(--color-text-muted);
-      font-size: 0.58rem;
+      font-family: var(--ui-sans);
+      font-size: 0.75rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -72,7 +75,8 @@ import type { PresentedEvent } from './game-ui.model';
       min-width: 0;
       overflow: hidden;
       display: block;
-      font-size: 0.75rem;
+      font-family: var(--ui-sans);
+      font-size: 0.8rem;
       line-height: 1.25;
       text-overflow: ellipsis;
       white-space: nowrap;

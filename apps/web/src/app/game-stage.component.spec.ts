@@ -176,7 +176,7 @@ describe('GameStageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Hallway Minotaur');
   });
 
-  it('shows simultaneous combat rewards in recipient tabs, with only the owner card revealed', async () => {
+  it('prioritizes the cleanup decision over a previous simultaneous reward', async () => {
     await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
     const fixture = TestBed.createComponent(GameStageComponent);
     const ownTreasure = card('own-treasure', 'Copper Compass');
@@ -209,21 +209,9 @@ describe('GameStageComponent', () => {
     fixture.componentRef.setInput('stage', 'TURN_CLEANUP');
     fixture.detectChanges();
 
-    const tabs = fixture.nativeElement.querySelectorAll(
-      '.receipt-tabs button',
-    ) as NodeListOf<HTMLButtonElement>;
-    expect(tabs).toHaveLength(2);
-    expect(tabs[0]?.textContent).toContain('Ada получил 1 сокровище');
-    expect(tabs[1]?.textContent).toContain('Grace получил 1 сокровище');
-    expect(fixture.nativeElement.textContent).toContain('Ada получил 1 карту сокровищ в закрытую');
-    expect(fixture.nativeElement.querySelector('.event-card h3')?.textContent).toContain(
-      'Copper Compass',
-    );
-
-    tabs[1]?.click();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.hidden-card-art')?.textContent).toContain('?');
-    expect(fixture.nativeElement.textContent).not.toContain('Copper Compass');
+    expect(fixture.nativeElement.querySelector('.receipt-tabs')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.event-card')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Можно завершать ход');
   });
 
   it('shows all cards from one utility draw in the card selector', async () => {

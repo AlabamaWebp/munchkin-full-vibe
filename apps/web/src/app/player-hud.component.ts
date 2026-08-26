@@ -17,7 +17,14 @@ import type { ConnectionState } from './lobby-client';
         @if (connection() !== 'CONNECTED') {
           <span class="warning" role="status">Нет связи</span>
         }
-        <button type="button" aria-label="Открыть меню" (click)="menuOpened.emit()">☰</button>
+        <button
+          type="button"
+          class="icon-button"
+          aria-label="Открыть меню"
+          (click)="menuOpened.emit()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
         @if (fullscreenSupported()) {
           <button
             type="button"
@@ -26,7 +33,9 @@ import type { ConnectionState } from './lobby-client';
             aria-label="Переключить полноэкранный режим"
             (click)="fullscreenOpened.emit()"
           >
-            ⛶
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 4H4v4m12-4h4v4M8 20H4v-4m12 4h4v-4" />
+            </svg>
           </button>
         }
       </div>
@@ -63,13 +72,13 @@ import type { ConnectionState } from './lobby-client';
       display: grid;
       height: 100%;
       min-height: 0;
-      grid-template-rows: auto minmax(0, 1fr);
-      gap: 0.3rem;
+      grid-template-rows: 2.75rem minmax(0, 1fr);
+      gap: 0.2rem;
       min-width: 0;
     }
     .turn-line {
       display: flex;
-      min-height: 2.65rem;
+      min-height: 2.75rem;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
@@ -77,38 +86,47 @@ import type { ConnectionState } from './lobby-client';
     .turn-line > div {
       display: grid;
       min-width: 0;
-      min-height: 2.65rem;
-      padding: 0.27rem 0.65rem 0.32rem;
+      min-height: 2.75rem;
+      padding: 0.34rem 0.65rem;
       flex: 1;
-      border: 1px solid var(--surface-frame);
-      border-radius: 0.75rem 0.75rem 1.1rem 1.1rem;
+      border: 1px solid rgba(115, 157, 115, 0.52);
+      border-radius: 0.7rem;
       background: linear-gradient(100deg, rgba(24, 70, 42, 0.96), rgba(15, 40, 27, 0.96));
-      box-shadow:
-        inset 0 1px var(--tabletop-highlight),
-        var(--surface-shadow);
+      box-shadow: inset 0 1px var(--tabletop-highlight);
       text-align: center;
       order: 2;
     }
     strong {
       overflow: hidden;
       font:
-        800 1.28rem/1.05 Georgia,
+        800 1.16rem/1.05 Georgia,
         serif;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .turn-line span {
-      color: #dac78e;
-      font-size: 0.68rem;
+      color: #e4d2a5;
+      font-family: var(--ui-sans);
+      font-size: 0.78rem;
+      font-weight: 650;
     }
     .turn-line button {
-      width: 2.55rem;
-      min-width: 2.55rem;
-      min-height: 2.55rem;
-      border: 1px solid var(--surface-frame);
-      border-radius: 50%;
+      width: 2.75rem;
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+      padding: 0;
+      border: 1px solid rgba(141, 99, 46, 0.7);
+      border-radius: 0.7rem;
       color: #f5f8f6;
       background: var(--raised-fill);
+    }
+    .icon-button svg {
+      width: 1.25rem;
+      height: 1.25rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-width: 1.8;
     }
     .turn-line button[aria-label='Открыть меню'] {
       order: 1;
@@ -124,7 +142,7 @@ import type { ConnectionState } from './lobby-client';
     }
     .players {
       display: grid;
-      grid-auto-columns: minmax(10.5rem, 1fr);
+      grid-auto-columns: minmax(9.5rem, 1fr);
       grid-auto-flow: column;
       min-width: 0;
       min-height: 0;
@@ -143,22 +161,19 @@ import type { ConnectionState } from './lobby-client';
       min-height: 0;
       height: 100%;
       box-sizing: border-box;
-      padding: 0.35rem 0.5rem;
-      grid-template-columns: 2.35rem minmax(0, 1fr);
+      padding: 0.25rem 0.45rem;
+      grid-template-columns: 2rem minmax(0, 1fr);
       grid-template-rows: 1fr 1fr;
       column-gap: 0.35rem;
       text-align: left;
-      border: 1px solid var(--surface-frame);
-      border-radius: 0.75rem;
+      border: 0;
+      border-radius: 0.55rem;
       color: #eef4ef;
-      background: var(--panel-fill);
+      background: rgba(23, 18, 13, 0.66);
       scroll-snap-align: start;
     }
     .player.active {
-      border-color: #e5bd62;
-      box-shadow:
-        inset 0 -2px #e5bd62,
-        0 0.15rem 0.5rem rgba(0, 0, 0, 0.4);
+      box-shadow: inset 2px 0 #e5bd62;
     }
     .player.self {
       background: linear-gradient(105deg, #51351f, #25170e);
@@ -168,15 +183,15 @@ import type { ConnectionState } from './lobby-client';
     }
     .avatar {
       display: grid;
-      width: 2.05rem;
-      height: 2.05rem;
+      width: 1.75rem;
+      height: 1.75rem;
       grid-row: 1 / -1;
       place-items: center;
       border-radius: 50%;
-      border: 3px solid #e0b660;
+      border: 2px solid #e0b660;
       color: #2b1b0d;
       background: radial-gradient(circle at 35% 30%, #e0b660, #66411d 60%, #21140c);
-      font-size: 1rem;
+      font-size: 0.82rem;
       font-weight: 900;
     }
     .player-color-pink {
@@ -209,17 +224,15 @@ import type { ConnectionState } from './lobby-client';
       display: block;
       width: 100%;
       overflow: hidden;
-      font:
-        800 0.8rem/1.05 Georgia,
-        serif;
-      font-weight: 750;
+      font: 750 0.78rem/1.05 var(--ui-sans);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     small {
       color: #b9aa91;
       color: #d2b984;
-      font-size: 0.74rem;
+      font-family: var(--ui-sans);
+      font-size: 0.75rem;
       white-space: nowrap;
     }
     button:focus-visible {

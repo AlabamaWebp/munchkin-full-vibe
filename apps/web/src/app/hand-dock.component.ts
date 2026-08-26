@@ -20,13 +20,13 @@ import { unavailableReason } from './game-ui.model';
               >{{ game().self.name.charAt(0) }}</span
             >
             <span
-              ><small>ВАШ ГЕРОЙ · УР. {{ game().self.level }}</small
+              ><small>Ваш герой · ур. {{ game().self.level }}</small
               ><strong>{{ game().self.name }}</strong
-              ><small class="summary-sex">Пол: {{ sexLabel(game().self.sex) }}</small></span
+              ><small class="summary-sex">{{ sexLabel(game().self.sex) }}</small></span
             >
           </span>
           <span class="summary-power"
-            ><small>СИЛА</small
+            ><small>Сила</small
             ><b>{{ game().combat?.playerPower ?? game().self.combatPower }}</b></span
           >
         </button>
@@ -83,12 +83,12 @@ import { unavailableReason } from './game-ui.model';
       display: flex;
       justify-content: space-between;
       min-width: 0;
-      min-height: 3.25rem;
+      min-height: 2.9rem;
       padding: 0.25rem 0.4rem;
       align-items: stretch;
       gap: 0.25rem;
-      border: 1px solid var(--surface-frame);
-      border-radius: 0.95rem;
+      border: 0;
+      border-radius: 0.7rem;
       color: #f3e4c7;
       background: linear-gradient(
         105deg,
@@ -96,15 +96,13 @@ import { unavailableReason } from './game-ui.model';
         rgba(58, 37, 20, 0.94) 55%,
         rgba(14, 11, 8, 0.97)
       );
-      box-shadow:
-        inset 0 1px var(--tabletop-highlight),
-        var(--surface-shadow);
+      box-shadow: inset 0 1px var(--tabletop-highlight);
       text-align: left;
     }
     .summary-initial {
       display: grid;
-      width: 2.75rem;
-      height: 2.75rem;
+      width: 2.4rem;
+      height: 2.4rem;
       place-items: center;
       border: 2px solid #d2a253;
       border-radius: 50%;
@@ -114,7 +112,7 @@ import { unavailableReason } from './game-ui.model';
         0 0 0 2px #31200f,
         0 0.2rem 0.5rem #000;
       font:
-        900 1.2rem Georgia,
+        900 1.05rem Georgia,
         serif;
     }
     .player-color-pink {
@@ -146,21 +144,20 @@ import { unavailableReason } from './game-ui.model';
     .character-summary small {
       display: block;
       color: #c8b99d;
-      font-size: 0.7rem;
+      font-family: var(--ui-sans);
+      font-size: 0.75rem;
       letter-spacing: 0.04em;
     }
     .character-summary strong {
       display: block;
       overflow: hidden;
-      font:
-        800 0.9rem Georgia,
-        serif;
+      font: 750 0.9rem/1.05 var(--ui-sans);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .character-summary .summary-sex {
       color: #e0c792;
-      font-size: 0.64rem;
+      font-size: 0.75rem;
     }
     .summary-power {
       text-align: center;
@@ -168,7 +165,7 @@ import { unavailableReason } from './game-ui.model';
     .summary-power b {
       color: #f7e4b8;
       font:
-        900 1.45rem Georgia,
+        900 1.25rem Georgia,
         serif;
     }
     .cards {
@@ -177,10 +174,10 @@ import { unavailableReason } from './game-ui.model';
       height: 100%;
       min-width: 0;
       grid-auto-flow: column;
-      grid-auto-columns: clamp(4.85rem, 23vw, 5.65rem);
+      grid-auto-columns: clamp(7rem, 36vw, 8rem);
       gap: 0.45rem;
       overflow-x: auto;
-      padding: 0 0.25rem 0.15rem 0;
+      padding: 0.35rem 0.25rem max(0.4rem, env(safe-area-inset-bottom)) 0;
       scroll-padding-inline: 0.25rem;
       scroll-snap-type: x mandatory;
       scrollbar-width: thin;
@@ -194,7 +191,7 @@ import { unavailableReason } from './game-ui.model';
       align-self: center;
       min-height: 2.75rem;
       padding: 0.35rem 0.65rem;
-      border: 1px solid #b17a38;
+      border: 1px solid rgba(177, 122, 56, 0.72);
       border-radius: 999px;
       color: #f3e4c7;
       background: linear-gradient(
@@ -203,7 +200,8 @@ import { unavailableReason } from './game-ui.model';
         rgba(58, 37, 20, 0.94) 55%,
         rgba(14, 11, 8, 0.97)
       );
-      font-size: 0.65rem;
+      font-family: var(--ui-sans);
+      font-size: 0.78rem;
       font-weight: 900;
       box-shadow:
         inset 0 1px rgba(255, 220, 149, 0.18),
@@ -215,7 +213,7 @@ import { unavailableReason } from './game-ui.model';
       grid-row: 2;
       place-items: center;
       color: #8e9e93;
-      font-size: 0.7rem;
+      font-size: 0.75rem;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
@@ -244,7 +242,7 @@ import { unavailableReason } from './game-ui.model';
         font-size: 1.15rem;
       }
       .character-summary small {
-        font-size: 0.62rem;
+        font-size: 0.75rem;
       }
       .summary-power b {
         font-size: 1.2rem;

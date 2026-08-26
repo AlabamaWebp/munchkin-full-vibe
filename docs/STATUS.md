@@ -40,6 +40,14 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-26: refined the shared mobile game shell hierarchy for the fixed
+  `390×844` scene. Cleanup now gives the current hand-limit task the stage
+  focus and keeps prior card receipts in the event capsule/history; charity is
+  visually primary when its server-projected intent is blocking. HUD controls
+  use consistent local SVG icons, player and character rails are compact, hand
+  previews retain readable horizontal cards, and normal action/card metadata
+  follows the sans-serif `12px+` mobile contract. No rules, projections, or
+  transport contracts changed.
 - 2026-08-26: extended the shared combat stage across active reaction, pending
   help, and serialized escape workflows. One compact status-strip pattern keeps
   the encounter and authoritative totals visible while exposing only projected

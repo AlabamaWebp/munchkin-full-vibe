@@ -49,18 +49,18 @@ function hashKey(value: string): number {
       display: grid;
       height: 100%;
       min-height: 5.2rem;
-      padding: 0.65rem;
+      padding: 0.25rem;
       place-items: center;
       overflow: hidden;
-      border: 1px solid hsl(var(--art-accent-hue) 24% 61% / 0.52);
-      border-radius: 0.72rem;
+      border: 0;
+      border-radius: 0.52rem;
       color: #f9fbfa;
       background: linear-gradient(
         var(--art-angle),
         hsl(var(--art-hue) 30% 31%),
         hsl(var(--art-accent-hue) 27% 19%)
       );
-      box-shadow: inset 0 0 2rem rgba(3, 8, 5, 0.2);
+      box-shadow: inset 0 0 1rem rgba(3, 8, 5, 0.28);
     }
     .artwork::before,
     .artwork::after {
@@ -129,7 +129,7 @@ function hashKey(value: string): number {
       height: 100%;
       min-height: 0;
       padding: 0.2rem;
-     display: flex;
+      display: flex;
     }
     .artwork.compact .glyph {
       font-size: 1rem;

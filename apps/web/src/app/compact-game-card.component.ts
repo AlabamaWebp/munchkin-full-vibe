@@ -47,7 +47,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-width: 0;
       height: 100%;
       overflow: hidden;
-      border: 2px solid #a67d4b;
+      border: 1px solid rgba(166, 125, 75, 0.86);
       border-radius: 0.75rem;
       background: linear-gradient(155deg, #3a2818, #17100b 72%);
       box-shadow:
@@ -80,28 +80,34 @@ import { CardArtworkComponent } from './card-artwork.component';
     .upgrade-badge {
       position: absolute;
       z-index: 1;
-      top: 0.35rem;
       right: 0.35rem;
-      padding: 0.15rem 0.3rem;
-      border: 1px solid #a8eed5;
+      bottom: 0.35rem;
+      left: 0.35rem;
+      padding: 0.2rem 0.35rem;
+      border: 0;
       border-radius: 999px;
       color: #e6fff4;
       background: #1c6954;
-      font-size: 0.58rem;
+      font-family: var(--ui-sans);
+      font-size: 0.75rem;
+      text-align: center;
       font-weight: 900;
     }
     .card-action {
       display: grid;
       width: 100%;
       height: 100%;
-      min-height: 7.9rem;
-      padding: 0.27rem;
+      min-height: 9rem;
+      padding: 0.32rem;
       grid-template-rows: minmax(0, 1fr) auto;
       gap: 0.14rem;
       border: 0;
       color: #f5f8f6;
       background: transparent;
       text-align: left;
+    }
+    article.upgrade .card-action {
+      padding-bottom: 1.75rem;
     }
     article.with-details .card-action {
       min-height: 12rem;
@@ -119,9 +125,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       max-height: 2.1em;
       overflow: hidden;
       align-items: center;
-      font:
-        800 0.76rem/1.05 Georgia,
-        serif;
+      font: 750 0.82rem/1.1 var(--ui-sans);
       text-align: center;
       white-space: normal;
     }
@@ -136,7 +140,7 @@ import { CardArtworkComponent } from './card-artwork.component';
       padding: 0.14rem 0.05rem;
       overflow: hidden;
       color: #efcb78;
-      font-size: 0.6rem;
+      font-size: 0.75rem;
       text-align: center;
       text-overflow: ellipsis;
       white-space: nowrap;

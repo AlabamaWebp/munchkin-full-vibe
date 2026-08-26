@@ -1753,9 +1753,11 @@ describe('GameShellComponent', () => {
     fixture.detectChanges();
     expect(root.textContent).toContain('вступил в бой');
     root.querySelector<HTMLButtonElement>('[aria-label="Закрыть историю"]')!.click();
-    Array.from(root.querySelectorAll<HTMLButtonElement>('app-action-dock .utility'))
-      .find((button) => button.textContent?.includes('Раздать милостыню'))!
-      .click();
+    const charityButton = Array.from(
+      root.querySelectorAll<HTMLButtonElement>('app-action-dock .utility'),
+    ).find((button) => button.textContent?.includes('Раздать милостыню'))!;
+    expect(charityButton.classList).toContain('primary');
+    charityButton.click();
     fixture.detectChanges();
     expect(root.querySelector('.charity-card app-card-artwork')).not.toBeNull();
     root.querySelector<HTMLButtonElement>('.charity-card .sale-card-artwork')!.click();

@@ -123,6 +123,7 @@ interface CardUse {
         [actions]="primaryActions()"
         [hasPlayableCombatCards]="hasPlayableCombatCards()"
         [utilityActions]="utilityActions()"
+        [primaryUtilityId]="primaryUtilityId()"
         [isOwnTurn]="game().activePlayerId === game().viewerPlayerId"
         (actionSelected)="sendAction($event)"
         (playCardOpened)="openCombatHand()"
@@ -1115,7 +1116,7 @@ export class GameShellComponent {
     presentEvents(this.game(), (card) => this.cardName(card)),
   );
   protected readonly recentEvents = computed(() => {
-    const stageSequences = new Set(stageExplainedEventSequences(this.game()));
+    const stageSequences = new Set(stageExplainedEventSequences(this.game(), this.stage()));
     return this.allEvents()
       .filter((event) => !stageSequences.has(event.entry.sequence))
       .slice(-5)
@@ -1188,6 +1189,10 @@ export class GameShellComponent {
           },
         ]),
   ]);
+  /** Charity is server-projected as mandatory hand-limit resolution. */
+  protected readonly primaryUtilityId = computed<ActionDockUtilityAction['id'] | null>(() =>
+    this.charityIntent() === undefined ? null : 'GIVE_CHARITY',
+  );
   protected readonly helperIds = computed(() => {
     const intent = this.intent('PROPOSE_HELP');
     return intent?.kind === 'PROPOSE_HELP' ? intent.helperIds : [];

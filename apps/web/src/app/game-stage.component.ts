@@ -12,7 +12,7 @@ import type { GameCardView, GameView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
 import { CombatStageComponent } from './combat-stage.component';
 import type { GameStageKind, StageCardReceipt } from './game-ui.model';
-import { latestStageCardEvent } from './game-ui.model';
+import { latestStageCardEvent, stageShowsCard } from './game-ui.model';
 import { LocalizationService } from './localization';
 import { motionClass } from './motion';
 
@@ -176,17 +176,25 @@ import { motionClass } from './motion';
             </div>
           }
           @case ('TURN_CLEANUP') {
-            <div class="message">
+            <div class="message cleanup-message">
               <p class="eyebrow">ЗАВЕРШЕНИЕ ХОДА</p>
               <h2>
                 {{
-                  game().self.handCount > handLimit() ? 'Слишком много карт' : 'Можно завершать ход'
+                  game().self.handCount > handLimit()
+                    ? game().self.handCount +
+                      '/' +
+                      handLimit() +
+                      ' — нужно убрать ' +
+                      (game().self.handCount - handLimit()) +
+                      ' ' +
+                      cardsLabel(game().self.handCount - handLimit())
+                    : 'Можно завершать ход'
                 }}
               </h2>
               <p>
                 {{
                   game().self.handCount > handLimit()
-                    ? 'Оставьте не больше ' + handLimit() + ' карт или раздайте милостыню.'
+                    ? 'Слишком много карт. Раздайте милостыню или выберите карты в полной руке.'
                     : 'Проверьте снаряжение и передайте ход.'
                 }}
               </p>
@@ -310,6 +318,25 @@ import { motionClass } from './motion';
         var(--surface-shadow);
       text-align: center;
     }
+    .cleanup-message {
+      width: 100%;
+      height: auto;
+      min-height: 0;
+      padding: 1rem 0.75rem;
+      border: 0;
+      border-radius: 0.6rem;
+      background: linear-gradient(180deg, rgba(31, 23, 15, 0.52), rgba(19, 14, 10, 0.24));
+      box-shadow: none;
+    }
+    .cleanup-message h2 {
+      font-size: clamp(1.35rem, 6vw, 1.8rem);
+    }
+    .cleanup-message p:not(.eyebrow) {
+      max-width: 25rem;
+      color: #e7d7bd;
+      font-size: 0.95rem;
+      line-height: 1.35;
+    }
     .message.blocking {
       border-color: var(--color-gold);
       background:
@@ -390,7 +417,7 @@ import { motionClass } from './motion';
     p {
       margin: 0;
       color: #bdc9c0;
-      font-size: 0.78rem;
+      font-size: 0.88rem;
       line-height: 1.25;
     }
     .card-event {
@@ -449,7 +476,7 @@ import { motionClass } from './motion';
       border-radius: 0.5rem;
       color: #d9dedb;
       background: #211d17;
-      font-size: 0.62rem;
+      font-size: 0.75rem;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -487,7 +514,7 @@ import { motionClass } from './motion';
     }
     .event-card-title small {
       color: #d9b76f;
-      font-size: 0.56rem;
+      font-size: 0.75rem;
       font-weight: 900;
       letter-spacing: 0.1em;
     }
@@ -546,7 +573,7 @@ import { motionClass } from './motion';
       margin: 0;
       overflow: hidden;
       color: #e2d4d1;
-      font-size: 0.7rem;
+      font-size: 0.8rem;
       line-height: 1.2;
       text-align: center;
       -webkit-box-orient: vertical;
@@ -564,7 +591,7 @@ import { motionClass } from './motion';
       color: #dff0e3;
       border-left: 2px solid var(--color-success);
       background: rgba(25, 61, 39, 0.8);
-      font-size: 0.68rem;
+      font-size: 0.75rem;
     }
     .attempts span.failed {
       color: #ffd8cf;
@@ -641,7 +668,18 @@ export class GameStageComponent {
     return motionClass(this.motionReady(), 'ui-stage-enter');
   }
   protected showsStageCard(): boolean {
-    return ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE', 'TURN_CLEANUP'].includes(this.stage());
+    return stageShowsCard(this.stage());
+  }
+  protected cardsLabel(count: number): string {
+    const lastTwo = count % 100;
+    const last = count % 10;
+    return lastTwo >= 11 && lastTwo <= 14
+      ? 'карт'
+      : last === 1
+        ? 'карту'
+        : last >= 2 && last <= 4
+          ? 'карты'
+          : 'карт';
   }
   protected cardZone(card: GameCardView): string {
     return card.deck === 'DOOR' ? 'КАРТА ДВЕРИ' : 'КАРТА СОКРОВИЩА';

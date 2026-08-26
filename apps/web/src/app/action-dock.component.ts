@@ -33,13 +33,22 @@ const PRIORITY: readonly AvailableGameAction[] = [
         </button>
       }
       @for (action of visible(); track action; let first = $first) {
-        <button type="button" [class.primary]="first" (click)="actionSelected.emit(action)">
+        <button
+          type="button"
+          [class.primary]="first && primaryUtilityId() === null"
+          (click)="actionSelected.emit(action)"
+        >
           <strong>{{ label(action) }}</strong
           ><small>{{ hint(action) }}</small>
         </button>
       }
       @for (action of utilityActions(); track action.id) {
-        <button type="button" class="utility" (click)="utilityActionSelected.emit(action.id)">
+        <button
+          type="button"
+          class="utility"
+          [class.primary]="action.id === primaryUtilityId()"
+          (click)="utilityActionSelected.emit(action.id)"
+        >
           <strong>{{ action.label }}</strong
           ><small>{{ action.hint }}</small>
         </button>
@@ -83,24 +92,23 @@ const PRIORITY: readonly AvailableGameAction[] = [
       display: grid;
       min-height: 4.7rem;
       grid-auto-flow: column;
-      grid-auto-columns: minmax(7.15rem, 1fr);
-      gap: 0.35rem;
+      grid-auto-columns: minmax(9rem, 1fr);
+      gap: 0.45rem;
       align-items: stretch;
       overflow-x: auto;
     }
     button {
       min-width: 0;
       min-height: 4.7rem;
-      padding: 0.4rem 0.45rem;
+      padding: 0.45rem 0.65rem;
       overflow: hidden;
-      border: 1px solid var(--surface-frame);
-      border-radius: 0.85rem;
+      border: 1px solid rgba(141, 99, 46, 0.58);
+      border-radius: 0.7rem;
       color: #e5ede7;
       background: linear-gradient(145deg, #49301a, #21140c);
-      font-size: 0.76rem;
-      font-weight: 850;
+      font-family: var(--ui-sans);
       text-overflow: ellipsis;
-      text-transform: uppercase;
+      text-transform: none;
       white-space: normal;
     }
     button strong,
@@ -110,34 +118,32 @@ const PRIORITY: readonly AvailableGameAction[] = [
       text-overflow: ellipsis;
     }
     button strong {
-      font:
-        900 0.72rem/1.05 Georgia,
-        serif;
+      font: 800 0.88rem/1.1 var(--ui-sans);
     }
     button small {
       margin-top: 0.12rem;
       color: #dccdae;
-      font-size: 0.62rem;
+      font-size: 0.76rem;
       font-weight: 600;
       text-transform: none;
     }
     button.primary {
-      border-color: #efc76d;
-      color: #182019;
-      background: linear-gradient(145deg, #f4d688, #9b6829);
+      order: -1;
+      border-color: #80b276;
+      color: #f5fbf2;
+      background: linear-gradient(145deg, #315f3e, #173523);
       box-shadow:
         inset 0 1px rgba(255, 255, 255, 0.35),
         0 0.25rem 0.55rem rgba(0, 0, 0, 0.36);
     }
     button.primary small {
-      color: #fff8df;
-      text-shadow: 0 1px 2px rgba(45, 27, 9, 0.72);
+      color: #d7ecd2;
     }
     p {
       margin: 0;
       align-self: center;
       color: #8f9e94;
-      font-size: 0.74rem;
+      font-size: 0.8rem;
       text-align: center;
     }
     .card-gateway {
@@ -153,9 +159,9 @@ const PRIORITY: readonly AvailableGameAction[] = [
       background: #2b2117;
     }
     .utility {
-      border-color: #bd8645;
-      color: #ffebbd;
-      background: linear-gradient(145deg, #5a351a, #2b190d);
+      border-color: rgba(141, 99, 46, 0.58);
+      color: #e5ded0;
+      background: rgba(43, 30, 18, 0.9);
     }
     .action-sheet-backdrop {
       position: fixed;
@@ -217,6 +223,7 @@ export class ActionDockComponent {
   readonly actions = input.required<readonly AvailableGameAction[]>();
   readonly hasPlayableCombatCards = input(false);
   readonly utilityActions = input<readonly ActionDockUtilityAction[]>([]);
+  readonly primaryUtilityId = input<ActionDockUtilityAction['id'] | null>(null);
   readonly isOwnTurn = input(false);
   readonly actionSelected = output<AvailableGameAction>();
   readonly playCardOpened = output<void>();
@@ -225,8 +232,12 @@ export class ActionDockComponent {
   protected readonly ordered = computed(() =>
     PRIORITY.filter((action) => this.actions().includes(action)),
   );
-  protected readonly visible = computed(() => this.ordered().slice(0, 2));
-  protected readonly overflow = computed(() => this.ordered().slice(2));
+  protected readonly visible = computed(() =>
+    this.ordered().slice(0, this.primaryUtilityId() === null ? 2 : 1),
+  );
+  protected readonly overflow = computed(() =>
+    this.ordered().slice(this.primaryUtilityId() === null ? 2 : 1),
+  );
   protected label(action: AvailableGameAction): string {
     const labels: Record<AvailableGameAction, string> = {
       KICK_DOOR: 'Открыть дверь',
