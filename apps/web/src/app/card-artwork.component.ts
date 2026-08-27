@@ -150,7 +150,7 @@ function hashKey(value: string): number {
       height: 100%;
       max-width: 100%;
       max-height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       object-position: center;
       border-radius: 0.6rem;
     }

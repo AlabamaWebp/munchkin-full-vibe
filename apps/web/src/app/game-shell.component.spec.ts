@@ -166,6 +166,24 @@ describe('GameShellComponent', () => {
     expect(other.querySelector('app-action-dock p')?.textContent).toContain(
       'Ожидаем действие другого игрока',
     );
+    expect(other.querySelector('app-action-dock p')?.textContent).toContain('ход: Grace');
+  });
+
+  it('marks the finished scene so the fixed shell can release action and hand space', () => {
+    const winner = player({ level: 10 });
+    const root = render(
+      base({
+        status: 'FINISHED',
+        phase: 'FINISHED',
+        winnerId: winner.playerId,
+        players: [winner],
+        self: { ...winner, hand: [] },
+        availableIntents: [],
+      }),
+    ).nativeElement as HTMLElement;
+
+    expect(root.querySelector('.game-shell.finished')).not.toBeNull();
+    expect(root.querySelector('[data-stage="FINISHED"] .results-list li')).not.toBeNull();
   });
 
   it('opens History from the recent-events entry', () => {

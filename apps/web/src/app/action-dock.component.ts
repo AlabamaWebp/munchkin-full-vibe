@@ -1,11 +1,27 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import type { AvailableGameAction } from '@munchkin-lan/contracts';
+import { FocusTrapDirective } from './focus-trap.directive';
 
 export interface ActionDockUtilityAction {
   readonly id: 'SELL_CARDS' | 'GIVE_CHARITY';
   readonly label: string;
   readonly hint: string;
 }
+
+type ActionDockEntry =
+  | {
+      readonly id: `action:${AvailableGameAction}`;
+      readonly kind: 'ACTION';
+      readonly action: AvailableGameAction;
+      readonly primary: boolean;
+    }
+  | { readonly id: 'card:play'; readonly kind: 'CARD'; readonly primary: boolean }
+  | {
+      readonly id: `utility:${ActionDockUtilityAction['id']}`;
+      readonly kind: 'UTILITY';
+      readonly action: ActionDockUtilityAction;
+      readonly primary: boolean;
+    };
 
 const PRIORITY: readonly AvailableGameAction[] = [
   'PASS_COMBAT_REACTION',
@@ -24,112 +40,95 @@ const PRIORITY: readonly AvailableGameAction[] = [
 
 @Component({
   selector: 'app-action-dock',
+  imports: [FocusTrapDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="actions" aria-label="Доступные действия">
-      @if (hasPlayableCombatCards()) {
+      @for (entry of visibleEntries(); track entry.id) {
         <button
           type="button"
-          class="card-gateway"
-          [class.primary]="primaryCardGateway()"
-          (click)="playCardOpened.emit()"
+          [class.card-gateway]="entry.kind === 'CARD'"
+          [class.utility]="entry.kind === 'UTILITY'"
+          [class.primary]="entry.primary"
+          [class.escape]="entry.kind === 'ACTION' && entry.action === 'RUN_AWAY'"
+          (click)="selectEntry(entry)"
         >
           <span class="action-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="m7 5 11 2v12L7 17z" />
-              <path d="M4 4v12l3 1" />
-            </svg>
-          </span>
-          <span class="action-copy"
-            ><strong>Сыграть карту</strong><small>Карта из руки</small></span
-          >
-        </button>
-      }
-      @for (action of visible(); track action) {
-        <button
-          type="button"
-          [class.primary]="primaryUtilityId() === null && primaryAction() === action"
-          [class.escape]="action === 'RUN_AWAY'"
-          (click)="actionSelected.emit(action)"
-        >
-          <span class="action-icon" aria-hidden="true">
-            @switch (action) {
-              @case ('PROPOSE_HELP') {
+            @switch (entry.kind) {
+              @case ('CARD') {
                 <svg viewBox="0 0 24 24">
-                  <path d="M4 12h16M7 8h10M7 16h7" />
-                  <path d="m17 15 3 3m0-3-3 3" />
+                  <path d="m7 5 11 2v12L7 17z" />
+                  <path d="M4 4v12l3 1" />
                 </svg>
               }
-              @case ('RUN_AWAY') {
+              @case ('UTILITY') {
                 <svg viewBox="0 0 24 24">
-                  <path d="M4 12h13" />
-                  <path d="m13 7 5 5-5 5" />
-                  <path d="M4 6v12" />
+                  <path d="M5 7h14M7 4h10v16H7z" />
+                  <path d="M10 11h4M10 15h4" />
                 </svg>
               }
-              @case ('DECLARE_COMBAT_VICTORY') {
-                <svg viewBox="0 0 24 24">
-                  <path d="m12 3 2.2 5.2L20 10l-5.8 1.8L12 17l-2.2-5.2L4 10l5.8-1.8z" />
-                  <path d="M12 17v4" />
-                </svg>
-              }
-              @default {
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 5h14v14H5z" />
-                  <path d="M8 12h8M12 8v8" />
-                </svg>
+              @case ('ACTION') {
+                @switch (entry.action) {
+                  @case ('PROPOSE_HELP') {
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 12h16M7 8h10M7 16h7" />
+                      <path d="m17 15 3 3m0-3-3 3" />
+                    </svg>
+                  }
+                  @case ('RUN_AWAY') {
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 12h13" />
+                      <path d="m13 7 5 5-5 5" />
+                      <path d="M4 6v12" />
+                    </svg>
+                  }
+                  @case ('DECLARE_COMBAT_VICTORY') {
+                    <svg viewBox="0 0 24 24">
+                      <path d="m12 3 2.2 5.2L20 10l-5.8 1.8L12 17l-2.2-5.2L4 10l5.8-1.8z" />
+                      <path d="M12 17v4" />
+                    </svg>
+                  }
+                  @default {
+                    <svg viewBox="0 0 24 24">
+                      <path d="M5 5h14v14H5z" />
+                      <path d="M8 12h8M12 8v8" />
+                    </svg>
+                  }
+                }
               }
             }
           </span>
           <span class="action-copy"
-            ><strong>{{ label(action) }}</strong
-            ><small>{{ hint(action) }}</small></span
+            ><strong>{{ entryLabel(entry) }}</strong
+            ><small>{{ entryHint(entry) }}</small></span
           >
         </button>
       }
-      @for (action of utilityActions(); track action.id) {
-        <button
-          type="button"
-          class="utility"
-          [class.primary]="action.id === primaryUtilityId()"
-          (click)="utilityActionSelected.emit(action.id)"
-        >
-          <span class="action-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="M5 7h14M7 4h10v16H7z" />
-              <path d="M10 11h4M10 15h4" />
-            </svg>
-          </span>
-          <span class="action-copy"
-            ><strong>{{ action.label }}</strong
-            ><small>{{ action.hint }}</small></span
-          >
-        </button>
-      }
-      @if (overflow().length > 0) {
+      @if (overflowEntries().length > 0) {
         <button type="button" class="more" (click)="allOpen.set(true)">
-          Все действия · {{ overflow().length }}
+          Ещё · {{ overflowEntries().length }}
         </button>
       }
-      @if (
-        visible().length === 0 &&
-        utilityActions().length === 0 &&
-        !hasPlayableCombatCards() &&
-        !isOwnTurn()
-      ) {
-        <p>Ожидаем действие другого игрока</p>
+      @if (entries().length === 0 && !isOwnTurn()) {
+        <p>{{ waitingMessage() }}</p>
       }
     </nav>
     @if (allOpen()) {
       <div class="action-sheet-backdrop">
-        <section class="action-sheet" aria-label="Все доступные действия">
+        <section
+          class="action-sheet"
+          appFocusTrap
+          role="dialog"
+          aria-modal="true"
+          aria-label="Все доступные действия"
+        >
           <header>
             <strong>Все действия</strong
             ><button type="button" aria-label="Закрыть" (click)="allOpen.set(false)">×</button>
           </header>
-          @for (action of overflow(); track action) {
-            <button type="button" (click)="actionSelected.emit(action); allOpen.set(false)">
-              {{ label(action) }}
+          @for (entry of overflowEntries(); track entry.id) {
+            <button type="button" (click)="selectEntry(entry); allOpen.set(false)">
+              {{ entryLabel(entry) }}
             </button>
           }
         </section>
@@ -142,28 +141,30 @@ const PRIORITY: readonly AvailableGameAction[] = [
       min-width: 0;
     }
     .actions {
-      display: grid;
-      min-height: 4.25rem;
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(8rem, 1fr);
-      gap: 0.45rem;
+      display: flex;
+      width: min(100%, 32rem);
+      height: 100%;
+      min-height: 2.75rem;
+      margin-inline: auto;
+      gap: var(--space-1);
       align-items: stretch;
-      overflow-x: auto;
+      overflow: hidden;
     }
     button {
+      flex: 1 1 0;
       min-width: 0;
-      min-height: 4.25rem;
-      padding: 0.35rem 0.55rem;
+      min-height: 2.75rem;
+      padding: 0.28rem 0.45rem;
       display: grid;
-      grid-template-columns: 1.45rem minmax(0, 1fr);
+      grid-template-columns: 1.25rem minmax(0, 1fr);
       align-content: center;
       align-items: center;
       column-gap: 0.35rem;
       overflow: hidden;
-      border: 1px solid rgba(141, 99, 46, 0.58);
-      border-radius: 0.7rem;
+      border: 1px solid var(--surface-line);
+      border-radius: var(--radius-compact);
       color: #e5ede7;
-      background: linear-gradient(145deg, #49301a, #21140c);
+      background: linear-gradient(145deg, rgba(62, 40, 22, 0.9), rgba(28, 19, 12, 0.92));
       font-family: var(--ui-sans);
       text-overflow: ellipsis;
       text-transform: none;
@@ -171,14 +172,14 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     .action-icon {
       display: grid;
-      width: 1.4rem;
-      height: 1.4rem;
+      width: 1.2rem;
+      height: 1.2rem;
       place-items: center;
       color: #d8bd78;
     }
     .action-icon svg {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1.15rem;
+      height: 1.15rem;
       fill: none;
       stroke: currentColor;
       stroke-linecap: round;
@@ -196,23 +197,22 @@ const PRIORITY: readonly AvailableGameAction[] = [
       text-overflow: ellipsis;
     }
     button strong {
-      font: 800 0.88rem/1.1 var(--ui-sans);
+      font: 800 0.8rem/1.08 var(--ui-sans);
     }
     button small {
       margin-top: 0.12rem;
       color: #dccdae;
-      font-size: 0.76rem;
+      font-size: 0.75rem;
       font-weight: 600;
       text-transform: none;
     }
     button.primary {
+      flex-grow: 1.2;
       order: -1;
-      border-color: #80b276;
+      border-color: rgba(128, 178, 118, 0.86);
       color: #f5fbf2;
       background: linear-gradient(145deg, #315f3e, #173523);
-      box-shadow:
-        inset 0 1px rgba(255, 255, 255, 0.35),
-        0 0.25rem 0.55rem rgba(0, 0, 0, 0.36);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.2);
     }
     button.escape {
       border-color: rgba(177, 86, 65, 0.7);
@@ -249,8 +249,15 @@ const PRIORITY: readonly AvailableGameAction[] = [
         0 0.25rem 0.55rem rgba(0, 0, 0, 0.36);
     }
     .more {
+      flex: 0 0 auto;
+      width: auto;
+      max-width: 5.5rem;
+      padding-inline: 0.55rem;
+      grid-template-columns: 1fr;
       border-color: #8d632e;
-      background: #2b2117;
+      background: rgba(43, 33, 23, 0.92);
+      font-size: 0.72rem;
+      font-weight: 850;
     }
     .utility {
       border-color: rgba(141, 99, 46, 0.58);
@@ -271,7 +278,7 @@ const PRIORITY: readonly AvailableGameAction[] = [
       width: 100%;
       height: auto;
       max-height: 90dvh;
-      padding: 0.7rem;
+      padding: 0.7rem 0.7rem max(0.7rem, env(safe-area-inset-bottom));
       gap: 0.4rem;
       overflow: auto;
       border: 0;
@@ -285,8 +292,11 @@ const PRIORITY: readonly AvailableGameAction[] = [
       justify-content: space-between;
     }
     .action-sheet button {
+      display: block;
+      width: 100%;
       height: auto;
       min-height: 2.75rem;
+      flex: none;
       padding: 0.45rem 0.6rem;
       border: 1px solid #8d632e;
       border-radius: 0.65rem;
@@ -296,19 +306,17 @@ const PRIORITY: readonly AvailableGameAction[] = [
     }
     .action-sheet header button {
       width: 2.75rem;
+      flex: 0 0 2.75rem;
       text-align: center;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
-      outline-offset: 2px;
+      outline-offset: -3px;
     }
     @media (max-height: 42rem) {
       .actions,
       button {
-        min-height: 3.5rem;
-      }
-      .actions {
-        grid-auto-columns: minmax(7.6rem, 1fr);
+        min-height: 2.75rem;
       }
       .action-icon {
         width: 1.25rem;
@@ -316,6 +324,17 @@ const PRIORITY: readonly AvailableGameAction[] = [
       }
       button small {
         display: none;
+      }
+    }
+    @media (min-width: 48rem) {
+      .action-sheet-backdrop {
+        padding: 1rem;
+        place-items: center;
+      }
+      .action-sheet {
+        width: min(100%, 32rem);
+        max-height: min(88dvh, 40rem);
+        border-radius: 1rem;
       }
     }
   `,
@@ -326,6 +345,7 @@ export class ActionDockComponent {
   readonly utilityActions = input<readonly ActionDockUtilityAction[]>([]);
   readonly primaryUtilityId = input<ActionDockUtilityAction['id'] | null>(null);
   readonly isOwnTurn = input(false);
+  readonly waitingMessage = input('Ожидаем действие другого игрока');
   readonly actionSelected = output<AvailableGameAction>();
   readonly playCardOpened = output<void>();
   readonly utilityActionSelected = output<ActionDockUtilityAction['id']>();
@@ -333,19 +353,73 @@ export class ActionDockComponent {
   protected readonly ordered = computed(() =>
     PRIORITY.filter((action) => this.actions().includes(action)),
   );
-  protected readonly visible = computed(() =>
-    this.ordered().slice(0, this.primaryUtilityId() === null ? 2 : 1),
-  );
-  protected readonly overflow = computed(() =>
-    this.ordered().slice(this.primaryUtilityId() === null ? 2 : 1),
-  );
-  protected readonly primaryAction = computed(() => {
-    if (this.primaryUtilityId() !== null) return null;
-    return this.ordered().find((action) => action !== 'RUN_AWAY') ?? null;
+  protected readonly entries = computed<readonly ActionDockEntry[]>(() => {
+    const primaryUtility = this.primaryUtilityId();
+    const primaryAction =
+      primaryUtility === null
+        ? (this.ordered().find((action) => action !== 'RUN_AWAY') ?? null)
+        : null;
+    const cardIsPrimary =
+      primaryUtility === null && primaryAction === null && this.hasPlayableCombatCards();
+    const entries: ActionDockEntry[] = [];
+
+    if (primaryUtility !== null) {
+      const utility = this.utilityActions().find((candidate) => candidate.id === primaryUtility);
+      if (utility !== undefined)
+        entries.push({
+          id: `utility:${utility.id}`,
+          kind: 'UTILITY',
+          action: utility,
+          primary: true,
+        });
+    } else if (primaryAction !== null) {
+      entries.push({
+        id: `action:${primaryAction}`,
+        kind: 'ACTION',
+        action: primaryAction,
+        primary: true,
+      });
+    } else if (cardIsPrimary) {
+      entries.push({ id: 'card:play', kind: 'CARD', primary: true });
+    }
+
+    if (this.hasPlayableCombatCards() && !cardIsPrimary)
+      entries.push({ id: 'card:play', kind: 'CARD', primary: false });
+    for (const action of this.ordered()) {
+      if (action !== primaryAction)
+        entries.push({ id: `action:${action}`, kind: 'ACTION', action, primary: false });
+    }
+    for (const utility of this.utilityActions()) {
+      if (utility.id !== primaryUtility)
+        entries.push({
+          id: `utility:${utility.id}`,
+          kind: 'UTILITY',
+          action: utility,
+          primary: false,
+        });
+    }
+    return entries;
   });
-  protected readonly primaryCardGateway = computed(
-    () => this.primaryUtilityId() === null && this.primaryAction() === null,
-  );
+  protected readonly visibleEntries = computed(() => this.entries().slice(0, 2));
+  protected readonly overflowEntries = computed(() => this.entries().slice(2));
+
+  protected selectEntry(entry: ActionDockEntry): void {
+    if (entry.kind === 'ACTION') this.actionSelected.emit(entry.action);
+    else if (entry.kind === 'UTILITY') this.utilityActionSelected.emit(entry.action.id);
+    else this.playCardOpened.emit();
+  }
+
+  protected entryLabel(entry: ActionDockEntry): string {
+    if (entry.kind === 'CARD') return 'Сыграть карту';
+    if (entry.kind === 'UTILITY') return entry.action.label;
+    return this.label(entry.action);
+  }
+
+  protected entryHint(entry: ActionDockEntry): string {
+    if (entry.kind === 'CARD') return 'Карта из руки';
+    if (entry.kind === 'UTILITY') return entry.action.hint;
+    return this.hint(entry.action);
+  }
   protected label(action: AvailableGameAction): string {
     const labels: Record<AvailableGameAction, string> = {
       KICK_DOOR: 'Открыть дверь',

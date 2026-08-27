@@ -29,22 +29,44 @@ import { motionClass } from './motion';
             aria-label="Последнее карточное действие"
             [animate.enter]="stageMotionClass()"
           >
-            @if (event.receipts.length > 1) {
-              <div class="card-tabs receipt-tabs" aria-label="Получатели карт">
-                @for (candidate of event.receipts; track candidate.entry.sequence) {
-                  <button
-                    type="button"
-                    [class.active]="receipt.entry.sequence === candidate.entry.sequence"
-                    (click)="focusedReceiptSequence.set(candidate.entry.sequence)"
-                  >
-                    {{ receiptLabel(candidate) }}
-                  </button>
+            <div class="card-event-context">
+              @if (event.receipts.length > 1) {
+                <div class="card-tabs receipt-tabs" aria-label="Получатели карт">
+                  @for (candidate of event.receipts; track candidate.entry.sequence) {
+                    <button
+                      type="button"
+                      [class.active]="receipt.entry.sequence === candidate.entry.sequence"
+                      (click)="focusedReceiptSequence.set(candidate.entry.sequence)"
+                    >
+                      {{ receiptLabel(candidate) }}
+                    </button>
+                  }
+                </div>
+              }
+              @if (receipt.hiddenCard) {
+                <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+                <h2 class="event-summary">{{ hiddenCardSummary(receipt) }}</h2>
+              } @else {
+                @for (focused of focusedStageCards(); track focused.instanceId) {
+                  @if (receipt.cards.length > 1) {
+                    <div class="card-tabs" aria-label="Карты последнего действия">
+                      @for (card of receipt.cards; track card.instanceId) {
+                        <button
+                          type="button"
+                          [class.active]="focused.instanceId === card.instanceId"
+                          (click)="focusedStageCardId.set(card.instanceId)"
+                        >
+                          {{ cardName(card) }}
+                        </button>
+                      }
+                    </div>
+                  }
+                  <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
+                  <h2 class="event-summary">{{ stageSummary(receipt.summary, receipt.cards) }}</h2>
                 }
-              </div>
-            }
+              }
+            </div>
             @if (receipt.hiddenCard; as hiddenCard) {
-              <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
-              <h2 class="event-summary">{{ hiddenCardSummary(receipt) }}</h2>
               <article class="event-card hidden-card">
                 <div class="event-card-title">
                   <small>ЗАКРЫТАЯ КАРТА</small>
@@ -55,21 +77,6 @@ import { motionClass } from './motion';
               </article>
             } @else {
               @for (focused of focusedStageCards(); track focused.instanceId) {
-                @if (receipt.cards.length > 1) {
-                  <div class="card-tabs" aria-label="Карты последнего действия">
-                    @for (card of receipt.cards; track card.instanceId) {
-                      <button
-                        type="button"
-                        [class.active]="focused.instanceId === card.instanceId"
-                        (click)="focusedStageCardId.set(card.instanceId)"
-                      >
-                        {{ cardName(card) }}
-                      </button>
-                    }
-                  </div>
-                }
-                <p class="eyebrow">ПОСЛЕДНЕЕ ДЕЙСТВИЕ</p>
-                <h2 class="event-summary">{{ stageSummary(receipt.summary, receipt.cards) }}</h2>
                 <article class="event-card" animate.enter="ui-stage-card-enter">
                   <div class="event-card-title">
                     <small>{{ cardZone(focused) }}</small>
@@ -301,21 +308,15 @@ import { motionClass } from './motion';
     .run-away {
       display: grid;
       width: min(100%, 27rem);
-      height: min(100%, 19rem);
-      min-height: 10.5rem;
-      margin: auto;
-      padding: clamp(0.9rem, 4vw, 1.35rem);
+      height: 100%;
+      min-height: 0;
+      margin: 0 auto;
+      padding: clamp(0.5rem, 3vw, 1rem);
       place-content: center;
       gap: 0.35rem;
       overflow: hidden;
-      border: 1px solid var(--surface-frame);
-      border-radius: 1rem;
-      background:
-        radial-gradient(circle at 50% 0%, rgba(217, 165, 75, 0.16), transparent 66%),
-        var(--panel-fill);
-      box-shadow:
-        inset 0 1px var(--tabletop-highlight),
-        var(--surface-shadow);
+      border: 0;
+      background: radial-gradient(circle at 50% 42%, rgba(217, 165, 75, 0.13), transparent 64%);
       text-align: center;
     }
     .cleanup-message {
@@ -338,20 +339,14 @@ import { motionClass } from './motion';
       line-height: 1.35;
     }
     .message.blocking {
-      border-color: var(--color-gold);
-      background:
-        radial-gradient(circle at 50% 0%, rgba(226, 179, 87, 0.2), transparent 66%),
-        var(--raised-fill);
+      background: radial-gradient(circle at 50% 42%, rgba(226, 179, 87, 0.2), transparent 64%);
     }
     .message.victory {
-      border-color: var(--color-gold);
-      background:
-        radial-gradient(circle at 50% 20%, rgba(224, 184, 86, 0.38), transparent 65%),
-        var(--raised-fill);
+      background: radial-gradient(circle at 50% 42%, rgba(224, 184, 86, 0.28), transparent 64%);
     }
     .message.results {
       align-content: center;
-      overflow: auto;
+      overflow: hidden;
     }
     .results-list {
       display: grid;
@@ -367,7 +362,8 @@ import { motionClass } from './motion';
       grid-template-columns: minmax(0, 1fr) auto auto;
       gap: 0.45rem;
       align-items: baseline;
-      padding: 0.42rem 0.5rem;
+      min-height: 2rem;
+      padding: 0.28rem 0.5rem;
       border-left: 2px solid var(--color-brass);
       border-radius: 0.5rem;
       background: rgba(12, 8, 5, 0.45);
@@ -393,6 +389,7 @@ import { motionClass } from './motion';
       gap: 0.45rem;
     }
     .lifecycle-actions button {
+      min-height: 2.75rem;
       padding: 0.5rem 0.7rem;
       border: 1px solid var(--color-gold);
       border-radius: 0.5rem;
@@ -424,12 +421,19 @@ import { motionClass } from './motion';
       display: grid;
       height: 100%;
       min-height: 0;
-      padding: 0.65rem;
-      grid-template-rows: auto auto minmax(0, 1fr);
+      padding: 0.25rem;
+      grid-template-rows: auto minmax(0, 1fr);
       align-items: center;
       justify-items: center;
-      gap: 0.35rem;
+      gap: 0.25rem;
       overflow: hidden;
+    }
+    .card-event-context {
+      display: grid;
+      width: 100%;
+      min-width: 0;
+      justify-items: center;
+      gap: 0.2rem;
     }
     .ui-stage-enter {
       animation: ui-stage-enter 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -468,7 +472,7 @@ import { motionClass } from './motion';
     }
     .card-tabs button {
       min-width: 7rem;
-      min-height: 2.15rem;
+      min-height: 2.75rem;
       padding: 0.3rem 0.45rem;
       overflow: hidden;
       flex: 0 0 7rem;
@@ -486,25 +490,27 @@ import { motionClass } from './motion';
     }
     .event-summary {
       width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       text-align: center;
     }
     .event-card {
       display: grid;
-      width: min(100%, 17rem);
+      width: min(100%, 14rem);
       min-width: 0;
       min-height: 0;
-      height: 100%;
+      height: min(100%, 23rem);
+      max-height: min(100%, 23rem);
       padding: 0.38rem;
       grid-template-rows: auto minmax(0, 1fr) auto;
       justify-self: center;
       gap: 0.28rem;
       overflow: hidden;
-      border: 2px solid #8e6734;
-      border-radius: 0.95rem;
+      border: 1px solid #8e6734;
+      border-radius: 0.8rem;
       background: linear-gradient(145deg, rgba(77, 54, 28, 0.96), rgba(17, 12, 9, 0.96));
-      box-shadow:
-        inset 0 0 0 2px rgba(10, 7, 5, 0.82),
-        0 0.5rem 1.25rem rgba(0, 0, 0, 0.58);
+      box-shadow: 0 0.35rem 0.9rem rgba(0, 0, 0, 0.42);
     }
     .event-card-title {
       display: grid;
@@ -532,7 +538,8 @@ import { motionClass } from './motion';
     .event-card-art {
       position: relative;
       display: grid;
-      width: min(100%, 11rem);
+      width: auto;
+      max-width: 100%;
       min-height: 0;
       height: 100%;
       aspect-ratio: 3 / 4;
@@ -552,7 +559,8 @@ import { motionClass } from './motion';
     }
     .hidden-card-art {
       display: grid;
-      width: min(100%, 11rem);
+      width: auto;
+      max-width: 100%;
       min-height: 0;
       height: 100%;
       aspect-ratio: 3 / 4;
@@ -583,9 +591,10 @@ import { motionClass } from './motion';
     }
     .attempts {
       display: grid;
-      max-height: 9rem;
+      max-height: min(12rem, 100%);
       gap: 0.3rem;
-      overflow: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
     .attempts span {
       padding: 0.35rem 0.45rem;
@@ -602,7 +611,20 @@ import { motionClass } from './motion';
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
-      outline-offset: 2px;
+      outline-offset: -3px;
+    }
+    @media (max-height: 42rem) {
+      .card-event-context > .eyebrow,
+      .message:not(.blocking):not(.results) p:not(.eyebrow) {
+        display: none;
+      }
+      .message.results > p:not(.eyebrow) {
+        display: none;
+      }
+      .results-list {
+        margin-block: 0.15rem;
+        gap: 0.15rem;
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       .ui-stage-enter,

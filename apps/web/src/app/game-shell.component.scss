@@ -9,10 +9,12 @@
   display: grid;
   width: 100%;
   height: 100dvh;
-  padding: max(0.35rem, env(safe-area-inset-top)) max(0.35rem, env(safe-area-inset-right))
-    max(0.35rem, env(safe-area-inset-bottom)) max(0.35rem, env(safe-area-inset-left));
-  grid-template-rows: 5.55rem 3.6rem minmax(10rem, 1fr) 4.25rem 9.25rem;
-  gap: 0.3rem;
+  padding: max(var(--scene-gutter), env(safe-area-inset-top))
+    max(var(--scene-gutter), env(safe-area-inset-right))
+    max(var(--scene-gutter), env(safe-area-inset-bottom))
+    max(var(--scene-gutter), env(safe-area-inset-left));
+  grid-template-rows: 5.5rem 3rem minmax(0, 1fr) 3.5rem 7.75rem;
+  gap: var(--space-1);
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 48%, rgba(210, 131, 47, 0.23), transparent 42%),
@@ -22,8 +24,12 @@
     #17100b;
   isolation: isolate;
 }
+app-player-hud,
+app-recent-events,
 app-game-stage,
+app-action-dock,
 app-hand-dock {
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -191,7 +197,7 @@ app-hand-dock {
 .sheet footer {
   display: flex;
   min-height: 3.7rem;
-  padding: 0.5rem 0.7rem;
+  padding: 0.5rem 0.7rem max(0.5rem, env(safe-area-inset-bottom));
   align-items: center;
   justify-content: flex-end;
   border-top: 1px solid #6c4b2e;
@@ -213,7 +219,7 @@ app-hand-dock {
   background: transparent;
   border-radius: 0.6rem;
   color: #f4e7ce;
-  height: 100%;
+  height: auto;
 }
 .sheet button.primary {
   border-color: #e0b85e;
@@ -242,7 +248,7 @@ app-hand-dock {
 }
 .hand-filters button,
 .history-filters button {
-  min-width: max-content;
+  min-width: 2.75rem;
   padding: 0.3rem 0.55rem;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -831,15 +837,14 @@ select:focus-visible {
   .game-shell {
     width: min(calc(100% - 2rem), 72rem);
     margin-inline: auto;
-    grid-template-columns: minmax(0, 1fr) minmax(19rem, 20rem);
-    grid-template-rows: 6.2rem 3.3rem 3.8rem minmax(0, 1fr) 4.35rem;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 18rem);
+    grid-template-rows: 5.5rem 3rem minmax(0, 1fr) 3.75rem;
     grid-template-areas:
       'hud hud'
       'events events'
       'stage hand'
-      'stage hand'
       'actions hand';
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   app-player-hud {
     grid-area: hud;
@@ -859,10 +864,43 @@ select:focus-visible {
   .full-hand-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  .backdrop {
+    padding: 1rem;
+    place-items: center;
+  }
+  .sheet,
+  .full-hand-sheet {
+    width: min(100%, 40rem);
+    height: min(88dvh, 48rem);
+    border-radius: 1rem;
+  }
+  .full-hand-sheet {
+    width: min(100%, 56rem);
+  }
+  .full-hand-backdrop {
+    padding: 1rem;
+  }
+  .game-shell.finished {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 5.5rem 3rem minmax(0, 1fr);
+    grid-template-areas:
+      'hud'
+      'events'
+      'stage';
+  }
+}
+@media (max-width: 47.999rem) {
+  .game-shell.finished {
+    grid-template-rows: 5.5rem 3rem minmax(0, 1fr);
+  }
+}
+.game-shell.finished app-action-dock,
+.game-shell.finished app-hand-dock {
+  display: none;
 }
 @media (max-height: 42rem) {
   .game-shell {
-    grid-template-rows: 5.55rem 3.3rem minmax(9rem, 1fr) 3.5rem 8rem;
+    grid-template-rows: 5.5rem 2.75rem minmax(0, 1fr) 3.25rem 7.5rem;
     gap: 0.2rem;
   }
 }

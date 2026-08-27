@@ -31,8 +31,9 @@ this document lists remaining work rather than restating completed milestones.
 - Exercise stale/duplicate commands, browser backgrounding, deadline expiry,
   replacement sockets, host reconnect, room lifecycle, and deck exhaustion in
   live transport—not just engine fixtures.
-- Complete accessibility and responsive QA for all gameplay states at 360px+
-  and on desktop/tablet, including focus management and reduced motion.
+- Complete real-device accessibility and browser-toolbar/safe-area QA beyond the
+  in-app responsive matrix, including focus return and reduced motion on the
+  supported phone/browser mix.
 - Turn recurring playtest defects into focused engine/server/web regression
   tests before changing behavior.
 

@@ -158,7 +158,9 @@ safe-area viewport (100dvh, overflow: hidden)
 
 The stage may change between turn start, Door reveal, combat, reaction, escape,
 blocking decision, cleanup, and victory. The surrounding shell should remain
-stable so controls do not jump unpredictably.
+stable so controls do not jump unpredictably. `FINISHED` is the deliberate
+lifecycle exception: its authoritative results replace the no-longer-actionable
+action and hand docks and receive the released Stage space.
 
 The finished stage is a results surface rather than a generic game-over notice.
 It shows the authoritative winner plus every player's projected final level and
@@ -200,7 +202,8 @@ ornament and secondary copy before reducing touch targets.
 ### Turn bar
 
 Shows whose turn it is, the public phase label, connection warning when needed,
-and entry points to menu and history. "Your turn" is shown only when
+and entry points to menu and optional fullscreen. History is entered only through
+the recent-events surface. "Your turn" is shown only when
 `activePlayerId === viewerPlayerId`; otherwise name the active player.
 
 ### Player rail
@@ -227,9 +230,12 @@ authoritative events from the serialized history.
 
 ### Stage
 
-Owns the dominant card or decision. The stage is not a scroll container. Long
-copy is clamped and details open in a sheet. Blocking workflows should also use
-the existing modal/focus-trap path so they survive reconnect without ambiguity.
+Owns the dominant card or decision. The stage is not a scroll container. Focused
+`3:4` artwork is sized from the real remaining Stage budget and capped on taller
+viewports; it is never cropped or stretched. Secondary copy may be clamped or
+moved to Details, but mandatory focused facts such as current strength, reward,
+and concise Bad Stuff remain fully visible. Blocking workflows use the existing
+modal/focus-trap path so they survive reconnect without ambiguity.
 
 ### Action dock
 

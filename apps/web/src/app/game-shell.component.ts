@@ -98,7 +98,7 @@ interface CardUse {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <main class="game-shell" aria-label="Игровой стол">
+    <main class="game-shell" [class.finished]="stage() === 'FINISHED'" aria-label="Игровой стол">
       <app-player-hud
         [game]="game()"
         [connection]="connectionState()"
@@ -125,6 +125,7 @@ interface CardUse {
         [utilityActions]="utilityActions()"
         [primaryUtilityId]="primaryUtilityId()"
         [isOwnTurn]="game().activePlayerId === game().viewerPlayerId"
+        [waitingMessage]="waitingActionMessage()"
         (actionSelected)="sendAction($event)"
         (playCardOpened)="openCombatHand()"
         (utilityActionSelected)="openUtilityAction($event)"
@@ -147,7 +148,12 @@ interface CardUse {
           [animate.enter]="motionClasses('overlay')"
           animate.leave="ui-overlay-leave"
         >
-          <section class="sheet decision-sheet" appFocusTrap role="dialog" aria-modal="true">
+          <section
+            class="sheet decision-sheet compact-sheet"
+            appFocusTrap
+            role="dialog"
+            aria-modal="true"
+          >
             <header>
               <div>
                 <small>ОТВЕТ НА ПРОКЛЯТИЕ</small>
@@ -1112,6 +1118,25 @@ export class GameShellComponent {
   );
   protected readonly locale = this.localization.locale;
   protected readonly stage = computed(() => selectStage(this.game()));
+  protected readonly waitingActionMessage = computed(() => {
+    const expected = this.game().expectedAction;
+    const actor = this.playerName(expected.playerId);
+    const detail =
+      expected.type === 'CURSE_RESPONSE'
+        ? `ответ на проклятие: ${actor}`
+        : expected.type === 'DISCARD_CARDS'
+          ? `${actor} выбирает карты`
+          : expected.type === 'RESOLVE_ROLE_RETENTION'
+            ? `${actor} выбирает роль`
+            : expected.type === 'RESPOND_TO_HELP'
+              ? `ответ на предложение помощи: ${actor}`
+              : expected.type === 'COMBAT_REACTIONS'
+                ? `реакции: ${expected.waitingPlayerIds.map((id) => this.playerName(id)).join(', ')}`
+                : expected.type === 'COMBAT_DECISION'
+                  ? `решение в бою: ${actor}`
+                  : `ход: ${actor}`;
+    return `Ожидаем действие другого игрока · ${detail}`;
+  });
   protected readonly allEvents = computed(() =>
     presentEvents(this.game(), (card) => this.cardName(card)),
   );

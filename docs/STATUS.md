@@ -1,6 +1,6 @@
 # Project status
 
-Status date: 2026-08-26
+Status date: 2026-08-27
 Current baseline: schema-5 V2 game is ready for internal LAN live playtesting;
 single-origin production packaging and real-device validation remain.
 
@@ -40,6 +40,16 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-27: completed a system-level responsive audit of the fixed game scene
+  across `360×640`, `390×844`, `430×932`, `768×1024`, and `1024×768`. The shell
+  now gives Stage the actual remainder, caps focused `3:4` artwork without crop,
+  keeps required Bad Stuff/reward/totals visible, bounds action overflow and
+  sheets, uses compact scrollable player/hand rails, and releases obsolete docks
+  for finished results. Real browser checks covered solo and six-player tables,
+  long Russian names, small/large hands, card reveal, combat/reaction/help,
+  escape, blocking discard/Curse, cleanup/charity, reconnect restoration, and
+  finished standings. No engine, rules, DTO, projection, or transport behavior
+  changed.
 - 2026-08-26: completed the portrait mobile visual-polish pass across the
   fixed game shell. The turn banner now groups menu, History, and fullscreen
   controls into one compact HUD; the player rail and recent event are dense

@@ -18,7 +18,7 @@ import type { PresentedEvent } from './game-ui.model';
         <span class="event-list">
           @for (event of events().slice(0, 3); track event.entry.sequence) {
             <span class="event-row" [class.important]="event.priority !== 'ROUTINE'">
-              <i aria-hidden="true"></i>{{ event.summary }}
+              <i aria-hidden="true"></i><span class="event-copy">{{ event.summary }}</span>
             </span>
           }
         </span>
@@ -37,33 +37,27 @@ import type { PresentedEvent } from './game-ui.model';
       display: grid;
       width: 100%;
       height: 100%;
-      min-height: 0;
       min-height: 2.75rem;
-      padding: 0.25rem 0.55rem;
-      grid-template-columns: auto minmax(0, 1fr);
+      padding: 0.2rem 0.45rem;
+      grid-template-columns: 4.25rem minmax(0, 1fr);
       align-items: center;
-      gap: 0.55rem;
+      gap: var(--space-1);
       overflow: hidden;
       border: 0;
-      border: 1px solid rgba(173, 132, 67, 0.48);
-      border-left: 3px solid rgba(173, 132, 67, 0.78);
-      border-radius: 0.7rem;
+      border-left: 2px solid rgba(204, 159, 82, 0.68);
+      border-radius: var(--radius-compact);
       color: #ead5ad;
-      background: rgba(23, 16, 10, 0.78);
-      box-shadow: inset 0 1px rgba(255, 225, 159, 0.08);
+      background: linear-gradient(90deg, rgba(30, 21, 13, 0.76), rgba(16, 12, 8, 0.42));
+      box-shadow: none;
       text-align: left;
     }
     .title {
       flex: 0 0 auto;
       min-width: 0;
-      padding: 0.18rem 0.35rem;
       overflow: hidden;
-      border: 1px solid rgba(173, 132, 67, 0.38);
-      border-radius: 999px;
-      color: #c7b697;
-      background: rgba(61, 42, 23, 0.65);
+      color: #bfae91;
       font-family: var(--ui-sans);
-      font-size: 0.62rem;
+      font-size: 0.68rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
@@ -74,7 +68,7 @@ import type { PresentedEvent } from './game-ui.model';
       display: grid;
       min-width: 0;
       min-height: 0;
-      gap: 0.06rem;
+      gap: 0.04rem;
       overflow: hidden;
     }
     .event-row,
@@ -83,11 +77,17 @@ import type { PresentedEvent } from './game-ui.model';
       width: 100%;
       min-width: 0;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.28rem;
       overflow: hidden;
       font-family: var(--ui-sans);
-      font-size: 0.76rem;
+      font-size: 0.75rem;
       line-height: 1.1;
+      white-space: nowrap;
+    }
+    .event-copy {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
     .event-row i {
@@ -111,20 +111,23 @@ import type { PresentedEvent } from './game-ui.model';
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
-      outline-offset: 2px;
+      outline-offset: -3px;
     }
     @media (max-height: 42rem) {
       .strip {
-        min-height: 0;
-        padding-block: 0.22rem;
+        min-height: 2.75rem;
+        padding-block: 0.18rem;
       }
       .title {
         padding-inline: 0.3rem;
-        font-size: 0.6rem;
+        font-size: 0.68rem;
       }
       .event-row,
       .empty {
-        font-size: 0.72rem;
+        font-size: 0.75rem;
+      }
+      .event-row:nth-child(n + 3) {
+        display: none;
       }
     }
   `,

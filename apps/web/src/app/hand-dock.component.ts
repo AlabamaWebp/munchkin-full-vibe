@@ -78,29 +78,29 @@ import { unavailableReason } from './game-ui.model';
     .hand-header {
       display: grid;
       min-width: 0;
+      min-height: 2.75rem;
       grid-row: 1;
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      gap: 0.35rem;
+      overflow: hidden;
+      border-top: 1px solid var(--surface-line-soft);
+      border-bottom: 1px solid var(--surface-line-soft);
+      border-radius: var(--radius-compact);
+      background: linear-gradient(90deg, rgba(20, 15, 10, 0.88), rgba(49, 32, 18, 0.78));
     }
     .character-summary {
       display: flex;
       justify-content: space-between;
       min-width: 0;
       min-height: 2.75rem;
-      padding: 0.2rem 0.35rem;
+      padding: 0.18rem 0.4rem;
       align-items: stretch;
       gap: 0.25rem;
       border: 0;
-      border-radius: 0.7rem;
+      border-radius: 0;
       color: #f3e4c7;
-      background: linear-gradient(
-        105deg,
-        rgba(17, 13, 9, 0.97),
-        rgba(58, 37, 20, 0.94) 55%,
-        rgba(14, 11, 8, 0.97)
-      );
-      box-shadow: inset 0 1px var(--tabletop-highlight);
+      background: transparent;
+      box-shadow: none;
       text-align: left;
     }
     .summary-identity {
@@ -118,9 +118,7 @@ import { unavailableReason } from './game-ui.model';
       border-radius: 50%;
       color: #f7dfae;
       background: radial-gradient(circle at 35% 30%, #724923, #17130e 69%);
-      box-shadow:
-        0 0 0 2px #31200f,
-        0 0.2rem 0.5rem #000;
+      box-shadow: 0 0.15rem 0.35rem rgba(0, 0, 0, 0.5);
       font:
         900 0.95rem Georgia,
         serif;
@@ -204,44 +202,45 @@ import { unavailableReason } from './game-ui.model';
         serif;
     }
     .cards {
-      display: grid;
+      display: flex;
       grid-row: 2;
       height: 100%;
       min-width: 0;
-      grid-auto-flow: column;
-      grid-auto-columns: 5rem;
-      gap: 0.4rem;
+      min-height: 0;
+      align-items: stretch;
+      gap: 0.35rem;
       overflow-x: auto;
-      padding: 0.25rem 0.2rem max(0.35rem, env(safe-area-inset-bottom)) 0;
+      overflow-y: hidden;
+      padding: 0.18rem 0.15rem 0;
       scroll-padding-inline: 0.25rem;
       scroll-snap-type: x mandatory;
-      scrollbar-width: thin;
+      scrollbar-width: none;
+    }
+    .cards::-webkit-scrollbar {
+      display: none;
     }
     app-compact-game-card {
+      width: auto;
+      flex: 0 0 auto;
       min-width: 0;
       min-height: 0;
       height: 100%;
+      aspect-ratio: 3 / 4;
       scroll-snap-align: start;
     }
     .hand-menu {
       align-self: center;
       min-height: 2.75rem;
-      padding: 0.35rem 0.65rem;
-      border: 1px solid rgba(177, 122, 56, 0.72);
-      border-radius: 999px;
+      padding: 0.3rem 0.6rem;
+      border: 0;
+      border-left: 1px solid var(--surface-line-soft);
+      border-radius: 0;
       color: #f3e4c7;
-      background: linear-gradient(
-        105deg,
-        rgba(17, 13, 9, 0.97),
-        rgba(58, 37, 20, 0.94) 55%,
-        rgba(14, 11, 8, 0.97)
-      );
+      background: rgba(37, 25, 15, 0.55);
       font-family: var(--ui-sans);
       font-size: 0.78rem;
       font-weight: 900;
-      box-shadow:
-        inset 0 1px rgba(255, 220, 149, 0.18),
-        0 0.35rem 0.9rem rgba(0, 0, 0, 0.48);
+      box-shadow: none;
     }
     .empty {
       display: grid;
@@ -264,7 +263,7 @@ import { unavailableReason } from './game-ui.model';
       }
       .character-summary {
         min-height: 2.75rem;
-        padding: 0.25rem 0.35rem;
+        padding: 0.18rem 0.35rem;
         gap: 0.2rem;
       }
       .summary-initial {
@@ -285,11 +284,21 @@ import { unavailableReason } from './game-ui.model';
         grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-auto-flow: row;
         grid-auto-columns: auto;
-        grid-auto-rows: minmax(9rem, 1fr);
+        grid-auto-rows: auto;
+        align-content: start;
         gap: 0.45rem;
         overflow-x: hidden;
         overflow-y: auto;
         padding-right: 0.25rem;
+      }
+      app-compact-game-card {
+        width: 100%;
+        height: auto;
+      }
+    }
+    @media (max-width: 26rem) {
+      .summary-loadout {
+        display: none;
       }
     }
   `,

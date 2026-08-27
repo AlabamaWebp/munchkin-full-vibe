@@ -47,12 +47,10 @@ import { CardArtworkComponent } from './card-artwork.component';
       min-width: 0;
       height: 100%;
       overflow: hidden;
-      border: 1px solid rgba(166, 125, 75, 0.86);
-      border-radius: 0.75rem;
+      border: 1px solid rgba(166, 125, 75, 0.68);
+      border-radius: var(--radius-compact);
       background: linear-gradient(155deg, #3a2818, #17100b 72%);
-      box-shadow:
-        inset 0 0 0 1px rgba(0, 0, 0, 0.76),
-        0 0.28rem 0.6rem rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0.16rem 0.38rem rgba(0, 0, 0, 0.42);
     }
     article[data-type='MONSTER'] {
       border-color: #9f5f56;
@@ -151,7 +149,9 @@ import { CardArtworkComponent } from './card-artwork.component';
     }
     :host-context(.hand-dock) .card-action {
       min-height: 0;
-      padding: 0.2rem;
+      padding: 0.12rem;
+      grid-template-rows: minmax(0, 1fr);
+      gap: 0;
     }
     :host-context(.hand-dock) app-card-artwork {
       width: 100%;
@@ -161,9 +161,33 @@ import { CardArtworkComponent } from './card-artwork.component';
       align-self: center;
     }
     :host-context(.hand-dock) strong {
-      min-height: 1.8em;
-      max-height: 1.8em;
-      font-size: 0.72rem;
+      display: none;
+    }
+    :host-context(.hand-dock) article.upgrade .card-action {
+      padding-bottom: 0.12rem;
+    }
+    :host-context(.hand-dock) .upgrade-badge {
+      right: 0.25rem;
+      bottom: 0.25rem;
+      left: auto;
+      width: 1.25rem;
+      height: 1.25rem;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid rgba(205, 255, 236, 0.72);
+      border-radius: 50%;
+      color: transparent;
+      font-size: 0;
+      box-shadow: 0 0.12rem 0.3rem rgba(0, 0, 0, 0.45);
+    }
+    :host-context(.hand-dock) .upgrade-badge::after {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      place-items: center;
+      color: #e6fff4;
+      content: '↑';
+      font-size: 0.82rem;
     }
     :host-context(.hand-dock) .facts span {
       font-size: 0.66rem;

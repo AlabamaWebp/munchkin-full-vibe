@@ -751,14 +751,16 @@ GAME ROOT: height 100dvh; overflow hidden; safe-area padding
   TOP HUD       players, turn, phase, connection
   EVENT STRIP   2–3 meaningful authoritative events
   CENTER STAGE  exactly the current gameplay context
-  HAND DOCK     compact playable-first preview + Full Hand control
   ACTION DOCK   at most 1 primary + 1–2 secondary actions
+  HAND DOCK     compact playable-first preview + Full Hand control
 ```
 
 There is no document/page scroll on either axis. The browser brand/header is
-folded into the Top HUD during play. Six players fit as compact, non-scrolling
-color/status cells. The Hand Dock itself does not scroll; the Full Hand sheet
-does.
+folded into the Top HUD during play. Five or six players use an internally
+horizontal, snap-aligned public rail rather than unreadably compressed cells.
+The compact Hand Dock is likewise an internal horizontal preview rail with
+height-derived `3:4` cards; Full Hand remains the complete inspection and
+selection surface.
 
 Scrolling is allowed only inside sheets/dialogs, history, Full Hand, and long
 target/selection pickers. Center Stage never becomes an unbounded board. In a

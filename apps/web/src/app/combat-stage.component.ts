@@ -97,12 +97,12 @@ export function formatReactionCountdown(remainingMs: number): string {
                   [label]="cardName(focused().monster)"
                   [compact]="true"
                 />
+                <span class="monster-strength"
+                  ><b>{{ focused().currentStrength }}</b
+                  ><small>СИЛА</small></span
+                >
                 <span class="monster-info" aria-hidden="true">i</span>
               </button>
-              <span class="monster-strength"
-                ><b>{{ focused().currentStrength }}</b
-                ><small>СИЛА</small></span
-              >
               <div class="monster-footer">
                 <p><strong>Непотребство:</strong> {{ badStuff() }}</p>
                 <div class="rewards">
@@ -126,43 +126,47 @@ export function formatReactionCountdown(remainingMs: number): string {
             </article>
           }
         </div>
-        <button
-          type="button"
-          class="score"
-          aria-label="Открыть расчёт силы"
-          (click)="breakdownOpened.emit()"
-        >
-          <span
-            ><small>СИЛА ИГРОКОВ</small><b>{{ combat.playerPower }}</b></span
+        <div class="combat-summary">
+          <button
+            type="button"
+            class="score"
+            aria-label="Открыть расчёт силы"
+            (click)="breakdownOpened.emit()"
           >
-          <strong aria-hidden="true">VS</strong>
-          <span
-            ><small>СИЛА МОНСТРА</small><b>{{ combat.monsterPower }}</b></span
-          >
-          @if (combat.monsters.length > 1) {
-            <span class="score-reward"
-              >НАГРАДА: +{{ totalLevelRewards() }} {{ totalLevelWord() }} ·
-              {{ totalTreasureRewards() }} {{ totalTreasureWord() }}</span
+            <span
+              ><small>ИГРОКИ</small><b>{{ combat.playerPower }}</b></span
             >
-          }
-          <em [class.losing]="difference() <= 0"
-            >{{ difference() > 0 ? '+' : '' }}{{ difference() }}</em
-          >
-        </button>
-        @if (difference() <= 0 && combatHint(); as hint) {
-          <p class="combat-hint">{{ hint }}</p>
-        }
-        <div class="participants">
-          <span>{{ playerName(combat.playerId) }}</span>
-          @if (combat.helpAgreement; as agreement) {
-            <span class="agreement"
-              >{{ playerName(agreement.helperId) }} помогает · получит
-              {{ agreement.promisedTreasures }}
-              {{ treasureLabel(agreement.promisedTreasures) }}</span
+            <strong aria-hidden="true">VS</strong>
+            <span
+              ><small>МОНСТРЫ</small><b>{{ combat.monsterPower }}</b></span
             >
-          } @else if (combat.helperId) {
-            <span>{{ playerName(combat.helperId) }} помогает</span>
-          }
+            <em [class.losing]="difference() <= 0"
+              >{{ difference() > 0 ? '+' : '' }}{{ difference() }}</em
+            >
+            @if (combat.monsters.length > 1) {
+              <span class="score-reward"
+                >НАГРАДА: +{{ totalLevelRewards() }} {{ totalLevelWord() }} ·
+                {{ totalTreasureRewards() }} {{ totalTreasureWord() }}</span
+              >
+            }
+          </button>
+          <div class="combat-meta">
+            @if (difference() <= 0 && combatHint(); as hint) {
+              <p class="combat-hint">{{ hint }}</p>
+            }
+            <div class="participants">
+              <span>{{ playerName(combat.playerId) }}</span>
+              @if (combat.helpAgreement; as agreement) {
+                <span class="agreement"
+                  >{{ playerName(agreement.helperId) }} помогает · получит
+                  {{ agreement.promisedTreasures }}
+                  {{ treasureLabel(agreement.promisedTreasures) }}</span
+                >
+              } @else if (combat.helperId) {
+                <span>{{ playerName(combat.helperId) }} помогает</span>
+              }
+            </div>
+          </div>
         </div>
       </section>
     }
@@ -177,30 +181,36 @@ export function formatReactionCountdown(remainingMs: number): string {
       display: grid;
       height: 100%;
       min-height: 0;
-      grid-template-rows: minmax(0, 1fr) auto auto auto;
-      gap: 0.28rem;
+      grid-template-rows: minmax(0, 26rem) auto;
+      align-content: center;
+      gap: var(--space-1);
     }
     .combat:has(.combat-status),
     .combat:has(.reaction) {
-      grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+      grid-template-rows: auto minmax(0, 26rem) auto;
     }
     .monster-zone {
       display: grid;
       min-width: 0;
       min-height: 0;
+      grid-template-rows: minmax(0, 1fr);
+      gap: var(--space-1);
+      align-items: stretch;
+      justify-items: center;
+    }
+    .monster-zone:has(.encounter-tabs) {
       grid-template-rows: auto minmax(0, 1fr);
-      gap: 0.32rem;
-      align-content: center;
     }
     .combat-status,
     .reaction {
       display: grid;
-      padding: 0.32rem 0.5rem;
+      min-height: 2.25rem;
+      padding: 0.25rem 0.45rem;
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       column-gap: 0.5rem;
-      border: 1px solid #806f42;
-      border-radius: 0.6rem;
+      border: 1px solid var(--surface-line);
+      border-radius: var(--radius-compact);
       color: #ffe9ad;
       background: #3b321d;
     }
@@ -223,7 +233,7 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .combat-status-detail,
     .reaction small {
-      font-size: 0.68rem;
+      font-size: 0.75rem;
     }
     .combat-status-detail {
       grid-column: 1;
@@ -244,17 +254,23 @@ export function formatReactionCountdown(remainingMs: number): string {
       font-variant-numeric: tabular-nums;
       font-weight: 800;
     }
+    .combat-summary {
+      display: grid;
+      min-width: 0;
+      gap: 0.15rem;
+    }
     .score {
       position: relative;
       display: grid;
-      width: min(100%, 20rem);
-      min-height: 0;
+      width: min(100%, 21rem);
+      min-height: 3.25rem;
       justify-self: center;
-      padding: 0.28rem 0.45rem;
-      grid-template-columns: 1fr auto 1fr;
+      padding: 0.25rem 0.4rem;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
       align-items: center;
-      border: 1px solid var(--surface-frame);
-      border-radius: 0.9rem;
+      column-gap: 0.35rem;
+      border: 1px solid var(--surface-line);
+      border-radius: var(--radius-surface);
       color: #fff;
       background: linear-gradient(
         100deg,
@@ -262,9 +278,7 @@ export function formatReactionCountdown(remainingMs: number): string {
         rgba(20, 15, 10, 0.97) 48%,
         rgba(54, 25, 19, 0.97)
       );
-      box-shadow:
-        inset 0 1px rgba(255, 225, 159, 0.13),
-        0 0.3rem 0.85rem rgba(0, 0, 0, 0.28);
+      box-shadow: inset 0 1px rgba(255, 225, 159, 0.1);
     }
     .score span {
       display: grid;
@@ -272,47 +286,55 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .score small {
       color: #bdc9c0;
-      font-size: 0.64rem;
+      font-size: 0.68rem;
       letter-spacing: 0.08em;
     }
     .score b {
       font:
-        900 clamp(1.55rem, 8vw, 2.05rem)/1 Georgia,
+        900 clamp(1.35rem, 7vw, 1.75rem)/1 Georgia,
         serif;
       line-height: 1;
     }
     .score > strong {
       color: #edc978;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       letter-spacing: 0.08em;
     }
     .score-reward {
       grid-column: 1 / -1;
-      margin-top: 0.12rem;
+      margin-top: 0.05rem;
       color: #e6c987;
-      font-size: 0.65rem;
+      font-size: 0.7rem;
       font-weight: 800;
       line-height: 1.1;
       text-align: center;
     }
     .score em {
-      grid-column: 1 / -1;
-      justify-self: center;
+      justify-self: end;
       display: grid;
-      min-width: 3.1rem;
-      height: 1.35rem;
-      padding-inline: 0.35rem;
+      min-width: 2.5rem;
+      height: 1.5rem;
+      padding-inline: 0.3rem;
       place-items: center;
       border-radius: 999px;
       color: #2b1b0d;
       background: #e0b85f;
       font-style: normal;
-      font-size: 0.78rem;
+      font-size: 0.74rem;
       font-weight: 950;
     }
     .score em.losing {
       color: #fff;
       background: #aa5147;
+    }
+    .combat-meta {
+      display: flex;
+      min-width: 0;
+      min-height: 1.1rem;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-1);
+      overflow: hidden;
     }
     .participants {
       display: flex;
@@ -327,7 +349,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       border-radius: 999px;
       color: #dce5de;
       background: rgba(34, 26, 18, 0.85);
-      font-size: 0.62rem;
+      font-size: 0.75rem;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -342,12 +364,12 @@ export function formatReactionCountdown(remainingMs: number): string {
       display: block;
       width: min(100%, 22rem);
       justify-self: center;
-      padding: 0.24rem 0.55rem;
-      border: 1px solid rgba(153, 124, 76, 0.4);
-      border-radius: 999px;
+      padding: 0.08rem 0.2rem;
+      border: 0;
+      border-radius: 0;
       color: #e1ceb0;
-      background: rgba(27, 20, 13, 0.72);
-      font-size: 0.7rem;
+      background: transparent;
+      font-size: 0.72rem;
       line-height: 1.15;
       text-align: center;
     }
@@ -361,7 +383,7 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .encounter-tabs button {
       min-width: 8rem;
-      min-height: 2.4rem;
+      min-height: 2.75rem;
       padding: 0.3rem 0.45rem;
       overflow: hidden;
       flex: 0 0 8rem;
@@ -369,7 +391,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       border-radius: 0.5rem;
       color: #d9dedb;
       background: #211d17;
-      font-size: 0.62rem;
+      font-size: 0.75rem;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -380,24 +402,20 @@ export function formatReactionCountdown(remainingMs: number): string {
     .monster {
       position: relative;
       display: grid;
-      width: min(100%, clamp(12rem, 55vw, 15rem));
+      width: min(100%, clamp(10.5rem, 56vw, 13.25rem));
       min-height: 0;
-      height: auto;
-      max-height: 100%;
-      padding: 0.3rem;
-      grid-template-rows: auto auto auto;
+      height: min(100%, 23rem);
+      max-height: min(100%, 23rem);
+      padding: 0.25rem;
+      grid-template-rows: auto minmax(0, 1fr) auto;
       align-self: center;
       justify-self: center;
-      gap: 0.24rem;
+      gap: 0.2rem;
       overflow: hidden;
-      border: 1px solid #a95b52;
-      border-radius: 0.95rem;
-      background: linear-gradient(145deg, rgba(77, 35, 21, 0.96), rgba(17, 12, 9, 0.96));
-      box-shadow:
-        inset 0 0 0 1px rgba(223, 159, 103, 0.16),
-        inset 0 1rem 2.5rem rgba(255, 210, 132, 0.05),
-        0 0.35rem 0.9rem rgba(0, 0, 0, 0.5),
-        0 0 1rem rgba(113, 45, 25, 0.2);
+      border: 1px solid rgba(169, 91, 82, 0.76);
+      border-radius: var(--radius-stage);
+      background: linear-gradient(145deg, rgba(64, 31, 20, 0.88), rgba(17, 12, 9, 0.9));
+      box-shadow: 0 0.25rem 0.7rem rgba(0, 0, 0, 0.42);
     }
     .ui-combat-card-enter {
       animation: ui-combat-card-enter 150ms cubic-bezier(0.16, 0.82, 0.25, 1) both;
@@ -415,11 +433,13 @@ export function formatReactionCountdown(remainingMs: number): string {
     .monster-art {
       position: relative;
       display: grid;
-      width: 100%;
-      height: auto;
+      width: auto;
+      height: 100%;
       aspect-ratio: 3 / 4;
       align-self: center;
       justify-self: center;
+      max-width: 100%;
+      max-height: 100%;
       min-width: 0;
       min-height: 0;
       place-items: center;
@@ -480,10 +500,10 @@ export function formatReactionCountdown(remainingMs: number): string {
       align-items: center;
       justify-content: center;
       gap: 0.3rem;
-      border-top: 1px solid rgba(194, 139, 69, 0.62);
-      border-radius: 0.35rem;
+      border-top: 1px solid rgba(194, 139, 69, 0.44);
+      border-radius: 0;
       color: #f0cf87;
-      background: linear-gradient(90deg, rgba(100, 65, 23, 0.78), rgba(47, 30, 17, 0.62));
+      background: transparent;
     }
     .rewards b {
       color: #dcb76b;
@@ -492,26 +512,19 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     .rewards span {
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       font: 800 0.7rem/1 var(--ui-sans);
     }
     p {
-      display: -webkit-box;
       margin: 0;
-      overflow: hidden;
       color: #e2d4d1;
       font-size: 0.7rem;
-      line-height: 1.15;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
+      line-height: 1.18;
     }
     .monster-strength {
       position: absolute;
       z-index: 2;
-      top: 2.15rem;
-      right: 0.45rem;
+      top: 0.35rem;
+      right: 0.35rem;
       display: grid;
       width: 2.15rem;
       height: 2.55rem;
@@ -531,7 +544,7 @@ export function formatReactionCountdown(remainingMs: number): string {
         serif;
     }
     .monster-strength small {
-      font-size: 0.56rem;
+      font-size: 0.68rem;
       font-weight: 900;
     }
     .modifiers {
@@ -543,7 +556,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       border-radius: 999px;
       color: #ffddb5;
       background: #593a31;
-      font-size: 0.58rem;
+      font-size: 0.68rem;
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
@@ -551,12 +564,10 @@ export function formatReactionCountdown(remainingMs: number): string {
     }
     @media (min-width: 48rem) {
       .combat {
-        padding: 0.5rem 0;
+        padding: 0.25rem 0;
       }
       .monster {
         width: min(100%, 14rem);
-        min-height: 0;
-        max-height: min(26rem, 50dvh);
       }
       h3 {
         font-size: 1rem;
@@ -574,7 +585,7 @@ export function formatReactionCountdown(remainingMs: number): string {
         gap: 0.2rem;
       }
       .monster {
-        width: min(100%, clamp(10rem, 48vw, 12.5rem));
+        width: min(100%, clamp(9.5rem, 48vw, 11.5rem));
         height: 100%;
         grid-template-rows: auto minmax(0, 1fr) auto;
       }
@@ -587,12 +598,12 @@ export function formatReactionCountdown(remainingMs: number): string {
         min-height: 0;
       }
       .score b {
-        font-size: 1.7rem;
+        font-size: 1.45rem;
       }
       .combat-hint {
         display: none;
       }
-      .participants {
+      .participants span:first-child:not(:only-child) {
         display: none;
       }
       h3 {

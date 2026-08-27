@@ -81,23 +81,20 @@ import type { ConnectionState } from './lobby-client';
       display: grid;
       height: 100%;
       min-height: 0;
-      grid-template-rows: 2.75rem minmax(0, 1fr);
-      gap: 0.2rem;
+      grid-template-rows: 2.75rem minmax(2.75rem, 1fr);
       min-width: 0;
     }
     .turn-line {
       display: grid;
-      min-height: 2.75rem;
+      height: 2.75rem;
+      min-height: 0;
       grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
       align-items: stretch;
-      gap: 0.25rem;
-      padding: 0.12rem;
-      border: 1px solid rgba(110, 79, 39, 0.62);
-      border-radius: 0.82rem;
-      background: linear-gradient(180deg, rgba(28, 20, 13, 0.94), rgba(13, 10, 7, 0.96));
-      box-shadow:
-        inset 0 1px rgba(255, 220, 149, 0.13),
-        0 0.25rem 0.7rem rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      border: 1px solid var(--surface-line);
+      border-radius: var(--radius-surface);
+      background: linear-gradient(100deg, rgba(20, 55, 35, 0.96), rgba(18, 24, 17, 0.97));
+      box-shadow: inset 0 1px rgba(255, 220, 149, 0.1);
     }
     .turn-line:not(:has(.fullscreen-button)) {
       grid-template-columns: 2.75rem minmax(0, 1fr);
@@ -105,13 +102,9 @@ import type { ConnectionState } from './lobby-client';
     .turn-context {
       display: grid;
       min-width: 0;
-      min-height: 2.75rem;
-      padding: 0.24rem 0.55rem;
+      min-height: 0;
+      padding: 0.2rem 0.45rem;
       align-content: center;
-      border: 1px solid rgba(115, 157, 115, 0.52);
-      border-radius: 0.62rem;
-      background: linear-gradient(100deg, rgba(24, 70, 42, 0.96), rgba(15, 40, 27, 0.96));
-      box-shadow: inset 0 1px var(--tabletop-highlight);
       text-align: center;
     }
     strong {
@@ -125,7 +118,7 @@ import type { ConnectionState } from './lobby-client';
     .turn-line span {
       color: #e4d2a5;
       font-family: var(--ui-sans);
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 650;
     }
     .turn-line button {
@@ -133,11 +126,11 @@ import type { ConnectionState } from './lobby-client';
       min-width: 2.75rem;
       min-height: 2.75rem;
       padding: 0;
-      border: 1px solid rgba(141, 99, 46, 0.6);
-      border-radius: 0.62rem;
+      border: 0;
+      border-radius: 0;
       color: #f5f8f6;
-      background: rgba(59, 40, 22, 0.8);
-      box-shadow: inset 0 1px rgba(255, 220, 149, 0.12);
+      background: rgba(35, 25, 16, 0.44);
+      box-shadow: none;
     }
     .icon-button svg {
       width: 1.1rem;
@@ -158,15 +151,19 @@ import type { ConnectionState } from './lobby-client';
     }
     .players {
       display: grid;
-      grid-auto-columns: minmax(8.5rem, 1fr);
+      grid-auto-columns: clamp(7.5rem, 34vw, 9rem);
       grid-auto-flow: column;
       min-width: 0;
       min-height: 0;
       height: 100%;
+      gap: 0.15rem;
       overflow-x: auto;
       overflow-y: hidden;
       scroll-snap-type: x proximity;
-      scrollbar-width: thin;
+      scrollbar-width: none;
+    }
+    .players::-webkit-scrollbar {
+      display: none;
     }
     .players.solo {
       display: flex;
@@ -175,34 +172,30 @@ import type { ConnectionState } from './lobby-client';
     .players.solo .player {
       width: min(12rem, 100%);
       flex: 0 0 min(12rem, 100%);
-      background: transparent;
-    }
-    .players.solo .player.self {
-      background: transparent;
     }
     .player {
       display: grid;
       min-width: 0;
-      min-height: 0;
       height: 100%;
       box-sizing: border-box;
       min-height: 2.75rem;
-      padding: 0.2rem 0.35rem;
+      padding: 0.18rem 0.3rem;
       grid-template-columns: 1.8rem minmax(0, 1fr);
       grid-template-rows: 1fr 1fr;
       column-gap: 0.35rem;
       text-align: left;
       border: 0;
-      border-radius: 0.55rem;
+      border-radius: var(--radius-compact);
       color: #eef4ef;
-      background: rgba(23, 18, 13, 0.66);
+      background: rgba(18, 14, 10, 0.52);
       scroll-snap-align: start;
     }
     .player.active {
-      box-shadow: inset 2px 0 #e5bd62;
+      color: #fff2d1;
+      box-shadow: inset 2px 0 var(--color-gold);
     }
     .player.self {
-      background: linear-gradient(105deg, #51351f, #25170e);
+      background: rgba(67, 43, 24, 0.66);
     }
     .player.dead {
       opacity: 0.65;
@@ -214,7 +207,7 @@ import type { ConnectionState } from './lobby-client';
       grid-row: 1 / -1;
       place-items: center;
       border-radius: 50%;
-      border: 2px solid #e0b660;
+      border: 2px solid #cfa756;
       color: #2b1b0d;
       background: radial-gradient(circle at 35% 30%, #e0b660, #66411d 60%, #21140c);
       font-size: 0.75rem;
@@ -257,10 +250,9 @@ import type { ConnectionState } from './lobby-client';
     small {
       display: block;
       overflow: hidden;
-      color: #b9aa91;
       color: #d2b984;
       font-family: var(--ui-sans);
-      font-size: 0.68rem;
+      font-size: 0.75rem;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -270,7 +262,7 @@ import type { ConnectionState } from './lobby-client';
     }
     button:focus-visible {
       outline: 3px solid #fff2a8;
-      outline-offset: 2px;
+      outline-offset: -3px;
     }
   `,
 })

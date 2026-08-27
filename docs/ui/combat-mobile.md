@@ -46,8 +46,8 @@ authoritative.
 | "Ваш ход" banner                  | `activePlayerId`, `viewerPlayerId`, `turnNumber`, `phase`                                                               | Keep the banner style. Say "Ваш ход" only for the active viewer; otherwise show whose combat it is.                                                                                                                                                                    |
 | "Выбита дверь · Бой"              | `phase` plus `combat !== null`                                                                                          | Use localized real phase and a combat label. Do not create a new phase.                                                                                                                                                                                                |
 | Menu                              | Existing menu sheet                                                                                                     | Keep, restyle.                                                                                                                                                                                                                                                         |
-| History button                    | `presentation` and `gameLog`                                                                                            | No dedicated HUD button. The recent-events strip is the entry into the bounded History sheet.                                                                                                                                                                           |
-| "Показывать историю" checkbox     | No corresponding setting                                                                                                | Omit. Up to three recent events stay visible; the recent strip opens full history explicitly.                                                                                                                                                                           |
+| History button                    | `presentation` and `gameLog`                                                                                            | No dedicated HUD button. The recent-events strip is the entry into the bounded History sheet.                                                                                                                                                                          |
+| "Показывать историю" checkbox     | No corresponding setting                                                                                                | Omit. Up to three recent events stay visible; the recent strip opens full history explicitly.                                                                                                                                                                          |
 | Player-versus-Monster row         | `combat.playerId`, helper data, `combat.monsters`                                                                       | Rework as public player rail plus combat participants. A Monster has no Class/Race field; never show fictional role copy.                                                                                                                                              |
 | Player color                      | Public player color selected in the lobby                                                                               | Use the selected color consistently in the player rail and character summary. Monster uses its real `artKey`; color remains cosmetic.                                                                                                                                  |
 | Recent actions with "minutes ago" | `presentation`, `gameLog`, `combat.history`                                                                             | Show authoritative summaries in sequence order, without relative time because events have no timestamp.                                                                                                                                                                |
@@ -67,13 +67,13 @@ authoritative.
 ## Mobile layout
 
 The shell remains a fixed grid. The implemented `390 x 844` budget is a
-starting point for visual QA, not a new hard-coded game rule:
+reference for visual QA, not a set of component-specific hard-coded rules:
 
 ```text
 ┌──────────────────────────────────────┐
-│ Turn banner + public player rail 89px│
+│ Turn banner + public player rail 88px│
 ├──────────────────────────────────────┤
-│ Recent events (up to 3)         ~58px│
+│ Recent events (up to 3)          48px│
 ├──────────────────────────────────────┤
 │                                      │
 │ Encounter stage              minmax()│
@@ -81,27 +81,29 @@ starting point for visual QA, not a new hard-coded game rule:
 │  total score · state/help summary     │
 │                                      │
 ├──────────────────────────────────────┤
-│ Contextual combat actions        68px│
+│ Contextual combat actions        56px│
 ├──────────────────────────────────────┤
-│ Own summary + hand rail         148px│
+│ Own summary + hand rail         124px│
 └──────────────────────────────────────┘
 ```
 
 Use `100dvh` minus safe-area padding. The encounter stage receives all remaining
 height through `minmax(0, 1fr)`. The recent-events strip shows the newest
 authoritative summaries (up to three of them, excluding whatever the stage card
-already explains) in one compact area and opens complete history on tap. The hand rail shares a compact
-own-character utility row and is always visible on mobile; it scrolls horizontally
-with a fixed card width rather than enlarging a lone card. At compact heights,
-remove decorative padding, reduce the event to one line, and shorten secondary
-Monster copy while retaining a readable portrait card preview and the full-hand
-gateway. Do not reduce touch targets below `44px` and do not introduce body
-scrolling.
+already explains) in one compact area and opens complete history on tap. The hand
+rail shares a compact own-character utility row and is always visible on mobile;
+it scrolls horizontally with height-derived `3:4` cards instead of squeezing the
+whole hand into equal columns. Focused encounter and event cards are capped by
+both available Stage space and a readable maximum, so a taller viewport adds
+breathing room rather than stretching artwork. At compact heights, remove
+decorative padding and secondary copy while retaining mandatory facts, a readable
+portrait preview, and the Full Hand gateway. Do not reduce touch targets below
+`44px` and do not introduce body scrolling.
 
 ### Turn banner
 
-- Left: menu action; right: History and optional fullscreen actions, all inside
-  one restrained dark HUD surface.
+- Left: menu action; right: optional fullscreen action, all inside one restrained
+  dark HUD surface. History opens only from the recent-events strip.
 - Center: active context, for example "Ваш ход" / "Бой: Анна", followed by
   localized real phase and turn number.
 - A connection warning replaces secondary subtitle space rather than adding
@@ -286,10 +288,11 @@ The combat presentation must be checked in at least these states:
 | `EquipmentLayoutComponent`                                                           | Appears in character sheets alongside a compact shell summary.       |
 | Focus trap, autofocus, safe-area and fixed-viewport foundation                       | Present; preserve in follow-up work.                                 |
 
-## Follow-up verification
+## Verification baseline
 
-1. Re-run fixed-viewport and overflow checks at `390 x 844` and `360 x 640`
-   after visual changes, including safe-area/browser-toolbar conditions.
+1. Re-run fixed-viewport and overflow checks at `360 x 640`, `390 x 844`,
+   `430 x 932`, `768 x 1024`, and `1024 x 768` after visual changes, including
+   safe-area/browser-toolbar conditions.
 2. Validate the turn bar, player rail, and prioritized event capsule with 1–6
    player fixtures, long names, and color-only identity treatment.
 3. Recheck focused encounter, total score, multi-Monster navigation,
