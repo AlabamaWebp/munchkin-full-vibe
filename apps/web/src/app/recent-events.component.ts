@@ -16,8 +16,10 @@ import type { PresentedEvent } from './game-ui.model';
         <span class="empty">Игра начинается…</span>
       } @else {
         <span class="event-list">
-          @for (event of events().slice(0, 1); track event.entry.sequence) {
-            <span [class.important]="event.priority !== 'ROUTINE'">{{ event.summary }}</span>
+          @for (event of events().slice(0, 3); track event.entry.sequence) {
+            <span class="event-row" [class.important]="event.priority !== 'ROUTINE'">
+              <i aria-hidden="true"></i>{{ event.summary }}
+            </span>
           }
         </span>
       }
@@ -69,25 +71,40 @@ import type { PresentedEvent } from './game-ui.model';
       white-space: nowrap;
     }
     .event-list {
-      display: block;
+      display: grid;
+      min-width: 0;
       min-height: 0;
+      gap: 0.06rem;
       overflow: hidden;
     }
-    .event-list span,
+    .event-row,
     .empty {
-      display: -webkit-box;
+      display: flex;
       width: 100%;
       min-width: 0;
+      align-items: center;
+      gap: 0.35rem;
       overflow: hidden;
       font-family: var(--ui-sans);
-      font-size: 0.78rem;
-      line-height: 1.15;
-      text-overflow: ellipsis;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
+      font-size: 0.76rem;
+      line-height: 1.1;
+      white-space: nowrap;
     }
-    .important {
+    .event-row i {
+      flex: 0 0 auto;
+      width: 0.34rem;
+      height: 0.34rem;
+      border-radius: 50%;
+      background: #a67648;
+    }
+    .event-row.important {
       color: #ffe5a4;
+    }
+    .event-row.important i {
+      background: #e5bd62;
+    }
+    .event-list .event-row:not(.important) {
+      color: #e6d3ae;
     }
     .empty {
       color: #95a49a;
@@ -99,15 +116,15 @@ import type { PresentedEvent } from './game-ui.model';
     @media (max-height: 42rem) {
       .strip {
         min-height: 0;
-        padding-block: 0.25rem;
+        padding-block: 0.22rem;
       }
       .title {
         padding-inline: 0.3rem;
         font-size: 0.6rem;
       }
-      .event-list span,
+      .event-row,
       .empty {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
       }
     }
   `,

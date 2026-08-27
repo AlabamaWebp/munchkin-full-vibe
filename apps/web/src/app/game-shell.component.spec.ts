@@ -168,11 +168,11 @@ describe('GameShellComponent', () => {
     );
   });
 
-  it('keeps History reachable from the compact HUD', () => {
+  it('opens History from the recent-events entry', () => {
     const fixture = render(base());
     const root = fixture.nativeElement as HTMLElement;
 
-    root.querySelector<HTMLButtonElement>('[aria-label="Открыть историю"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Открыть историю игры"]')!.click();
     fixture.detectChanges();
 
     expect(root.querySelector('#history-title')?.textContent).toContain('История');
@@ -276,19 +276,29 @@ describe('GameShellComponent', () => {
     expect(root.querySelectorAll('.equipment-grid .empty')).toHaveLength(7);
   });
 
-  it('keeps projected equipment and role facts visible in the compact character strip', () => {
-    const equipment = card({ type: 'EQUIPMENT', name: 'Шлем испытаний' });
+  it('keeps role facts in the compact character strip and equipment in the sheet', () => {
+    const equipment = card({
+      type: 'EQUIPMENT',
+      name: 'Шлем испытаний',
+      equipment: { slot: 'HEAD', hands: 0, combatBonus: 1, restrictions: [], value: 300 },
+    });
     const classCard = card({ type: 'CLASS', name: 'Воин' });
     const self = player({ equipment: [equipment], classCard, combatPower: 4 });
-    const root = render(
+    const fixture = render(
       base({
         players: [self],
         self: { ...self, hand: [] },
       }),
-    ).nativeElement as HTMLElement;
+    );
+    const root = fixture.nativeElement as HTMLElement;
 
-    expect(root.querySelector('.summary-loadout')?.textContent).toContain('Шлем испытаний');
-    expect(root.querySelector('.summary-loadout')?.textContent).toContain('Воин');
+    const loadout = root.querySelector('.summary-loadout');
+    expect(loadout?.textContent).toContain('Воин');
+    expect(loadout?.textContent).not.toContain('Шлем испытаний');
+
+    root.querySelector<HTMLButtonElement>('.character-summary')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.equipment-grid')?.textContent).toContain('Шлем испытаний');
   });
 
   it('shows Door reveal and immediate Curse consequence from the event log', () => {
@@ -379,8 +389,8 @@ describe('GameShellComponent', () => {
       }),
     ).nativeElement as HTMLElement;
 
-    const events = root.querySelectorAll('app-recent-events .event-list span');
-    expect(events).toHaveLength(1);
+    const events = root.querySelectorAll('app-recent-events .event-row');
+    expect(events).toHaveLength(3);
     expect(events[0]?.textContent).toContain('вступил в бой');
   });
 

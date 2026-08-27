@@ -106,7 +106,6 @@ interface CardUse {
         [fullscreen]="isFullscreen()"
         (playerOpened)="selectedPlayerId.set($event)"
         (menuOpened)="menuOpen.set(true)"
-        (historyOpened)="historyOpen.set(true)"
         (fullscreenOpened)="toggleFullscreen()"
       />
       <app-recent-events [events]="recentEvents()" (historyOpened)="historyOpen.set(true)" />
@@ -1120,7 +1119,7 @@ export class GameShellComponent {
     const stageSequences = new Set(stageExplainedEventSequences(this.game(), this.stage()));
     return this.allEvents()
       .filter((event) => !stageSequences.has(event.entry.sequence))
-      .slice(-5)
+      .slice(-3)
       .reverse();
   });
   protected readonly playableIds = computed(() => this.collectPlayableIds());

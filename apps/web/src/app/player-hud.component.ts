@@ -25,18 +25,6 @@ import type { ConnectionState } from './lobby-client';
             <span class="warning" role="status">Нет связи</span>
           }
         </div>
-        <button
-          type="button"
-          class="icon-button"
-          aria-label="Открыть историю"
-          (click)="historyOpened.emit()"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 7v5l3 2" />
-            <path d="M5.6 9.2A7.2 7.2 0 1 1 5 14" />
-            <path d="M5.5 5.5v3.7h3.7" />
-          </svg>
-        </button>
         @if (fullscreenSupported()) {
           <button
             type="button"
@@ -100,7 +88,7 @@ import type { ConnectionState } from './lobby-client';
     .turn-line {
       display: grid;
       min-height: 2.75rem;
-      grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem auto;
+      grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
       align-items: stretch;
       gap: 0.25rem;
       padding: 0.12rem;
@@ -112,7 +100,7 @@ import type { ConnectionState } from './lobby-client';
         0 0.25rem 0.7rem rgba(0, 0, 0, 0.25);
     }
     .turn-line:not(:has(.fullscreen-button)) {
-      grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+      grid-template-columns: 2.75rem minmax(0, 1fr);
     }
     .turn-context {
       display: grid;
@@ -160,7 +148,7 @@ import type { ConnectionState } from './lobby-client';
       stroke-width: 1.8;
     }
     .fullscreen-button {
-      grid-column: 4;
+      grid-column: 3;
     }
     .warning {
       padding: 0.25rem 0.45rem;
@@ -293,7 +281,6 @@ export class PlayerHudComponent {
   readonly fullscreen = input(false);
   readonly playerOpened = output<string>();
   readonly menuOpened = output<void>();
-  readonly historyOpened = output<void>();
   readonly fullscreenOpened = output<void>();
 
   protected orderedPlayers() {

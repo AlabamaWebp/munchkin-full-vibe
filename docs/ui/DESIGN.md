@@ -149,7 +149,7 @@ The in-game shell is one fixed-height scene:
 safe-area viewport (100dvh, overflow: hidden)
 ├── turn bar / global controls
 ├── player rail
-├── recent authoritative event
+├── recent authoritative events (up to 3; opens history)
 ├── state-specific stage (takes remaining height)
 ├── contextual action dock
 ├── own-character summary
@@ -210,18 +210,20 @@ active/self/dead state, and may open the existing character sheet. Equipment,
 roles, and companion details stay in that sheet. For 5-6 players, use an
 internally horizontal rail rather than shrinking names below legibility.
 
-### Event capsule
+### Recent events
 
-Shows one blocking or important authoritative summary from `presentation`.
-Tapping it opens full history. `GameLogEntryView` contains sequence, turn, phase,
-and visibility but no wall-clock timestamp, so the UI must not show invented
-"minutes ago" labels.
+Shows the newest authoritative summaries from `presentation` — up to three in
+one compact strip, newest first, each a single truncated line. Prefer blocking
+or important summaries over routine ones. Tapping the strip opens full history.
+`GameLogEntryView` contains sequence, turn, phase, and visibility but no
+wall-clock timestamp, so the UI must not show invented "minutes ago" labels.
 
 When the stage is already presenting a card receipt, the nearby recent-events
 surface skips that exact event sequence and shows the next distinct useful
-event. Typed reward count and private-receipt events map to one player-facing
-reward item. This is presentation filtering only: it never removes authoritative
-events from the serialized history.
+events; a single event is never shown both at full size on the stage and in the
+strip at once. Typed reward count and private-receipt events map to one
+player-facing reward item. This is presentation filtering only: it never removes
+authoritative events from the serialized history.
 
 ### Stage
 
@@ -303,8 +305,8 @@ legal permanent-power upgrade.
 
 - The green dashboard palette and flat panel treatment.
 - The current HUD grid that compresses all 5-6 players into equal columns.
-- The multi-item recent-event strip; use one prioritized event capsule and full
-  history for the rest.
+- The multi-item recent-event strip: keep it as the home for compact recent
+  summaries (up to three) that opens full history on tap.
 - The compact two-column combat card; make the encounter the visual center while
   retaining totals, multi-Monster navigation, and details.
 - The generic three-button action dock that slices the available action list.

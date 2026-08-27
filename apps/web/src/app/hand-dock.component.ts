@@ -209,8 +209,8 @@ import { unavailableReason } from './game-ui.model';
       height: 100%;
       min-width: 0;
       grid-auto-flow: column;
-      grid-auto-columns: 7.25rem;
-      gap: 0.45rem;
+      grid-auto-columns: 5rem;
+      gap: 0.4rem;
       overflow-x: auto;
       padding: 0.25rem 0.2rem max(0.35rem, env(safe-area-inset-bottom)) 0;
       scroll-padding-inline: 0.25rem;
@@ -315,7 +315,6 @@ export class HandDockComponent {
     const companionCards = self.hirelingCards ?? (self.hirelingCard ? [self.hirelingCard] : []);
     const mountCards = self.mountCards ?? (self.mountCard ? [self.mountCard] : []);
     const candidates = [
-      ...self.equipment.map((card) => `Снаряжение · ${this.cardName()(card)}`),
       ...classCards.map((card) => `Класс · ${this.cardName()(card)}`),
       ...raceCards.map((card) => `Раса · ${this.cardName()(card)}`),
       ...companionCards.map((card) => `Спутник · ${this.cardName()(card)}`),

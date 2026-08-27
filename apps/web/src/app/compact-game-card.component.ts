@@ -154,10 +154,11 @@ import { CardArtworkComponent } from './card-artwork.component';
       padding: 0.2rem;
     }
     :host-context(.hand-dock) app-card-artwork {
-      width: auto;
-      height: 100%;
+      width: 100%;
+      height: auto;
       aspect-ratio: 3 / 4;
       justify-self: center;
+      align-self: center;
     }
     :host-context(.hand-dock) strong {
       min-height: 1.8em;

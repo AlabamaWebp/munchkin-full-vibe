@@ -46,8 +46,8 @@ authoritative.
 | "Ваш ход" banner                  | `activePlayerId`, `viewerPlayerId`, `turnNumber`, `phase`                                                               | Keep the banner style. Say "Ваш ход" only for the active viewer; otherwise show whose combat it is.                                                                                                                                                                    |
 | "Выбита дверь · Бой"              | `phase` plus `combat !== null`                                                                                          | Use localized real phase and a combat label. Do not create a new phase.                                                                                                                                                                                                |
 | Menu                              | Existing menu sheet                                                                                                     | Keep, restyle.                                                                                                                                                                                                                                                         |
-| History button                    | `presentation` and `gameLog`                                                                                            | Keep. Open the existing bounded History sheet.                                                                                                                                                                                                                         |
-| "Показывать историю" checkbox     | No corresponding setting                                                                                                | Omit. One recent event stays visible; full history is opened explicitly.                                                                                                                                                                                               |
+| History button                    | `presentation` and `gameLog`                                                                                            | No dedicated HUD button. The recent-events strip is the entry into the bounded History sheet.                                                                                                                                                                           |
+| "Показывать историю" checkbox     | No corresponding setting                                                                                                | Omit. Up to three recent events stay visible; the recent strip opens full history explicitly.                                                                                                                                                                           |
 | Player-versus-Monster row         | `combat.playerId`, helper data, `combat.monsters`                                                                       | Rework as public player rail plus combat participants. A Monster has no Class/Race field; never show fictional role copy.                                                                                                                                              |
 | Player color                      | Public player color selected in the lobby                                                                               | Use the selected color consistently in the player rail and character summary. Monster uses its real `artKey`; color remains cosmetic.                                                                                                                                  |
 | Recent actions with "minutes ago" | `presentation`, `gameLog`, `combat.history`                                                                             | Show authoritative summaries in sequence order, without relative time because events have no timestamp.                                                                                                                                                                |
@@ -73,7 +73,7 @@ starting point for visual QA, not a new hard-coded game rule:
 ┌──────────────────────────────────────┐
 │ Turn banner + public player rail 89px│
 ├──────────────────────────────────────┤
-│ Prioritized recent event         44px│
+│ Recent events (up to 3)         ~58px│
 ├──────────────────────────────────────┤
 │                                      │
 │ Encounter stage              minmax()│
@@ -88,8 +88,9 @@ starting point for visual QA, not a new hard-coded game rule:
 ```
 
 Use `100dvh` minus safe-area padding. The encounter stage receives all remaining
-height through `minmax(0, 1fr)`. The recent-event capsule shows the single highest
-priority summary and opens complete history on tap. The hand rail shares a compact
+height through `minmax(0, 1fr)`. The recent-events strip shows the newest
+authoritative summaries (up to three of them, excluding whatever the stage card
+already explains) in one compact area and opens complete history on tap. The hand rail shares a compact
 own-character utility row and is always visible on mobile; it scrolls horizontally
 with a fixed card width rather than enlarging a lone card. At compact heights,
 remove decorative padding, reduce the event to one line, and shorten secondary
@@ -118,14 +119,15 @@ scrolling.
 - The rail scrolls horizontally for 5-6 players and opens the existing player
   detail sheet on tap.
 
-### Recent event
+### Recent events
 
-Show at most one `presentation.blocking` or latest `important` summary on the
-table in a compact capsule. The small label is secondary to the event copy;
-the copy may clamp to two lines. Tapping opens History. If there is no
-important event, either show the latest meaningful routine event or a neutral
-"Бой начался" state. Do not invent an event time or locally acknowledge
-authoritative events.
+Show the newest authoritative summaries on the table in one compact strip —
+up to three events, newest first, each a single truncated line. Prefer
+`important`/`blocking` summaries over routine ones, exclude any event sequence
+the stage card already explains, and never render the same event at full size
+and in the strip at once. Tapping the whole strip opens History. If there is
+no event, show a neutral "Игра начинается…" state. Do not invent an event time
+or locally acknowledge authoritative events.
 
 ### Encounter stage
 
