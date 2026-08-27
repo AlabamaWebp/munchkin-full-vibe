@@ -370,6 +370,23 @@ Before considering a meaningful task complete, run the relevant available:
 * lint;
 * production builds.
 
+After significant frontend changes, use the UI verification workflow in this
+order:
+
+1. run the ordinary affected tests, lint, and production build;
+2. run `npm run ui:audit` across the configured viewport/state matrix;
+3. run `npm run ui:report`, read `artifacts/ui/report.md`, and fix geometry
+   errors caused by the change;
+4. run `npm run ui:visual` without updating snapshots;
+5. additionally run `npm run ui:map` for structural or layout changes and read
+   the relevant AI-readable map under `artifacts/ui/map/`.
+
+Do not repair layout with unexplained one-off offsets, negative margins, or
+translates. Fix the owning grid, flex, sizing, overflow, or spacing rule. Never
+update a visual baseline merely to make a failing check green; use
+`npm run ui:update` only after the visual change is understood, intentional, and
+reviewed.
+
 For narrow changes, targeted tests may be run during implementation, but the final verification should cover the affected packages sufficiently to detect integration regressions.
 
 If a required check cannot be run, report that explicitly instead of claiming verification succeeded.

@@ -40,6 +40,20 @@ single-origin production packaging and real-device validation remain.
 
 ## Recent meaningful changes
 
+- 2026-08-27: added automated Playwright UI verification over the real
+  Angular/NestJS/Socket.IO application. The five-viewport matrix now covers
+  home, lobby, ordinary game, multi-Monster combat, reaction, blocking discard,
+  and Full Hand states with JSON geometry issues, ARIA semantic maps plus DOM
+  boxes, masked/animation-free per-viewport visual baselines, and aggregated
+  reports under `artifacts/ui/`. Existing development scenarios remain the
+  state source; no gameplay rule or client legality layer was added.
+- 2026-08-27: enlarged the mobile hand artwork rail and added a persisted menu
+  preference that hides only its card previews while keeping the character row
+  and Full Hand gateway available. Focused card events now survive phase changes
+  through the current turn, including cleanup, so theft, trade, and reward cards
+  do not flash away. Side-neutral combat-card actions use signed-effect-neutral
+  “apply” wording. This remains presentation-only and consumes the existing
+  authoritative log and projected intents.
 - 2026-08-27: completed a system-level responsive audit of the fixed game scene
   across `360×640`, `390×844`, `430×932`, `768×1024`, and `1024×768`. The shell
   now gives Stage the actual remainder, caps focused `3:4` artwork without crop,

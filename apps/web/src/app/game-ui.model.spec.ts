@@ -5,6 +5,7 @@ import {
   presentEvents,
   selectStage,
   stageExplainedEventSequences,
+  stageShowsCard,
   unavailableReason,
 } from './game-ui.model';
 
@@ -443,7 +444,7 @@ describe('game UI state mapper', () => {
       'Ada сбросил расу: Clockwork Yak',
     ]);
   });
-  it('keeps the latest card event of the current phase and clears it on a phase change', () => {
+  it('keeps the latest card event through later phases of the same turn', () => {
     const soldCard = card({ instanceId: 'sold-1', name: 'Brass Greaves' });
     const otherSoldCard = card({ instanceId: 'sold-2', name: 'Silver Cloak' });
     const game = view({
@@ -476,7 +477,9 @@ describe('game UI state mapper', () => {
       summary: 'Ada продал карты',
       cards: [soldCard, otherSoldCard],
     });
-    expect(latestStageCardEvent({ ...game, phase: 'TURN_START' })).toBeNull();
+    expect(latestStageCardEvent({ ...game, phase: 'END_TURN' })).toMatchObject({
+      cards: [soldCard, otherSoldCard],
+    });
   });
   it('clears a previous turn card when the next turn returns to the same phase', () => {
     const equippedCard = card({ instanceId: 'old-role', name: 'Riverfolk' });
@@ -537,6 +540,32 @@ describe('game UI state mapper', () => {
       cards: [],
       hiddenCard: { deck: 'TREASURE', count: 1 },
       summary: 'Ada получил 1 карту сокровища в закрытую',
+    });
+  });
+  it('keeps a stolen equipped item focused through turn cleanup', () => {
+    const stolenItem = card({ instanceId: 'stolen-item', name: 'Brass Crown' });
+    const game = view({
+      phase: 'END_TURN',
+      players: [player(), player({ playerId: 'p2', name: 'Boris' })],
+      gameLog: [
+        {
+          sequence: 1,
+          turnNumber: 1,
+          phase: 'POST_DOOR',
+          type: 'EQUIPPED_ITEM_THEFT_ATTEMPTED',
+          visibility: 'PUBLIC',
+          playerId: 'p1',
+          targetPlayerId: 'p2',
+          card: stolenItem,
+          outcome: 'SUCCEEDED',
+        },
+      ],
+    });
+
+    expect(stageShowsCard(selectStage(game))).toBe(true);
+    expect(latestStageCardEvent(game)).toMatchObject({
+      cards: [stolenItem],
+      summary: 'Ada попытался забрать Brass Crown у Boris: успех',
     });
   });
   it('combines multiple same-deck draws into one visible card selection', () => {

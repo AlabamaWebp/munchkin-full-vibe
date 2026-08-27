@@ -64,8 +64,8 @@
   background: rgba(19, 13, 9, 0.72);
 }
 .brand button {
-  min-width: 2.55rem;
-  min-height: 2.55rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   border: 1px solid rgba(179, 126, 55, 0.64);
   border-radius: 0.48rem;
   color: var(--color-text-muted);
@@ -327,7 +327,7 @@
 }
 .color-picker button {
   display: flex;
-  min-height: 2.55rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.4rem;
   text-align: left;

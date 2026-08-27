@@ -672,3 +672,30 @@ than create card-specific workflows or Angular rule inference. Bounded random
 selection makes failure and deck-shortage behavior deterministic and atomic;
 serialized usage/events make reconnect reconstruct the same permissions and
 privacy.
+
+---
+
+## ADR-037 — Browser UI verification uses real projections and room-scoped QA state
+
+Automated frontend verification runs Playwright against real Angular and NestJS
+processes. Representative screens are reached through ordinary lobby/session
+actions and the existing development-only engine scenarios, with a room-scoped
+loader so parallel or previously created rooms cannot contaminate a fixture.
+The workflow records DOM geometry issues, a real Playwright ARIA snapshot plus
+separately measured boxes, and reviewed screenshots for each supported
+viewport. Runtime artifacts and reports live under `artifacts/ui/`; image
+baselines are updated only by an explicit command.
+
+Geometry annotations are narrow opt-in contracts for elements whose intent
+cannot be inferred safely: text/parent centering, parent containment,
+non-overlap, dynamic visual masking, and intentional clipping. Global checks
+remain limited to high-confidence failures such as fixed-root/page overflow,
+unreachable viewport geometry, invalid boxes, and undersized mobile controls.
+
+Reason:
+
+AI agents without vision need deterministic textual evidence about both
+semantics and layout, while pixel comparison remains useful for broader visual
+change detection. Reusing authoritative projections and QA scenarios prevents a
+second browser-side rules model, and explicit baseline updates prevent genuine
+regressions from being normalized automatically.

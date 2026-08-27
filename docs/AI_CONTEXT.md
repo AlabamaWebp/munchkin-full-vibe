@@ -1,6 +1,6 @@
 # Munchkin LAN — external AI context
 
-Updated: 2026-08-25
+Updated: 2026-08-27
 Repository commit: `f04e07814bb98e615d230892d58e47fe5cdfae1f`
 
 This is a compact planning context, not a substitute for repository inspection.
@@ -20,7 +20,8 @@ and tests. Treat code/tests as truth if a later branch changes the repository.
   Single-origin production packaging and broad real-device validation are still
   pending.
 - TypeScript throughout: Angular 22 frontend, NestJS 11 backend, Socket.IO 4,
-  npm workspaces, Jest/Vitest-style unit suites, and strict lint/build scripts.
+  npm workspaces, Jest/Vitest-style unit suites, strict lint/build scripts, and
+  Playwright UI verification that emits agent-readable JSON/Markdown artifacts.
 - NestJS listens on `0.0.0.0`. Today the Angular development server normally
   runs on port 4200 and connects to NestJS on port 3000. The backend does not
   yet serve the Angular production files, so the desired one-URL LAN deployment
@@ -91,6 +92,10 @@ current `AvailableIntentView`.
   theft targets, and Equipment upgrade hints are all intent/projection-driven.
   Card-instance pickers reuse artwork and Details while retaining valid local
   selection; never derive alternate targets or reveal hidden-hand candidates.
+- Browser UI verification uses real Angular/NestJS processes and room-scoped
+  existing development scenarios. Geometry audit, ARIA semantic maps with DOM
+  boxes, and per-viewport visual baselines live under `artifacts/ui/`; no mock
+  Angular legality or parallel browser rules state is used.
 
 ## Domain
 
@@ -229,6 +234,9 @@ current `AvailableIntentView`.
 - Keep Deck type separation, physical-card uniqueness, and atomic card draws.
 - Keep persistence explicitly in memory unless a product decision adds storage.
 - Add focused valid/invalid/edge tests for rule changes and preserve privacy tests.
+- After significant frontend changes, follow `AGENTS.md`: ordinary checks,
+  `ui:audit`, read `ui:report`, then `ui:visual`; add `ui:map` for structural
+  layout work and never refresh baselines only to make a check green.
 
 ## Current implementation status
 
@@ -257,6 +265,7 @@ Important incomplete/known areas:
 - Implemented rules overview: [GAME_RULES.md](GAME_RULES.md)
 - Intentional detailed V2 game/UI rules: [v2-game-design.md](v2-game-design.md)
 - UI visual contract: [ui/DESIGN.md](ui/DESIGN.md)
+- UI verification workflow: [UI_TESTING.md](UI_TESTING.md)
 - Architecture/product rationale: [DECISIONS.md](DECISIONS.md)
 - Current status and remaining plan: [STATUS.md](STATUS.md) and
   [ROADMAP.md](ROADMAP.md)

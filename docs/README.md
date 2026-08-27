@@ -28,6 +28,7 @@ implementation; “authoritative” states an intentional product/design contrac
 | [STATUS.md](STATUS.md)                                 | CURRENT                 | Working systems, known limits, and immediately next evidence to collect.                                  |
 | [ui/DESIGN.md](ui/DESIGN.md)                           | AUTHORITATIVE           | UI visual and responsive design contract.                                                                 |
 | [ui/combat-mobile.md](ui/combat-mobile.md)             | SUPPORTING              | Combat-screen model mapping and mobile layout guidance.                                                   |
+| [UI_TESTING.md](UI_TESTING.md)                         | CURRENT                 | Playwright geometry, semantic-map, and visual-regression workflow.                                        |
 | [AI_CONTEXT.md](AI_CONTEXT.md)                         | CURRENT                 | Compact repository context for external planning AIs.                                                     |
 | [v2-implementation-plan.md](v2-implementation-plan.md) | HISTORICAL              | How V2 was sequenced from its pre-schema-5 baseline.                                                      |
 | [v2-final-audit.md](v2-final-audit.md)                 | HISTORICAL              | The 2026-08-22 pre-release blocker snapshot.                                                              |

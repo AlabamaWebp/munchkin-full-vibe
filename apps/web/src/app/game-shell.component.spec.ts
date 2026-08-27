@@ -116,6 +116,7 @@ const combat = (
 describe('GameShellComponent', () => {
   let client: MockLobbyClient;
   beforeEach(async () => {
+    window.localStorage.removeItem('munchkin-lan:hand-preview-visible');
     client = new MockLobbyClient();
     await TestBed.configureTestingModule({
       imports: [GameShellComponent],
@@ -1019,6 +1020,27 @@ describe('GameShellComponent', () => {
     expect(root.querySelector('.full-hand-grid .with-details .facts')?.textContent).toContain('+3');
   });
 
+  it('lets the player hide the dock cards while keeping the Full Hand gateway', () => {
+    const fixture = render(
+      base({
+        self: { ...player({ handCount: 1 }), hand: [card({ instanceId: 'hidden-preview' })] },
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+
+    root.querySelector<HTMLButtonElement>('[aria-label="Открыть меню"]')!.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.menu-sheet .option-list button'))
+      .find((button) => button.textContent?.includes('Скрыть карты руки'))!
+      .click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.game-shell.hand-preview-hidden')).not.toBeNull();
+    expect(root.querySelector('app-hand-dock app-compact-game-card')).toBeNull();
+    expect(root.querySelector('.hand-menu')).not.toBeNull();
+    expect(window.localStorage.getItem('munchkin-lan:hand-preview-visible')).toBe('false');
+  });
+
   it('filters the full hand by card type and keeps combat to projected legal uses', () => {
     const combatBonus = card({
       instanceId: 'combat-bonus',
@@ -1501,10 +1523,14 @@ describe('GameShellComponent', () => {
     const actions = Array.from(
       root.querySelectorAll<HTMLButtonElement>('.card-detail-actions button'),
     );
-    expect(actions.some((button) => button.textContent?.includes('Сыграть за игроков'))).toBe(true);
-    actions.find((button) => button.textContent?.includes('Помочь монстру'))!.click();
+    expect(actions.some((button) => button.textContent?.includes('Применить к игрокам'))).toBe(
+      true,
+    );
+    actions.find((button) => button.textContent?.includes('Применить к монстру'))!.click();
     fixture.detectChanges();
-    expect(root.querySelector('#target-title')?.textContent).toContain('Помочь какому монстру');
+    expect(root.querySelector('#target-title')?.textContent).toContain(
+      'К какому монстру применить',
+    );
     expect(root.querySelectorAll('.picker-option-select')).toHaveLength(2);
   });
 

@@ -36,7 +36,7 @@ export function formatReactionCountdown(remainingMs: number): string {
               {{ combat.reactionWindow?.waitingPlayerIds?.length ?? 0 }}</span
             >
             @if (reactionCountdown(); as countdown) {
-              <small class="reaction-countdown">Осталось {{ countdown }}</small>
+              <small class="reaction-countdown" data-ui-dynamic>Осталось {{ countdown }}</small>
             }
             @if (
               !viewerMustReact() &&
@@ -440,7 +440,7 @@ export function formatReactionCountdown(remainingMs: number): string {
       justify-self: center;
       max-width: 100%;
       max-height: 100%;
-      min-width: 0;
+      min-width: 2.75rem;
       min-height: 0;
       place-items: center;
       padding: 0;

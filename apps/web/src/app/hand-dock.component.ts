@@ -8,7 +8,7 @@ import { unavailableReason } from './game-ui.model';
   imports: [CompactGameCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="hand-dock" aria-label="Ваша рука">
+    <section class="hand-dock" [class.preview-hidden]="!previewVisible()" aria-label="Ваша рука">
       <div class="hand-header">
         <button type="button" class="character-summary" (click)="characterOpened.emit()">
           <span class="summary-identity">
@@ -45,20 +45,23 @@ import { unavailableReason } from './game-ui.model';
           Рука {{ game().self.hand.length }}/{{ game().config?.maxHandSize ?? 5 }}
         </button>
       </div>
-      <div class="cards">
-        @for (card of preview(); track card.instanceId) {
-          <app-compact-game-card
-            [card]="card"
-            [cardName]="cardName()"
-            [playable]="playableIds().includes(card.instanceId)"
-            [upgrade]="card.permanentCombatUpgrade === true"
-            [reason]="reason(card)"
-            (activated)="cardActivated.emit($event)"
-          />
+      @if (previewVisible()) {
+        @if (game().self.hand.length > 0) {
+          <div class="cards">
+            @for (card of preview(); track card.instanceId) {
+              <app-compact-game-card
+                [card]="card"
+                [cardName]="cardName()"
+                [playable]="playableIds().includes(card.instanceId)"
+                [upgrade]="card.permanentCombatUpgrade === true"
+                [reason]="reason(card)"
+                (activated)="cardActivated.emit($event)"
+              />
+            }
+          </div>
+        } @else {
+          <span class="empty">Рука пуста</span>
         }
-      </div>
-      @if (game().self.hand.length === 0) {
-        <span class="empty">Рука пуста</span>
       }
     </section>
   `,
@@ -74,6 +77,9 @@ import { unavailableReason } from './game-ui.model';
       height: 100%;
       min-height: 0;
       overflow: hidden;
+    }
+    .hand-dock.preview-hidden {
+      grid-template-rows: minmax(0, 1fr);
     }
     .hand-header {
       display: grid;
@@ -307,6 +313,7 @@ export class HandDockComponent {
   readonly game = input.required<GameView>();
   readonly playableIds = input.required<readonly string[]>();
   readonly cardName = input.required<(card: GameCardView) => string>();
+  readonly previewVisible = input(true);
   readonly cardActivated = output<GameCardView>();
   readonly characterOpened = output<void>();
   readonly fullHandOpened = output<void>();

@@ -13,7 +13,7 @@
     max(var(--scene-gutter), env(safe-area-inset-right))
     max(var(--scene-gutter), env(safe-area-inset-bottom))
     max(var(--scene-gutter), env(safe-area-inset-left));
-  grid-template-rows: 5.5rem 3rem minmax(0, 1fr) 3.5rem 8.5rem;
+  grid-template-rows: 5.5rem 3rem minmax(0, 1fr) 3.5rem 9rem;
   gap: var(--space-1);
   overflow: hidden;
   background:
@@ -23,6 +23,9 @@
     url('/assets/background/game.png') center / cover no-repeat,
     #17100b;
   isolation: isolate;
+}
+.game-shell.hand-preview-hidden {
+  grid-template-rows: 5.5rem 3rem minmax(0, 1fr) 3.5rem 2.75rem;
 }
 app-player-hud,
 app-recent-events,
@@ -888,6 +891,16 @@ select:focus-visible {
       'events'
       'stage';
   }
+  .game-shell.hand-preview-hidden:not(.finished) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 5.5rem 3rem minmax(0, 1fr) 3.75rem 2.75rem;
+    grid-template-areas:
+      'hud'
+      'events'
+      'stage'
+      'actions'
+      'hand';
+  }
 }
 @media (max-width: 47.999rem) {
   .game-shell.finished {
@@ -900,8 +913,11 @@ select:focus-visible {
 }
 @media (max-height: 42rem) {
   .game-shell {
-    grid-template-rows: 5.5rem 2.75rem minmax(0, 1fr) 3.25rem 8.25rem;
+    grid-template-rows: 5.5rem 2.75rem minmax(0, 1fr) 3.25rem 8.75rem;
     gap: 0.2rem;
+  }
+  .game-shell.hand-preview-hidden {
+    grid-template-rows: 5.5rem 2.75rem minmax(0, 1fr) 3.25rem 2.75rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -137,6 +137,15 @@ horizontally scrollable rails where needed. Display-only arithmetic such as a
 shown power difference is allowed; changing state or deciding that a card is
 legal is not.
 
+Playwright exercises the real Angular and NestJS processes through the same
+Socket.IO flow as a browser. It opens deterministic room-scoped development
+scenarios already backed by engine state, then produces geometry issues,
+ARIA-based semantic maps with DOM boxes, and per-viewport visual comparisons.
+This is a verification boundary only: it does not add a client rules model or a
+parallel E2E state representation. Generated outputs live under
+`artifacts/ui/`; reviewed per-viewport image baselines are the only committed
+artifacts in that tree.
+
 ## Quality boundaries
 
 - Keep rules and state transitions in `packages/game-engine` with deterministic
@@ -146,5 +155,7 @@ legal is not.
 - Keep NestJS responsible for identity/session/transport and projections, not
   for duplicated rules.
 - Keep production in memory until persistence is explicitly requested.
+- Keep browser verification on the real projections and development scenarios;
+  do not mock projected legality in Angular or duplicate engine fixtures there.
 - Do not add accounts, a database, Redis, SSR, GraphQL, NgRx, Nx, or a second
   rules implementation without an explicit product decision.

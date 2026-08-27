@@ -75,6 +75,16 @@ interface TargetPickerState {
   >[];
 }
 
+const HAND_PREVIEW_STORAGE_KEY = 'munchkin-lan:hand-preview-visible';
+
+function readHandPreviewVisible(): boolean {
+  try {
+    return window.localStorage.getItem(HAND_PREVIEW_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 interface CardUse {
   readonly label: string;
   readonly command?: GameClientCommand;
@@ -99,7 +109,12 @@ interface CardUse {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <main class="game-shell" [class.finished]="stage() === 'FINISHED'" aria-label="Игровой стол">
+    <main
+      class="game-shell"
+      [class.finished]="stage() === 'FINISHED'"
+      [class.hand-preview-hidden]="!handPreviewVisible()"
+      aria-label="Игровой стол"
+    >
       <app-player-hud
         [game]="game()"
         [connection]="connectionState()"
@@ -135,6 +150,7 @@ interface CardUse {
         [game]="game()"
         [playableIds]="playableIds()"
         [cardName]="displayCardName"
+        [previewVisible]="handPreviewVisible()"
         (cardActivated)="activateCard($event)"
         (characterOpened)="selectedPlayerId.set(game().viewerPlayerId)"
         (fullHandOpened)="openFullHand()"
@@ -159,7 +175,7 @@ interface CardUse {
               <div>
                 <small>ОТВЕТ НА ПРОКЛЯТИЕ</small>
                 <h2>{{ cardName(response.curseCard) }}</h2>
-                <time>до {{ deadlineLabel(response.expiresAtEpochMs) }}</time>
+                <time data-ui-dynamic>до {{ deadlineLabel(response.expiresAtEpochMs) }}</time>
               </div>
             </header>
             @if (response.playerId === game().viewerPlayerId) {
@@ -212,11 +228,11 @@ interface CardUse {
                   {{ decision.type === 'DISCARD_CARDS' ? 'Выберите карты' : 'Оставьте одну роль' }}
                 </h2>
                 @if (decision.type === 'DISCARD_CARDS' && discardCountdown(); as countdown) {
-                  <time class="decision-countdown" aria-live="polite"
+                  <time class="decision-countdown" data-ui-dynamic aria-live="polite"
                     >Осталось {{ countdown }}</time
                   >
                 } @else {
-                  <time>до {{ deadlineLabel(decision.expiresAtEpochMs) }}</time>
+                  <time data-ui-dynamic>до {{ deadlineLabel(decision.expiresAtEpochMs) }}</time>
                 }
               </div>
             </header>
@@ -556,7 +572,7 @@ interface CardUse {
                   <b>{{ offer.treasureCount }} / {{ combatTreasureReward() }}</b>
                 </p>
                 <p>
-                  <time>Ответ до {{ deadlineLabel(offer.expiresAtEpochMs) }}</time>
+                  <time data-ui-dynamic>Ответ до {{ deadlineLabel(offer.expiresAtEpochMs) }}</time>
                 </p>
                 @if (hasIntent('ACCEPT_HELP_OFFER')) {
                   <button class="primary" type="button" (click)="sendAction('ACCEPT_HELP_OFFER')">
@@ -923,6 +939,9 @@ interface CardUse {
             <div class="sheet-scroll option-list">
               <button type="button" (click)="toggleLocale()">
                 Язык: {{ locale() === 'ru' ? 'Русский' : 'English' }}
+              </button>
+              <button type="button" (click)="toggleHandPreview()">
+                {{ handPreviewVisible() ? 'Скрыть карты руки' : 'Показать карты руки' }}
               </button>
               @if (game().status === 'FINISHED' && isHost()) {
                 <button type="button" (click)="rematch()">Играть снова</button
@@ -1341,6 +1360,7 @@ export class GameShellComponent {
   protected readonly breakdownOpen = signal(false);
   protected readonly helpOpen = signal(false);
   protected readonly menuOpen = signal(false);
+  protected readonly handPreviewVisible = signal(readHandPreviewVisible());
   protected readonly saleOpen = signal(false);
   protected readonly charityOpen = signal(false);
   protected readonly handFilter = signal<(typeof this.handFilters)[number]['id']>('ALL');
@@ -2165,6 +2185,15 @@ export class GameShellComponent {
   protected toggleLocale(): void {
     this.localization.setLocale(this.locale() === 'ru' ? 'en' : 'ru');
   }
+  protected toggleHandPreview(): void {
+    const visible = !this.handPreviewVisible();
+    this.handPreviewVisible.set(visible);
+    try {
+      window.localStorage.setItem(HAND_PREVIEW_STORAGE_KEY, String(visible));
+    } catch {
+      // Keep the in-memory preference when browser storage is unavailable.
+    }
+  }
   protected async toggleFullscreen(): Promise<void> {
     if (!this.fullscreenSupported) return;
     if (document.fullscreenElement === null) await document.documentElement.requestFullscreen();
@@ -2543,7 +2572,7 @@ export class GameShellComponent {
     }
     if (playerSideIntent)
       uses.push({
-        label: 'Сыграть за игроков',
+        label: 'Применить к игрокам',
         command: {
           type: 'PLAY_CARD',
           cardId: card.instanceId,
@@ -2557,8 +2586,8 @@ export class GameShellComponent {
       const supportsEitherSide = card.play?.target === 'COMBAT_SIDE';
       uses.push(
         this.useWithTargets(
-          supportsEitherSide ? 'Помочь монстру' : 'Сыграть на монстра',
-          supportsEitherSide ? 'Помочь какому монстру?' : 'Выберите монстра',
+          supportsEitherSide ? 'Применить к монстру' : 'Сыграть на монстра',
+          supportsEitherSide ? 'К какому монстру применить?' : 'Выберите монстра',
           card,
           'MONSTER',
           monsterIntents.map((intent) => ({

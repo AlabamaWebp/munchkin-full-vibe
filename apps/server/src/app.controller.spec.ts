@@ -5,19 +5,23 @@ import { GameService } from './game/game.service';
 
 describe('AppController', () => {
   let appController: AppController;
+  const gameService = {
+    developmentRoomCodes: jest.fn<() => readonly string[]>(),
+    stateForDevelopment: jest.fn(),
+    replaceForDevelopment: jest.fn(),
+  };
 
   beforeEach(async () => {
+    gameService.developmentRoomCodes.mockReturnValue([]);
+    gameService.stateForDevelopment.mockReturnValue(null);
+    gameService.replaceForDevelopment.mockReturnValue(false);
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
         AppService,
         {
           provide: GameService,
-          useValue: {
-            developmentRoomCodes: () => [],
-            stateForDevelopment: () => null,
-            replaceForDevelopment: () => false,
-          },
+          useValue: gameService,
         },
       ],
     }).compile();
@@ -34,6 +38,15 @@ describe('AppController', () => {
         serverConnection: 'game-ready',
         gameplay: 'game-completion-ready',
       });
+    });
+  });
+
+  describe('development scenarios', () => {
+    it('keeps the room-scoped loader unavailable without a matching game', () => {
+      expect(() =>
+        appController.loadDevelopmentScenarioForRoom('abcd', 'reaction'),
+      ).toThrow();
+      expect(gameService.stateForDevelopment).toHaveBeenCalledWith('ABCD');
     });
   });
 });

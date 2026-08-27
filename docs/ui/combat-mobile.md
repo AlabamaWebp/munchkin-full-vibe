@@ -91,9 +91,10 @@ Use `100dvh` minus safe-area padding. The encounter stage receives all remaining
 height through `minmax(0, 1fr)`. The recent-events strip shows the newest
 authoritative summaries (up to three of them, excluding whatever the stage card
 already explains) in one compact area and opens complete history on tap. The hand
-rail shares a compact own-character utility row and is always visible on mobile;
-it scrolls horizontally with height-derived `3:4` cards instead of squeezing the
-whole hand into equal columns. Focused encounter and event cards are capped by
+rail shares a compact own-character utility row and scrolls horizontally with
+height-derived `3:4` cards instead of squeezing the whole hand into equal columns.
+A local menu preference may hide only the artwork rail; the character row and Full
+Hand gateway remain visible while Stage receives the released height. Focused encounter and event cards are capped by
 both available Stage space and a readable maximum, so a taller viewport adds
 breathing room rather than stretching artwork. At compact heights, remove
 decorative padding and secondary copy while retaining mandatory facts, a readable

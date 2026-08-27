@@ -96,7 +96,11 @@ describe('GameStageComponent', () => {
       'Silver Cloak',
     );
 
-    fixture.componentRef.setInput('game', { ...currentGame, phase: 'TURN_START' });
+    fixture.componentRef.setInput('game', {
+      ...currentGame,
+      phase: 'TURN_START',
+      turnNumber: currentGame.turnNumber + 1,
+    });
     fixture.componentRef.setInput('stage', 'TURN_READY');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.card-event')).toBeNull();
@@ -184,7 +188,7 @@ describe('GameStageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Hallway Minotaur');
   });
 
-  it('prioritizes the cleanup decision over a previous simultaneous reward', async () => {
+  it('keeps the latest simultaneous reward visible through cleanup', async () => {
     await TestBed.configureTestingModule({ imports: [GameStageComponent] }).compileComponents();
     const fixture = TestBed.createComponent(GameStageComponent);
     const ownTreasure = card('own-treasure', 'Copper Compass');
@@ -217,9 +221,10 @@ describe('GameStageComponent', () => {
     fixture.componentRef.setInput('stage', 'TURN_CLEANUP');
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.receipt-tabs')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.event-card')).toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Можно завершать ход');
+    expect(fixture.nativeElement.querySelector('.receipt-tabs')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.event-card h3')?.textContent).toContain(
+      'Copper Compass',
+    );
   });
 
   it('shows all cards from one utility draw in the card selector', async () => {

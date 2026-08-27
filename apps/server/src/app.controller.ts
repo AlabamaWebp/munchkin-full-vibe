@@ -55,4 +55,28 @@ export class AppController {
     }
     return { loaded, phase };
   }
+
+  /** Room-scoped variant used by isolated browser automation. */
+  @Post('development/room/:roomCode/scenario/:scenario')
+  loadDevelopmentScenarioForRoom(
+    @Param('roomCode') roomCode: string,
+    @Param('scenario') scenario: string,
+  ): { loaded: boolean; phase: string | null } {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      !DEVELOPMENT_SCENARIOS.includes(scenario as DevelopmentScenario)
+    )
+      throw new NotFoundException();
+    const state = this.gameService.stateForDevelopment(roomCode.toUpperCase());
+    if (state === null) throw new NotFoundException();
+    const replacement = createDevelopmentScenario(
+      state,
+      scenario as DevelopmentScenario,
+    );
+    const loaded = this.gameService.replaceForDevelopment(
+      roomCode.toUpperCase(),
+      replacement,
+    );
+    return { loaded, phase: loaded ? replacement.phase : null };
+  }
 }

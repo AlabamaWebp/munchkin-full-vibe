@@ -9,3 +9,9 @@ Thumbs.db
 .idea/
 .vscode/
 todo
+artifacts/ui/audit/
+artifacts/ui/map/
+artifacts/ui/playwright-report/
+artifacts/ui/test-results/
+artifacts/ui/report.json
+artifacts/ui/report.md

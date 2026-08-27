@@ -70,11 +70,9 @@ export function compactCardFacts(card: GameCardView): readonly string[] {
   return [labels[card.type] ?? 'Карта', combatValue, price === undefined ? '—' : `${price}`];
 }
 
-/** Card receipts remain a stage focus until the turn enters cleanup. */
+/** Card receipts remain a stage focus through cleanup, until the turn advances. */
 export function stageShowsCard(stage: GameStageKind): boolean {
-  return (
-    stage !== 'TURN_CLEANUP' && ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE'].includes(stage)
-  );
+  return ['TURN_READY', 'DOOR_REVEAL', 'POST_DOOR_CHOICE', 'TURN_CLEANUP'].includes(stage);
 }
 
 export function selectStage(game: GameView): GameStageKind {
@@ -95,7 +93,6 @@ export function latestStageCardEvent(game: GameView): StageCardEvent | null {
     .reverse()
     .find(
       (candidate) =>
-        candidate.phase === game.phase &&
         candidate.turnNumber === game.turnNumber &&
         candidate.type !== 'CARDS_DEALT' &&
         (candidate.card !== undefined ||

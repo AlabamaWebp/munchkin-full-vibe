@@ -237,6 +237,10 @@ moved to Details, but mandatory focused facts such as current strength, reward,
 and concise Bad Stuff remain fully visible. Blocking workflows use the existing
 modal/focus-trap path so they survive reconnect without ambiguity.
 
+The latest meaningful card event remains focused across phase changes within the
+same turn, including cleanup, so trades, theft and rewards do not flash away during
+the following state projection. A new turn clears that focus.
+
 ### Action dock
 
 Renders only actions represented by `availableIntents` or a gateway to cards
@@ -263,12 +267,15 @@ Shows the viewer's private `self.hand`, with currently playable cards first.
 Cards retain their identity and readable category. The dock may scroll
 horizontally; it must not squeeze five cards into unreadable equal-width columns.
 The full-hand sheet remains the route to filtering, sale, charity, and detailed
-selection workflows.
+selection workflows. The menu may hide the artwork rail as a local preference;
+the compact character row and Full Hand gateway remain visible, and Stage receives
+the released height.
 
 Card Details renders server-projected typed effects, timing, targets,
 conditions/modifiers, role abilities and a duration category. Flavor copy may
 remain, but it cannot be the sole gameplay explanation. A side-neutral combat
-card presents separate “players” and exact named-Monster choices. An active role
+card presents neutral “apply to players” and exact named-Monster choices; labels
+must not imply that a signed modifier necessarily helps either side. An active role
 opens a bounded cost-card picker sourced only from its `AvailableIntentView`.
 The combat-hand category is likewise the set of cards with a current projected
 combat intent, never a client-maintained type list. Equipment cards carry a
