@@ -1,5 +1,6 @@
 import type { GameCardView, GamePlayerView, GameView } from '@munchkin-lan/contracts';
 import {
+  compactCardFacts,
   latestStageCardEvent,
   presentEvents,
   selectStage,
@@ -100,6 +101,16 @@ const combat = {
 } as NonNullable<GameView['combat']>;
 
 describe('game UI state mapper', () => {
+  it('builds the shared compact card facts from projected card data', () => {
+    expect(
+      compactCardFacts(
+        card({
+          equipment: { slot: 'HANDS', hands: 1, combatBonus: 3, restrictions: [], value: 400 },
+        }),
+      ),
+    ).toEqual(['Снар.', '+3', '400']);
+    expect(compactCardFacts(monster)).toEqual(['Монстр', 'Сила 3', '—']);
+  });
   it.each([
     ['TURN_START', 'TURN_READY'],
     ['KICK_DOOR', 'TURN_READY'],

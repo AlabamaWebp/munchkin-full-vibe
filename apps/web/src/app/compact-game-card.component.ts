@@ -23,7 +23,7 @@ import { CardArtworkComponent } from './card-artwork.component';
         <app-card-artwork [artKey]="card().artKey" [label]="displayName()" [compact]="true" />
         <strong>{{ displayName() }}</strong>
         @if (upgrade()) {
-          <span class="upgrade-badge">Постоянное усиление</span>
+          <span class="upgrade-badge" aria-hidden="true">↑</span>
         }
         @if (showDetails()) {
           @if (details().length > 0) {
@@ -79,17 +79,21 @@ import { CardArtworkComponent } from './card-artwork.component';
       position: absolute;
       z-index: 1;
       right: 0.35rem;
-      bottom: 0.35rem;
-      left: 0.35rem;
-      padding: 0.2rem 0.35rem;
-      border: 0;
-      border-radius: 999px;
+      top: 0.35rem;
+      display: grid;
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+      place-items: center;
+      border: 1px solid rgba(205, 255, 236, 0.72);
+      border-radius: 50%;
       color: #e6fff4;
       background: #1c6954;
       font-family: var(--ui-sans);
-      font-size: 0.75rem;
-      text-align: center;
+      font-size: 0.95rem;
       font-weight: 900;
+      line-height: 1;
+      box-shadow: 0 0.12rem 0.3rem rgba(0, 0, 0, 0.45);
     }
     .card-action {
       display: grid;
@@ -103,9 +107,6 @@ import { CardArtworkComponent } from './card-artwork.component';
       color: #f5f8f6;
       background: transparent;
       text-align: left;
-    }
-    article.upgrade .card-action {
-      padding-bottom: 1.75rem;
     }
     article.with-details .card-action {
       min-height: 12rem;
@@ -163,30 +164,11 @@ import { CardArtworkComponent } from './card-artwork.component';
     :host-context(.hand-dock) strong {
       display: none;
     }
-    :host-context(.hand-dock) article.upgrade .card-action {
-      padding-bottom: 0.12rem;
-    }
     :host-context(.hand-dock) .upgrade-badge {
+      top: 0.25rem;
       right: 0.25rem;
-      bottom: 0.25rem;
-      left: auto;
       width: 1.25rem;
       height: 1.25rem;
-      padding: 0;
-      overflow: hidden;
-      border: 1px solid rgba(205, 255, 236, 0.72);
-      border-radius: 50%;
-      color: transparent;
-      font-size: 0;
-      box-shadow: 0 0.12rem 0.3rem rgba(0, 0, 0, 0.45);
-    }
-    :host-context(.hand-dock) .upgrade-badge::after {
-      display: grid;
-      width: 100%;
-      height: 100%;
-      place-items: center;
-      color: #e6fff4;
-      content: '↑';
       font-size: 0.82rem;
     }
     :host-context(.hand-dock) .facts span {
@@ -214,7 +196,8 @@ export class CompactGameCardComponent {
   readonly activated = output<GameCardView>();
 
   protected ariaLabel(): string {
-    return `${this.displayName()}. ${this.playable() ? 'Доступно сейчас' : this.reason()}`;
+    const upgrade = this.upgrade() ? '. Постоянное усиление' : '';
+    return `${this.displayName()}. ${this.playable() ? 'Доступно сейчас' : this.reason()}${upgrade}`;
   }
   protected displayName(): string {
     return this.cardName()(this.card());

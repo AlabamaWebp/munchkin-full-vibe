@@ -1098,12 +1098,11 @@ describe('GameShellComponent', () => {
     });
     const fixture = render(base({ self: { ...player({ handCount: 1 }), hand: [upgrade] } }));
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelector('app-hand-dock .upgrade-badge')?.textContent).toContain(
-      'Постоянное усиление',
-    );
+    expect(root.querySelector('app-hand-dock .upgrade-badge')?.textContent).toBe('↑');
     root.querySelector<HTMLButtonElement>('.hand-menu')!.click();
     fixture.detectChanges();
-    expect(root.querySelector('.full-hand-grid .upgrade-badge')).not.toBeNull();
+    expect(root.querySelector('.full-hand-grid .upgrade-badge')?.textContent).toBe('↑');
+    expect(root.querySelector('.full-hand-grid')?.textContent).not.toContain('Постоянное усиление');
   });
 
   it('hides unused companion and role-permission slots from a Core-only match', () => {

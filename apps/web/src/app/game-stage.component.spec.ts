@@ -78,6 +78,14 @@ describe('GameStageComponent', () => {
     expect(fixture.nativeElement.querySelector('.event-card h3')?.textContent).toContain(
       'Brass Greaves',
     );
+    expect(fixture.nativeElement.querySelector('.event-summary')?.textContent).not.toContain(
+      'Brass Greaves',
+    );
+    expect(
+      [...fixture.nativeElement.querySelectorAll('.event-card-facts span')].map((fact) =>
+        fact.textContent.trim(),
+      ),
+    ).toEqual(['Снар.', '—', '—']);
 
     const choices = fixture.nativeElement.querySelectorAll(
       '.card-tabs button',

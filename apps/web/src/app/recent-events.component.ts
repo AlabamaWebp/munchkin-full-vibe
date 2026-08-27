@@ -39,7 +39,7 @@ import type { PresentedEvent } from './game-ui.model';
       height: 100%;
       min-height: 2.75rem;
       padding: 0.2rem 0.45rem;
-      grid-template-columns: 4.25rem minmax(0, 1fr);
+      grid-template-columns: max-content minmax(0, 1fr);
       align-items: center;
       gap: var(--space-1);
       overflow: hidden;
@@ -53,15 +53,12 @@ import type { PresentedEvent } from './game-ui.model';
     }
     .title {
       flex: 0 0 auto;
-      min-width: 0;
-      overflow: hidden;
       color: #bfae91;
       font-family: var(--ui-sans);
       font-size: 0.68rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       line-height: 1;
-      text-overflow: ellipsis;
       white-space: nowrap;
     }
     .event-list {
@@ -119,7 +116,6 @@ import type { PresentedEvent } from './game-ui.model';
         padding-block: 0.18rem;
       }
       .title {
-        padding-inline: 0.3rem;
         font-size: 0.68rem;
       }
       .event-row,

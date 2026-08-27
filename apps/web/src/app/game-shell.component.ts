@@ -29,6 +29,7 @@ import { EquipmentLayoutComponent } from './equipment-layout.component';
 import { FocusTrapDirective } from './focus-trap.directive';
 import { GameStageComponent } from './game-stage.component';
 import {
+  compactCardFacts,
   presentEvents,
   selectStage,
   stageExplainedEventSequences,
@@ -2100,37 +2101,7 @@ export class GameShellComponent {
     return `${cost}, дать ${ability.amount >= 0 ? '+' : ''}${ability.amount} стороне игроков; один раз за бой`;
   }
   protected compactHandFacts(card: GameCardView): readonly string[] {
-    const effectBonus = card.effects.flatMap((effect) => {
-      switch (effect.type) {
-        case 'COMBAT_BONUS':
-        case 'COMBAT_SIDE_BONUS':
-        case 'MONSTER_COMBAT_BONUS':
-          return [effect.amount];
-        default:
-          return [];
-      }
-    })[0];
-    const bonus = card.equipment?.combatBonus ?? effectBonus;
-    const combatValue = card.monster
-      ? `Сила ${card.monster.strength ?? card.monster.level ?? 0}`
-      : bonus === undefined
-        ? '—'
-        : `${bonus >= 0 ? '+' : ''}${bonus}`;
-    const price = card.goldValue ?? card.equipment?.value;
-    return [this.compactCardType(card), combatValue, price === undefined ? '—' : `${price}`];
-  }
-  private compactCardType(card: GameCardView): string {
-    const labels: Partial<Record<GameCardView['type'], string>> = {
-      EQUIPMENT: 'Снар.',
-      TEMPORARY_BONUS: 'Бонус',
-      MONSTER: 'Монстр',
-      CURSE: 'Прокл.',
-      COMBAT_CURSE: 'Бой. прокл.',
-      CLASS: 'Класс',
-      RACE: 'Раса',
-      ROLE_PERMISSION: 'Роль',
-    };
-    return labels[card.type] ?? 'Карта';
+    return compactCardFacts(card);
   }
   private slotLabel(slot: NonNullable<GameCardView['equipment']>['slot']): string {
     return ({ HEAD: 'голова', BODY: 'тело', FEET: 'ноги', HANDS: 'руки' } as const)[slot];

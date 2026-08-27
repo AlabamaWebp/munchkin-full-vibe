@@ -37,6 +37,39 @@ export interface StageCardReceipt {
   readonly summary: string;
 }
 
+/** Compact, presentation-only facts shared by hand previews and focused table cards. */
+export function compactCardFacts(card: GameCardView): readonly string[] {
+  const effectBonus = card.effects.flatMap((effect) => {
+    switch (effect.type) {
+      case 'COMBAT_BONUS':
+      case 'COMBAT_SIDE_BONUS':
+      case 'MONSTER_COMBAT_BONUS':
+        return [effect.amount];
+      default:
+        return [];
+    }
+  })[0];
+  const bonus = card.equipment?.combatBonus ?? effectBonus;
+  const combatValue = card.monster
+    ? `Сила ${card.monster.strength ?? card.monster.level ?? 0}`
+    : bonus === undefined
+      ? '—'
+      : `${bonus >= 0 ? '+' : ''}${bonus}`;
+  const price = card.goldValue ?? card.equipment?.value;
+  const labels: Partial<Record<GameCardView['type'], string>> = {
+    EQUIPMENT: 'Снар.',
+    TEMPORARY_BONUS: 'Бонус',
+    MONSTER: 'Монстр',
+    CURSE: 'Прокл.',
+    COMBAT_CURSE: 'Бой. прокл.',
+    CLASS: 'Класс',
+    RACE: 'Раса',
+    ROLE_PERMISSION: 'Роль',
+  };
+
+  return [labels[card.type] ?? 'Карта', combatValue, price === undefined ? '—' : `${price}`];
+}
+
 /** Card receipts remain a stage focus until the turn enters cleanup. */
 export function stageShowsCard(stage: GameStageKind): boolean {
   return (

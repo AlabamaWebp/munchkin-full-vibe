@@ -12,7 +12,7 @@ import type { GameCardView, GameView } from '@munchkin-lan/contracts';
 import { CardArtworkComponent } from './card-artwork.component';
 import { CombatStageComponent } from './combat-stage.component';
 import type { GameStageKind, StageCardReceipt } from './game-ui.model';
-import { latestStageCardEvent, stageShowsCard } from './game-ui.model';
+import { compactCardFacts, latestStageCardEvent, stageShowsCard } from './game-ui.model';
 import { LocalizationService } from './localization';
 import { motionClass } from './motion';
 
@@ -94,6 +94,11 @@ import { motionClass } from './motion';
                       [compact]="true"
                     />
                   </button>
+                  <div class="event-card-facts" aria-label="Краткая сводка">
+                    @for (fact of cardFacts(focused); track $index) {
+                      <span>{{ fact }}</span>
+                    }
+                  </div>
                   <p>{{ cardDescription(focused) }}</p>
                 </article>
               }
@@ -489,11 +494,14 @@ import { motionClass } from './motion';
       color: #ffe8b3;
     }
     .event-summary {
+      display: -webkit-box;
       width: 100%;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.05;
       text-align: center;
+      white-space: normal;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
     }
     .event-card {
       display: grid;
@@ -503,7 +511,7 @@ import { motionClass } from './motion';
       height: min(100%, 23rem);
       max-height: min(100%, 23rem);
       padding: 0.38rem;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      grid-template-rows: auto minmax(0, 1fr) auto auto;
       justify-self: center;
       gap: 0.28rem;
       overflow: hidden;
@@ -589,6 +597,30 @@ import { motionClass } from './motion';
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
     }
+    .event-card-facts {
+      display: grid;
+      min-width: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: hidden;
+      border: 1px solid rgba(214, 177, 104, 0.42);
+      border-radius: 0.42rem;
+      background: rgba(10, 8, 6, 0.58);
+    }
+    .event-card-facts span {
+      min-width: 0;
+      padding: 0.2rem 0.16rem;
+      overflow: hidden;
+      color: #f2dfb2;
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1.1;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .event-card-facts span + span {
+      border-left: 1px solid rgba(214, 177, 104, 0.28);
+    }
     .attempts {
       display: grid;
       max-height: min(12rem, 100%);
@@ -624,6 +656,9 @@ import { motionClass } from './motion';
       .results-list {
         margin-block: 0.15rem;
         gap: 0.15rem;
+      }
+      .event-card > p {
+        display: none;
       }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -714,9 +749,14 @@ export class GameStageComponent {
   protected cardDescription(card: GameCardView): string {
     return this.localization.cardDescription(card);
   }
+  protected cardFacts(card: GameCardView): readonly string[] {
+    return compactCardFacts(card);
+  }
   protected stageSummary(summary: string, cards: readonly GameCardView[]): string {
+    const cardWord = cards.length > 1 ? 'карты' : 'карту';
     return cards.reduce(
-      (translated, card) => translated.replaceAll(card.name, this.cardName(card)),
+      (shortSummary, card) =>
+        shortSummary.replaceAll(card.name, cardWord).replaceAll(this.cardName(card), cardWord),
       summary || 'Карточное действие',
     );
   }
